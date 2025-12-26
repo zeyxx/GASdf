@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: gasdf
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: HELIUS_API_KEY
+        sync: false
+      - key: RPC_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: gasdf-redis
+          type: redis
+          property: connectionString
+      - key: FEE_PAYER_PRIVATE_KEY
+        sync: false
+      - key: ASDF_MINT
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  - type: redis
+    name: gasdf-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru

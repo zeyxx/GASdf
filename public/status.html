@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GASdf Status</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #222;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    h1 a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .status-badge.ok {
+      background: rgba(0, 255, 136, 0.1);
+      color: #00ff88;
+    }
+
+    .status-badge.degraded {
+      background: rgba(255, 170, 0, 0.1);
+      color: #ffaa00;
+    }
+
+    .status-badge.unhealthy {
+      background: rgba(255, 107, 107, 0.1);
+      color: #ff6b6b;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.ok { background: #00ff88; }
+    .status-dot.degraded { background: #ffaa00; }
+    .status-dot.unhealthy { background: #ff6b6b; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .section {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+
+    .check-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .check-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #0a0a0a;
+      border-radius: 8px;
+    }
+
+    .check-name {
+      font-weight: 500;
+    }
+
+    .check-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .check-status-icon {
+      font-size: 1.1rem;
+    }
+
+    .check-status-icon.ok { color: #00ff88; }
+    .check-status-icon.warning { color: #ffaa00; }
+    .check-status-icon.error { color: #ff6b6b; }
+
+    .check-details {
+      color: #666;
+      font-size: 0.85rem;
+    }
+
+    .payer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .payer-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      background: #1a1a1a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .payer-pubkey {
+      font-family: monospace;
+      color: #888;
+    }
+
+    .payer-balance {
+      font-weight: 500;
+    }
+
+    .payer-balance.ok { color: #00ff88; }
+    .payer-balance.warning { color: #ffaa00; }
+    .payer-balance.critical { color: #ff6b6b; }
+
+    .breaker-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .breaker-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      background: #1a1a1a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .breaker-state {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .breaker-state.closed {
+      background: rgba(0, 255, 136, 0.1);
+      color: #00ff88;
+    }
+
+    .breaker-state.open {
+      background: rgba(255, 107, 107, 0.1);
+      color: #ff6b6b;
+    }
+
+    .breaker-state.half-open {
+      background: rgba(255, 170, 0, 0.1);
+      color: #ffaa00;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 1rem;
+      background: #0a0a0a;
+      border-radius: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #00ff88;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #666;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    .alert-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: #1a1a1a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .alert-severity {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .alert-severity.critical {
+      background: rgba(255, 107, 107, 0.1);
+      color: #ff6b6b;
+    }
+
+    .alert-severity.warning {
+      background: rgba(255, 170, 0, 0.1);
+      color: #ffaa00;
+    }
+
+    .alert-severity.info {
+      background: rgba(100, 181, 246, 0.1);
+      color: #64b5f6;
+    }
+
+    .alert-content {
+      flex: 1;
+    }
+
+    .alert-title {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .alert-message {
+      color: #888;
+    }
+
+    .alert-time {
+      color: #555;
+      font-size: 0.75rem;
+    }
+
+    .no-alerts {
+      color: #666;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    .last-updated {
+      text-align: center;
+      color: #444;
+      font-size: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    .meta-info {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><a href="/">GASdf Status</a></h1>
+      <div class="status-badge" id="overallStatus">
+        <span class="status-dot"></span>
+        <span>Loading...</span>
+      </div>
+    </header>
+
+    <div class="meta-info">
+      <span>Environment: <strong id="environment">-</strong></span>
+      <span>Network: <strong id="network">-</strong></span>
+      <span>Uptime: <strong id="uptime">-</strong></span>
+    </div>
+
+    <div class="section">
+      <h2>Service Health</h2>
+      <div class="check-list" id="checks">
+        <div class="check-item">
+          <span class="check-name">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Fee Payers</h2>
+      <div class="payer-list" id="payers">
+        <div class="payer-item">
+          <span>Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Circuit Breakers</h2>
+      <div class="breaker-list" id="breakers">
+        <div class="breaker-item">
+          <span>Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Statistics</h2>
+      <div class="stats-grid" id="stats">
+        <div class="stat-item">
+          <div class="stat-value">-</div>
+          <div class="stat-label">Loading</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Recent Alerts</h2>
+      <div class="alert-list" id="alerts">
+        <div class="no-alerts">Loading...</div>
+      </div>
+    </div>
+
+    <div class="last-updated">
+      Last updated: <span id="lastUpdated">-</span>
+    </div>
+  </div>
+
+  <script>
+    function formatUptime(seconds) {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${mins}m`;
+      return `${mins}m`;
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return 'Just now';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      return date.toLocaleDateString();
+    }
+
+    function getStatusIcon(status) {
+      switch (status) {
+        case 'ok': return '<span class="check-status-icon ok">&#10003;</span>';
+        case 'warning': return '<span class="check-status-icon warning">&#9888;</span>';
+        case 'error': return '<span class="check-status-icon error">&#10007;</span>';
+        default: return '<span class="check-status-icon">?</span>';
+      }
+    }
+
+    async function fetchStatus() {
+      try {
+        const [healthRes, statsRes, alertsRes] = await Promise.all([
+          fetch('/health'),
+          fetch('/stats'),
+          fetch('/alerts')
+        ]);
+
+        const health = await healthRes.json();
+        const stats = await statsRes.json();
+        const alerts = await alertsRes.json();
+
+        updateOverallStatus(health.status);
+        updateMeta(health);
+        updateChecks(health.checks);
+        updatePayers(health.checks.feePayer);
+        updateBreakers(health.circuitBreakers || {});
+        updateStats(stats, health);
+        updateAlerts(alerts);
+
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+      } catch (error) {
+        console.error('Failed to fetch status:', error);
+        updateOverallStatus('unhealthy');
+      }
+    }
+
+    function updateOverallStatus(status) {
+      const el = document.getElementById('overallStatus');
+      el.className = `status-badge ${status}`;
+      el.innerHTML = `
+        <span class="status-dot ${status}"></span>
+        <span>${status === 'ok' ? 'All Systems Operational' :
+               status === 'degraded' ? 'Partially Degraded' : 'Service Disruption'}</span>
+      `;
+    }
+
+    function updateMeta(health) {
+      document.getElementById('environment').textContent = health.environment || 'unknown';
+      document.getElementById('network').textContent = health.network || 'unknown';
+      document.getElementById('uptime').textContent = formatUptime(health.uptime || 0);
+    }
+
+    function updateChecks(checks) {
+      const container = document.getElementById('checks');
+      container.innerHTML = '';
+
+      const checkNames = {
+        redis: 'Redis',
+        rpc: 'Solana RPC',
+        feePayer: 'Fee Payers'
+      };
+
+      for (const [name, check] of Object.entries(checks)) {
+        const details = check.message || check.error ||
+                       (check.slot ? `Slot: ${check.slot}` : '') ||
+                       (check.type ? `Type: ${check.type}` : '');
+
+        container.innerHTML += `
+          <div class="check-item">
+            <div>
+              <span class="check-name">${checkNames[name] || name}</span>
+              ${details ? `<div class="check-details">${details}</div>` : ''}
+            </div>
+            <div class="check-status">
+              ${getStatusIcon(check.status)}
+              <span style="color: ${check.status === 'ok' ? '#00ff88' :
+                                   check.status === 'warning' ? '#ffaa00' : '#ff6b6b'}">${check.status}</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function updatePayers(feePayerCheck) {
+      const container = document.getElementById('payers');
+
+      if (!feePayerCheck || !feePayerCheck.payers) {
+        container.innerHTML = '<div class="payer-item"><span>No payers configured</span></div>';
+        return;
+      }
+
+      container.innerHTML = feePayerCheck.payers.map(payer => `
+        <div class="payer-item">
+          <span class="payer-pubkey">${payer.pubkey}</span>
+          <span class="payer-balance ${payer.status}">${payer.balance} SOL</span>
+        </div>
+      `).join('');
+    }
+
+    function updateBreakers(breakers) {
+      const container = document.getElementById('breakers');
+
+      if (Object.keys(breakers).length === 0) {
+        container.innerHTML = '<div class="breaker-item"><span>No circuit breakers active</span></div>';
+        return;
+      }
+
+      container.innerHTML = Object.entries(breakers).map(([name, breaker]) => `
+        <div class="breaker-item">
+          <span>${name}</span>
+          <div>
+            <span class="breaker-state ${breaker.state}">${breaker.state}</span>
+            ${breaker.failures > 0 ? `<span style="color: #666; margin-left: 0.5rem">(${breaker.failures} failures)</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateStats(stats, health) {
+      const container = document.getElementById('stats');
+
+      const summary = health.checks?.feePayer?.summary || { total: 0, healthy: 0 };
+
+      container.innerHTML = `
+        <div class="stat-item">
+          <div class="stat-value">${stats.totalTransactions?.toLocaleString() || 0}</div>
+          <div class="stat-label">Transactions</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" style="color: #ff6b6b">${stats.burnedFormatted || '0 $ASDF'}</div>
+          <div class="stat-label">Total Burned</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${summary.healthy}/${summary.total}</div>
+          <div class="stat-label">Healthy Payers</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${formatUptime(health.uptime || 0)}</div>
+          <div class="stat-label">Uptime</div>
+        </div>
+      `;
+    }
+
+    function updateAlerts(alertData) {
+      const container = document.getElementById('alerts');
+
+      const allAlerts = [...(alertData.active || []), ...(alertData.history || [])].slice(0, 5);
+
+      if (allAlerts.length === 0) {
+        container.innerHTML = '<div class="no-alerts">No recent alerts</div>';
+        return;
+      }
+
+      container.innerHTML = allAlerts.map(alert => `
+        <div class="alert-item">
+          <span class="alert-severity ${alert.severity}">${alert.severity}</span>
+          <div class="alert-content">
+            <div class="alert-title">${alert.title}</div>
+            <div class="alert-message">${alert.message}</div>
+            <div class="alert-time">${formatTime(alert.timestamp)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Initial fetch
+    fetchStatus();
+
+    // Refresh every 30 seconds
+    setInterval(fetchStatus, 30000);
+  </script>
+</body>
+</html>

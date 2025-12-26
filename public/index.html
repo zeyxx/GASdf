@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GASdf - Gasless Solana Transactions</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #00ff88, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .tagline {
+      color: #888;
+      font-size: 1.1rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .stat-card {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #00ff88;
+    }
+
+    .stat-value.burn {
+      color: #ff6b6b;
+    }
+
+    .info-section {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .info-section h2 {
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+
+    .endpoint {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .endpoint-method {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .endpoint-method.post {
+      background: #2d5a27;
+      color: #7ec96a;
+    }
+
+    .endpoint-method.get {
+      background: #1e4a6e;
+      color: #5eb3e4;
+    }
+
+    .endpoint-path {
+      color: #fff;
+    }
+
+    .endpoint-desc {
+      color: #888;
+      margin-top: 0.5rem;
+    }
+
+    .flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 1.5rem 0;
+    }
+
+    .flow-step {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+    }
+
+    .flow-arrow {
+      color: #00ff88;
+    }
+
+    footer {
+      text-align: center;
+      color: #444;
+      font-size: 0.85rem;
+      margin-top: auto;
+      padding-top: 2rem;
+    }
+
+    footer a {
+      color: #00ff88;
+      text-decoration: none;
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #00ff88;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .loading {
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GASdf</h1>
+      <p class="tagline">Gasless transactions for Solana. Pay fees with any token.</p>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label"><span class="live-dot"></span>Total Burned</div>
+        <div class="stat-value burn" id="burned">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value" id="txCount">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" id="status">...</div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h2>How It Works</h2>
+      <div class="flow">
+        <div class="flow-step">1. Get Quote</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">2. Sign TX</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">3. Submit</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">4. Fees → $ASDF Burn</div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h2>API Endpoints</h2>
+
+      <div class="endpoint">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/quote</span>
+        <div class="endpoint-desc">Get a fee quote for your transaction</div>
+      </div>
+
+      <div class="endpoint">
+        <span class="endpoint-method post">POST</span>
+        <span class="endpoint-path">/submit</span>
+        <div class="endpoint-desc">Submit your signed transaction for gasless execution</div>
+      </div>
+
+      <div class="endpoint">
+        <span class="endpoint-method get">GET</span>
+        <span class="endpoint-path">/tokens</span>
+        <div class="endpoint-desc">List supported payment tokens</div>
+      </div>
+
+      <div class="endpoint">
+        <span class="endpoint-method get">GET</span>
+        <span class="endpoint-path">/stats</span>
+        <div class="endpoint-desc">Get burn statistics</div>
+      </div>
+
+      <div class="endpoint">
+        <span class="endpoint-method get">GET</span>
+        <span class="endpoint-path">/health</span>
+        <div class="endpoint-desc">Health check endpoint</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Powered by $ASDFASDFA</p>
+  </footer>
+
+  <script>
+    async function fetchStats() {
+      try {
+        const res = await fetch('/stats');
+        const data = await res.json();
+
+        document.getElementById('burned').textContent = data.burnedFormatted;
+        document.getElementById('txCount').textContent = data.totalTransactions.toLocaleString();
+      } catch (err) {
+        document.getElementById('burned').textContent = '0 $ASDF';
+        document.getElementById('txCount').textContent = '0';
+      }
+    }
+
+    async function fetchHealth() {
+      try {
+        const res = await fetch('/health');
+        const data = await res.json();
+
+        const statusEl = document.getElementById('status');
+        if (data.status === 'ok') {
+          statusEl.textContent = 'Online';
+          statusEl.style.color = '#00ff88';
+        } else {
+          statusEl.textContent = 'Degraded';
+          statusEl.style.color = '#ffaa00';
+        }
+      } catch (err) {
+        document.getElementById('status').textContent = 'Offline';
+        document.getElementById('status').style.color = '#ff6b6b';
+      }
+    }
+
+    // Initial fetch
+    fetchStats();
+    fetchHealth();
+
+    // Refresh every 30 seconds
+    setInterval(fetchStats, 30000);
+    setInterval(fetchHealth, 30000);
+  </script>
+</body>
+</html>

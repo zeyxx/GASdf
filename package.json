@@ -1,0 +1,29 @@
+{
+  "name": "gasdf",
+  "version": "1.0.0",
+  "description": "Gasless transactions for Solana. Pay fees with any token. Fees burn $ASDF.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "NODE_ENV=production node src/index.js",
+    "dev": "NODE_ENV=development node --watch src/index.js",
+    "setup:wallet": "node scripts/setup-wallet.js"
+  },
+  "keywords": [
+    "solana",
+    "gasless",
+    "defi"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.0",
+    "bs58": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "redis": "^4.7.0",
+    "uuid": "^10.0.0"
+  }
+}
