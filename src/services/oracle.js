@@ -29,6 +29,7 @@ const TRUSTED_TOKENS = new Set([
 
 // Oracle API configuration
 const ORACLE_TIMEOUT = 3000; // 3 seconds max
+const MIN_HOLDERS_FOR_CONFIDENCE = 10; // Minimum holders for reliable K-score
 
 async function getKScore(mint) {
   // 1. Check trusted list (instant)
@@ -44,13 +45,36 @@ async function getKScore(mint) {
 
   // 3. Try oracle API
   try {
-    const score = await fetchFromOracle(mint);
+    const { score, holders } = await fetchFromOracle(mint);
+
+    // Low holder count = unreliable K-score → downgrade to RISKY
+    if (holders < MIN_HOLDERS_FOR_CONFIDENCE) {
+      logger.info('ORACLE', 'Low holder count, using RISKY tier', {
+        mint: mint.slice(0, 8),
+        holders,
+        minRequired: MIN_HOLDERS_FOR_CONFIDENCE,
+        rawScore: score,
+      });
+
+      const result = {
+        score,
+        tier: 'RISKY',
+        feeMultiplier: K_TIERS.RISKY.feeMultiplier,
+        holders,
+        lowConfidence: true,
+      };
+
+      kScoreCache.set(mint, { data: result, timestamp: Date.now() });
+      return result;
+    }
+
     const tier = getTierForScore(score);
 
     const result = {
       score,
       tier: tier.name,
       feeMultiplier: tier.feeMultiplier,
+      holders,
     };
 
     // Cache the result
@@ -103,7 +127,10 @@ async function fetchFromOracle(mint) {
     }
 
     const data = await response.json();
-    return data.k ?? data.k_score ?? data.score ?? 50;
+    const score = data.k ?? data.k_score ?? data.score ?? 50;
+    const holders = data.holders ?? 0;
+
+    return { score, holders };
   } finally {
     clearTimeout(timeout);
   }

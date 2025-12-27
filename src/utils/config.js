@@ -100,6 +100,10 @@ const config = {
   // Phase 3: Monitoring
   PROMETHEUS_ENABLED: process.env.PROMETHEUS_ENABLED === 'true',
   ALERTING_WEBHOOK: process.env.ALERTING_WEBHOOK,
+
+  // Security: Per-wallet rate limiting (in addition to IP-based)
+  WALLET_QUOTE_LIMIT: parseInt(process.env.WALLET_QUOTE_LIMIT) || 20, // quotes/min per wallet
+  WALLET_SUBMIT_LIMIT: parseInt(process.env.WALLET_SUBMIT_LIMIT) || 10, // submits/min per wallet
 };
 
 // =============================================================================

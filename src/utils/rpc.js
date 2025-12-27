@@ -47,6 +47,21 @@ async function getTokenBalance(pubkey, mint) {
   return parseInt(balance.value.amount);
 }
 
+/**
+ * Check if a blockhash is still valid (not expired)
+ * Blockhashes are valid for ~150 blocks (~60-90 seconds)
+ */
+async function isBlockhashValid(blockhash) {
+  const conn = getConnection();
+  try {
+    const result = await conn.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+    return result.value;
+  } catch (error) {
+    // If RPC fails, we can't determine validity - reject for safety
+    return false;
+  }
+}
+
 module.exports = {
   getConnection,
   getLatestBlockhash,
@@ -54,4 +69,5 @@ module.exports = {
   confirmTransaction,
   getBalance,
   getTokenBalance,
+  isBlockhashValid,
 };

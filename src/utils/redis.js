@@ -382,6 +382,89 @@ async function disconnect() {
   connectionState = 'disconnected';
 }
 
+// =============================================================================
+// Anti-Replay Protection
+// =============================================================================
+
+// TTL for transaction hashes: ~90 seconds (blockhash validity window)
+const TX_HASH_TTL_SECONDS = 90;
+
+/**
+ * Check if a transaction hash has been seen before (anti-replay)
+ * Returns true if hash exists (transaction already submitted)
+ */
+async function hasTransactionHash(txHash) {
+  return withRedis(
+    async (redis) => {
+      const exists = await redis.exists(`txhash:${txHash}`);
+      return exists === 1;
+    },
+    () => {
+      return memoryStore.get(`txhash:${txHash}`) !== null;
+    }
+  );
+}
+
+/**
+ * Mark a transaction hash as submitted (anti-replay)
+ */
+async function markTransactionHash(txHash) {
+  return withRedis(
+    async (redis) => {
+      await redis.setEx(`txhash:${txHash}`, TX_HASH_TTL_SECONDS, '1');
+    },
+    () => {
+      memoryStore.set(`txhash:${txHash}`, '1', TX_HASH_TTL_SECONDS);
+    }
+  );
+}
+
+// =============================================================================
+// Per-Wallet Rate Limiting
+// =============================================================================
+
+const WALLET_RATE_WINDOW_SECONDS = 60; // 1 minute window
+
+/**
+ * Increment and get wallet request count for rate limiting
+ * Returns current count after increment
+ */
+async function incrWalletRateLimit(wallet, type = 'quote') {
+  const key = `ratelimit:wallet:${type}:${wallet}`;
+
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      multi.incr(key);
+      multi.expire(key, WALLET_RATE_WINDOW_SECONDS);
+      const results = await multi.exec();
+      return results[0]; // incr result
+    },
+    () => {
+      const current = parseInt(memoryStore.get(key)) || 0;
+      memoryStore.set(key, String(current + 1), WALLET_RATE_WINDOW_SECONDS);
+      return current + 1;
+    }
+  );
+}
+
+/**
+ * Get current wallet rate limit count
+ */
+async function getWalletRateLimit(wallet, type = 'quote') {
+  const key = `ratelimit:wallet:${type}:${wallet}`;
+
+  return withRedis(
+    async (redis) => {
+      const count = await redis.get(key);
+      return parseInt(count) || 0;
+    },
+    () => {
+      return parseInt(memoryStore.get(key)) || 0;
+    }
+  );
+}
+
 module.exports = {
   initializeClient,
   getClient,
@@ -403,4 +486,10 @@ module.exports = {
   getTreasuryBalance,
   recordTreasuryEvent,
   getTreasuryHistory,
+  // Anti-Replay Protection
+  hasTransactionHash,
+  markTransactionHash,
+  // Per-Wallet Rate Limiting
+  incrWalletRateLimit,
+  getWalletRateLimit,
 };

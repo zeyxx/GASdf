@@ -1,4 +1,5 @@
 const { Transaction, VersionedTransaction, PublicKey, SystemProgram } = require('@solana/web3.js');
+const crypto = require('crypto');
 const { getAllFeePayerPublicKeys, getTransactionFeePayer } = require('./signer');
 
 // System Program instruction discriminators
@@ -203,9 +204,38 @@ function extractInstructions(transaction) {
   }
 }
 
+/**
+ * Extract blockhash from transaction
+ */
+function getTransactionBlockhash(transaction) {
+  if (transaction instanceof VersionedTransaction) {
+    return transaction.message.recentBlockhash;
+  } else {
+    return transaction.recentBlockhash;
+  }
+}
+
+/**
+ * Compute SHA256 hash of serialized transaction (for anti-replay)
+ * Uses the serialized message to ensure consistent hashing
+ */
+function computeTransactionHash(transaction) {
+  let messageBytes;
+
+  if (transaction instanceof VersionedTransaction) {
+    messageBytes = transaction.message.serialize();
+  } else {
+    messageBytes = transaction.serializeMessage();
+  }
+
+  return crypto.createHash('sha256').update(messageBytes).digest('hex');
+}
+
 module.exports = {
   deserializeTransaction,
   validateTransaction,
   extractInstructions,
+  getTransactionBlockhash,
+  computeTransactionHash,
   MAX_COMPUTE_UNITS,
 };

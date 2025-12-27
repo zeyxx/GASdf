@@ -4,22 +4,27 @@ const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { signTransaction, markPayerUnhealthy } = require('../services/signer');
-const { deserializeTransaction, validateTransaction } = require('../services/validator');
-const { submitLimiter } = require('../middleware/security');
+const {
+  deserializeTransaction,
+  validateTransaction,
+  getTransactionBlockhash,
+  computeTransactionHash,
+} = require('../services/validator');
+const { submitLimiter, walletSubmitLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const txQueue = require('../services/tx-queue');
 const { submitsTotal, submitDuration, activeQuotes } = require('../utils/metrics');
 
 const router = express.Router();
 
-// Apply rate limiting
+// Apply rate limiting (IP-based first, then wallet-based)
 router.use(submitLimiter);
 
 /**
  * POST /submit
  * Submit a transaction for gasless execution
  */
-router.post('/', validate('submit'), async (req, res) => {
+router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
   const { quoteId, transaction, userPubkey } = req.body;
   const startTime = process.hrtime.bigint();
 
@@ -55,6 +60,45 @@ router.post('/', validate('submit'), async (req, res) => {
       return res.status(400).json({
         error: 'Invalid transaction format',
         code: 'INVALID_TX_FORMAT',
+      });
+    }
+
+    // =========================================================================
+    // SECURITY: Anti-Replay Protection
+    // =========================================================================
+    const txHash = computeTransactionHash(tx);
+
+    // Check if this transaction was already submitted
+    const isReplay = await redis.hasTransactionHash(txHash);
+    if (isReplay) {
+      logger.warn('SUBMIT', 'Replay attack detected', {
+        requestId: req.requestId,
+        quoteId,
+        txHash: txHash.slice(0, 16),
+        userPubkey,
+      });
+      return res.status(400).json({
+        error: 'Transaction already submitted',
+        code: 'REPLAY_DETECTED',
+      });
+    }
+
+    // =========================================================================
+    // SECURITY: Blockhash Freshness Validation
+    // =========================================================================
+    const blockhash = getTransactionBlockhash(tx);
+    const isBlockhashValid = await rpc.isBlockhashValid(blockhash);
+
+    if (!isBlockhashValid) {
+      logger.warn('SUBMIT', 'Stale blockhash detected', {
+        requestId: req.requestId,
+        quoteId,
+        blockhash: blockhash.slice(0, 16),
+        userPubkey,
+      });
+      return res.status(400).json({
+        error: 'Transaction blockhash expired, please get a new quote',
+        code: 'BLOCKHASH_EXPIRED',
       });
     }
 
@@ -104,6 +148,9 @@ router.post('/', validate('submit'), async (req, res) => {
 
     // Success - delete used quote
     await redis.deleteQuote(quoteId);
+
+    // Mark transaction hash to prevent replay attacks
+    await redis.markTransactionHash(txHash);
 
     // Track for burn worker
     await redis.addPendingSwap(quote.feeAmountLamports);

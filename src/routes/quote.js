@@ -6,20 +6,20 @@ const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
 const oracle = require('../services/oracle');
 const { getFeePayerPublicKey } = require('../services/signer');
-const { quoteLimiter } = require('../middleware/security');
+const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
 
 const router = express.Router();
 
-// Apply rate limiting
+// Apply rate limiting (IP-based first, then wallet-based)
 router.use(quoteLimiter);
 
 /**
  * POST /quote
  * Get a fee quote for a gasless transaction
  */
-router.post('/', validate('quote'), async (req, res) => {
+router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
   const { paymentToken, userPubkey, estimatedComputeUnits = 200000 } = req.body;
   const startTime = process.hrtime.bigint();
 
