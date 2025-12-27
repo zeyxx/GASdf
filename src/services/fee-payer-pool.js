@@ -8,14 +8,20 @@ const rpc = require('../utils/rpc');
 // Constants
 // =============================================================================
 
-// Minimum balance to consider a payer healthy (0.05 SOL in prod, 0 in dev)
-const MIN_HEALTHY_BALANCE = process.env.NODE_ENV === 'development' ? 0 : 50_000_000;
+// Minimum balance to consider a payer healthy (0.1 SOL in prod, 0 in dev)
+const MIN_HEALTHY_BALANCE = process.env.NODE_ENV === 'development' ? 0 : 100_000_000;
 
-// Warning balance threshold (0.1 SOL)
-const WARNING_BALANCE = 100_000_000;
+// Warning balance threshold (0.2 SOL)
+const WARNING_BALANCE = 200_000_000;
 
-// How often to refresh balances (30 seconds)
-const BALANCE_REFRESH_INTERVAL = 30_000;
+// How often to refresh balances (10 seconds - reduced for better protection)
+const BALANCE_REFRESH_INTERVAL = 10_000;
+
+// Maximum pending reservations per fee payer (prevents over-commitment)
+const MAX_RESERVATIONS_PER_PAYER = 50;
+
+// Reservation TTL (matches quote TTL + buffer)
+const RESERVATION_TTL_MS = 90_000; // 90 seconds
 
 // =============================================================================
 // Fee Payer Pool
@@ -29,6 +35,15 @@ class FeePayerPool {
     this.unhealthyUntil = new Map(); // pubkey -> timestamp
     this.lastBalanceRefresh = 0;
     this.initialized = false;
+
+    // Balance reservation system
+    this.reservations = new Map(); // quoteId -> { pubkey, amount, expiresAt }
+    this.reservationsByPayer = new Map(); // pubkey -> Set<quoteId>
+
+    // Circuit breaker state
+    this.circuitOpen = false;
+    this.circuitOpenUntil = 0;
+    this.consecutiveFailures = 0;
   }
 
   /**
@@ -229,6 +244,247 @@ class FeePayerPool {
 
     return { total, healthy, warning, critical };
   }
+
+  // ===========================================================================
+  // Balance Reservation System
+  // ===========================================================================
+
+  /**
+   * Clean up expired reservations
+   */
+  cleanupExpiredReservations() {
+    const now = Date.now();
+    const expired = [];
+
+    for (const [quoteId, reservation] of this.reservations) {
+      if (now > reservation.expiresAt) {
+        expired.push(quoteId);
+      }
+    }
+
+    for (const quoteId of expired) {
+      this.releaseReservation(quoteId);
+    }
+
+    if (expired.length > 0) {
+      logger.debug('FEE_PAYER_POOL', `Cleaned up ${expired.length} expired reservations`);
+    }
+  }
+
+  /**
+   * Get available balance for a payer (actual balance - reserved amount)
+   */
+  getAvailableBalance(pubkey) {
+    const actualBalance = this.balances.get(pubkey) || 0;
+    const reservedAmount = this.getReservedAmount(pubkey);
+    return Math.max(0, actualBalance - reservedAmount);
+  }
+
+  /**
+   * Get total reserved amount for a payer
+   */
+  getReservedAmount(pubkey) {
+    const quoteIds = this.reservationsByPayer.get(pubkey);
+    if (!quoteIds || quoteIds.size === 0) return 0;
+
+    let total = 0;
+    for (const quoteId of quoteIds) {
+      const reservation = this.reservations.get(quoteId);
+      if (reservation) {
+        total += reservation.amount;
+      }
+    }
+    return total;
+  }
+
+  /**
+   * Get reservation count for a payer
+   */
+  getReservationCount(pubkey) {
+    return this.reservationsByPayer.get(pubkey)?.size || 0;
+  }
+
+  /**
+   * Reserve balance for a quote
+   * Returns the assigned fee payer pubkey, or null if circuit breaker is open
+   */
+  reserveBalance(quoteId, amountLamports) {
+    this.initialize();
+    this.cleanupExpiredReservations();
+
+    // Check circuit breaker
+    if (this.isCircuitOpen()) {
+      logger.warn('FEE_PAYER_POOL', 'Circuit breaker open, rejecting reservation', { quoteId });
+      return null;
+    }
+
+    // Find a payer with capacity
+    for (let i = 0; i < this.payers.length; i++) {
+      const index = (this.currentIndex + i) % this.payers.length;
+      const payer = this.payers[index];
+      const pubkey = payer.publicKey.toBase58();
+
+      // Skip unhealthy payers
+      if (!this.isPayerHealthy(pubkey)) continue;
+
+      // Check reservation count limit
+      const reservationCount = this.getReservationCount(pubkey);
+      if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
+        logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
+        continue;
+      }
+
+      // Check available balance
+      const availableBalance = this.getAvailableBalance(pubkey);
+      if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
+        logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... insufficient available balance`);
+        continue;
+      }
+
+      // Create reservation
+      const reservation = {
+        pubkey,
+        amount: amountLamports,
+        expiresAt: Date.now() + RESERVATION_TTL_MS,
+        createdAt: Date.now(),
+      };
+
+      this.reservations.set(quoteId, reservation);
+
+      if (!this.reservationsByPayer.has(pubkey)) {
+        this.reservationsByPayer.set(pubkey, new Set());
+      }
+      this.reservationsByPayer.get(pubkey).add(quoteId);
+
+      // Move to next payer for round-robin
+      this.currentIndex = (index + 1) % this.payers.length;
+
+      logger.debug('FEE_PAYER_POOL', 'Reserved balance', {
+        quoteId,
+        pubkey: pubkey.slice(0, 8),
+        amount: amountLamports,
+        availableAfter: availableBalance - amountLamports,
+      });
+
+      // Reset consecutive failures on successful reservation
+      this.consecutiveFailures = 0;
+
+      return pubkey;
+    }
+
+    // No payer available - record failure
+    this.recordFailure();
+    logger.error('FEE_PAYER_POOL', 'No payer available for reservation', {
+      quoteId,
+      amount: amountLamports,
+    });
+
+    return null;
+  }
+
+  /**
+   * Release a reservation (quote used or expired)
+   */
+  releaseReservation(quoteId) {
+    const reservation = this.reservations.get(quoteId);
+    if (!reservation) return false;
+
+    const { pubkey } = reservation;
+
+    // Remove from maps
+    this.reservations.delete(quoteId);
+
+    const payerReservations = this.reservationsByPayer.get(pubkey);
+    if (payerReservations) {
+      payerReservations.delete(quoteId);
+      if (payerReservations.size === 0) {
+        this.reservationsByPayer.delete(pubkey);
+      }
+    }
+
+    logger.debug('FEE_PAYER_POOL', 'Released reservation', {
+      quoteId,
+      pubkey: pubkey.slice(0, 8),
+    });
+
+    return true;
+  }
+
+  /**
+   * Get reservation info for a quote
+   */
+  getReservation(quoteId) {
+    return this.reservations.get(quoteId);
+  }
+
+  // ===========================================================================
+  // Circuit Breaker
+  // ===========================================================================
+
+  /**
+   * Record a failure (no payers available)
+   */
+  recordFailure() {
+    this.consecutiveFailures++;
+
+    // Open circuit after 5 consecutive failures
+    if (this.consecutiveFailures >= 5) {
+      this.openCircuit(30_000); // 30 seconds
+    }
+  }
+
+  /**
+   * Open the circuit breaker
+   */
+  openCircuit(durationMs) {
+    if (!this.circuitOpen) {
+      this.circuitOpen = true;
+      this.circuitOpenUntil = Date.now() + durationMs;
+      logger.error('FEE_PAYER_POOL', 'Circuit breaker OPENED', {
+        duration: durationMs,
+        consecutiveFailures: this.consecutiveFailures,
+      });
+    }
+  }
+
+  /**
+   * Check if circuit breaker is open
+   */
+  isCircuitOpen() {
+    if (!this.circuitOpen) return false;
+
+    // Check if circuit should close
+    if (Date.now() >= this.circuitOpenUntil) {
+      this.circuitOpen = false;
+      this.consecutiveFailures = 0;
+      logger.info('FEE_PAYER_POOL', 'Circuit breaker CLOSED');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Force close the circuit (manual recovery)
+   */
+  closeCircuit() {
+    this.circuitOpen = false;
+    this.circuitOpenUntil = 0;
+    this.consecutiveFailures = 0;
+    logger.info('FEE_PAYER_POOL', 'Circuit breaker manually closed');
+  }
+
+  /**
+   * Get circuit breaker state
+   */
+  getCircuitState() {
+    return {
+      isOpen: this.isCircuitOpen(),
+      consecutiveFailures: this.consecutiveFailures,
+      closesAt: this.circuitOpen ? this.circuitOpenUntil : null,
+      totalReservations: this.reservations.size,
+    };
+  }
 }
 
 // Singleton instance
@@ -351,7 +607,18 @@ module.exports = {
   markPayerUnhealthy: (pubkey, duration) => pool.markUnhealthy(pubkey, duration),
   getHealthSummary: () => pool.getHealthSummary(),
 
+  // Balance reservation system
+  reserveBalance: (quoteId, amount) => pool.reserveBalance(quoteId, amount),
+  releaseReservation: (quoteId) => pool.releaseReservation(quoteId),
+  getReservation: (quoteId) => pool.getReservation(quoteId),
+
+  // Circuit breaker
+  isCircuitOpen: () => pool.isCircuitOpen(),
+  getCircuitState: () => pool.getCircuitState(),
+  closeCircuit: () => pool.closeCircuit(),
+
   // Constants
   MIN_HEALTHY_BALANCE,
   WARNING_BALANCE,
+  MAX_RESERVATIONS_PER_PAYER,
 };

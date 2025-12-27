@@ -62,6 +62,41 @@ async function isBlockhashValid(blockhash) {
   }
 }
 
+/**
+ * Simulate a transaction before sending
+ * Returns { success: true } or { success: false, error: string, logs: string[] }
+ */
+async function simulateTransaction(signedTx) {
+  const conn = getConnection();
+  try {
+    const result = await conn.simulateTransaction(signedTx, {
+      sigVerify: true,
+      commitment: 'confirmed',
+    });
+
+    if (result.value.err) {
+      return {
+        success: false,
+        error: JSON.stringify(result.value.err),
+        logs: result.value.logs || [],
+        unitsConsumed: result.value.unitsConsumed,
+      };
+    }
+
+    return {
+      success: true,
+      logs: result.value.logs || [],
+      unitsConsumed: result.value.unitsConsumed,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      logs: [],
+    };
+  }
+}
+
 module.exports = {
   getConnection,
   getLatestBlockhash,
@@ -70,4 +105,5 @@ module.exports = {
   getBalance,
   getTokenBalance,
   isBlockhashValid,
+  simulateTransaction,
 };

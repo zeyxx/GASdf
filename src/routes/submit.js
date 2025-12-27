@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { signTransaction, markPayerUnhealthy } = require('../services/signer');
+const { releaseReservation, getReservation } = require('../services/fee-payer-pool');
 const {
   deserializeTransaction,
   validateTransaction,
@@ -116,6 +117,37 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       });
     }
 
+    // =========================================================================
+    // SECURITY: Validate fee payer matches quote reservation
+    // =========================================================================
+    const reservation = getReservation(quoteId);
+    if (reservation && reservation.pubkey !== validation.feePayer) {
+      logger.warn('SUBMIT', 'Fee payer mismatch with reservation', {
+        requestId: req.requestId,
+        quoteId,
+        expected: reservation.pubkey?.slice(0, 8),
+        actual: validation.feePayer?.slice(0, 8),
+      });
+      return res.status(400).json({
+        error: 'Transaction fee payer does not match quote',
+        code: 'FEE_PAYER_MISMATCH',
+      });
+    }
+
+    // Also validate against quote.feePayer for backward compatibility
+    if (quote.feePayer && quote.feePayer !== validation.feePayer) {
+      logger.warn('SUBMIT', 'Fee payer mismatch with quote', {
+        requestId: req.requestId,
+        quoteId,
+        expected: quote.feePayer?.slice(0, 8),
+        actual: validation.feePayer?.slice(0, 8),
+      });
+      return res.status(400).json({
+        error: 'Transaction fee payer does not match quote',
+        code: 'FEE_PAYER_MISMATCH',
+      });
+    }
+
     // Enqueue transaction for tracking
     const txEntry = await txQueue.enqueue({
       quoteId,
@@ -128,6 +160,35 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
 
     // Sign with fee payer
     const signedTx = signTransaction(tx, validation.feePayer);
+
+    // =========================================================================
+    // SECURITY: Simulate transaction before sending
+    // =========================================================================
+    const simulation = await rpc.simulateTransaction(signedTx);
+    if (!simulation.success) {
+      logger.warn('SUBMIT', 'Transaction simulation failed', {
+        requestId: req.requestId,
+        quoteId,
+        error: simulation.error,
+        logs: simulation.logs?.slice(-5), // Last 5 log lines
+      });
+
+      // Release reservation since we won't be using this quote
+      releaseReservation(quoteId);
+
+      return res.status(400).json({
+        error: 'Transaction simulation failed',
+        code: 'SIMULATION_FAILED',
+        details: simulation.error,
+        logs: simulation.logs?.slice(-3),
+      });
+    }
+
+    logger.debug('SUBMIT', 'Transaction simulation passed', {
+      requestId: req.requestId,
+      quoteId,
+      unitsConsumed: simulation.unitsConsumed,
+    });
 
     // Mark as processing
     await txQueue.markProcessing(quoteId);
@@ -146,8 +207,9 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       });
     }
 
-    // Success - delete used quote
+    // Success - delete used quote and release reservation
     await redis.deleteQuote(quoteId);
+    releaseReservation(quoteId);
 
     // Mark transaction hash to prevent replay attacks
     await redis.markTransactionHash(txHash);
@@ -199,6 +261,9 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       quoteId,
       error: error.message,
     });
+
+    // Release reservation on error
+    releaseReservation(quoteId);
 
     // Mark as failed in queue
     await txQueue.markRetryOrFailed(quoteId, error).catch(() => {});

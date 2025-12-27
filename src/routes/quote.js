@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
 const oracle = require('../services/oracle');
-const { getFeePayerPublicKey } = require('../services/signer');
+const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/fee-payer-pool');
 const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
@@ -24,6 +24,23 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
   const startTime = process.hrtime.bigint();
 
   try {
+    // =========================================================================
+    // SECURITY: Check circuit breaker first
+    // =========================================================================
+    if (isCircuitOpen()) {
+      const circuitState = getCircuitState();
+      logger.warn('QUOTE', 'Circuit breaker open, rejecting quote request', {
+        requestId: req.requestId,
+        userPubkey,
+        circuitState,
+      });
+      return res.status(503).json({
+        error: 'Service temporarily unavailable - fee payer capacity exceeded',
+        code: 'CIRCUIT_BREAKER_OPEN',
+        retryAfter: Math.ceil((circuitState.closesAt - Date.now()) / 1000),
+      });
+    }
+
     // Calculate base fee in lamports
     const priorityFee = Math.ceil(estimatedComputeUnits * 0.000001 * 1e9);
     const baseFee = config.BASE_FEE_LAMPORTS + priorityFee;
@@ -42,10 +59,28 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     const expiresAt = Date.now() + config.QUOTE_TTL_SECONDS * 1000;
     const ttl = config.QUOTE_TTL_SECONDS;
 
-    // Store quote
+    // =========================================================================
+    // SECURITY: Reserve fee payer balance for this quote
+    // =========================================================================
+    const feePayer = reserveBalance(quoteId, adjustedFee);
+    if (!feePayer) {
+      logger.warn('QUOTE', 'No fee payer capacity available', {
+        requestId: req.requestId,
+        userPubkey,
+        feeAmount: adjustedFee,
+      });
+      return res.status(503).json({
+        error: 'Service temporarily unavailable - no fee payer capacity',
+        code: 'NO_PAYER_CAPACITY',
+        retryAfter: 30,
+      });
+    }
+
+    // Store quote with assigned fee payer
     await redis.setQuote(quoteId, {
       paymentToken,
       userPubkey,
+      feePayer, // Store the assigned fee payer
       feeAmountLamports: adjustedFee,
       feeAmountToken: feeInToken.inputAmount,
       kScore: kScore.score,
@@ -60,6 +95,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       quoteId,
       paymentToken,
       userPubkey,
+      feePayer: feePayer.slice(0, 8),
       feeAmountSol: adjustedFee,
       kTier: kScore.tier,
     });
@@ -76,7 +112,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
 
     res.json({
       quoteId,
-      feePayer: getFeePayerPublicKey().toBase58(),
+      feePayer, // Return the reserved fee payer
       feeAmount: feeInToken.inputAmount.toString(),
       feeFormatted,
       paymentToken: {
