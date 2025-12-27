@@ -523,6 +523,96 @@ async function searchAuditLog(eventType, limit = 100) {
 }
 
 // =============================================================================
+// Wallet Burn Tracking (CCM-aligned)
+// =============================================================================
+
+/**
+ * Increment wallet's lifetime burn contribution
+ */
+async function incrWalletBurn(wallet, amount) {
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      // Increment wallet's total burn
+      multi.incrByFloat(`burn:wallet:${wallet}`, amount);
+      // Increment wallet's tx count
+      multi.incr(`burn:wallet:txcount:${wallet}`);
+      // Add to sorted set for leaderboard (score = total burned)
+      multi.zIncrBy('burn:leaderboard', amount, wallet);
+      const results = await multi.exec();
+      return {
+        totalBurned: results[0],
+        txCount: results[1],
+      };
+    },
+    () => {
+      const current = parseFloat(memoryStore.get(`burn:wallet:${wallet}`)) || 0;
+      const txCount = parseInt(memoryStore.get(`burn:wallet:txcount:${wallet}`)) || 0;
+      memoryStore.set(`burn:wallet:${wallet}`, String(current + amount));
+      memoryStore.set(`burn:wallet:txcount:${wallet}`, String(txCount + 1));
+      return { totalBurned: current + amount, txCount: txCount + 1 };
+    }
+  );
+}
+
+/**
+ * Get wallet's burn statistics
+ */
+async function getWalletBurnStats(wallet) {
+  return withRedis(
+    async (redis) => {
+      const [totalBurned, txCount, rank] = await Promise.all([
+        redis.get(`burn:wallet:${wallet}`),
+        redis.get(`burn:wallet:txcount:${wallet}`),
+        redis.zRevRank('burn:leaderboard', wallet),
+      ]);
+      return {
+        wallet,
+        totalBurned: parseFloat(totalBurned) || 0,
+        txCount: parseInt(txCount) || 0,
+        rank: rank !== null ? rank + 1 : null, // 1-indexed
+      };
+    },
+    () => ({
+      wallet,
+      totalBurned: parseFloat(memoryStore.get(`burn:wallet:${wallet}`)) || 0,
+      txCount: parseInt(memoryStore.get(`burn:wallet:txcount:${wallet}`)) || 0,
+      rank: null,
+    })
+  );
+}
+
+/**
+ * Get burn leaderboard (top contributors)
+ */
+async function getBurnLeaderboard(limit = 50) {
+  return withRedis(
+    async (redis) => {
+      // Get top wallets with scores
+      const results = await redis.zRangeWithScores('burn:leaderboard', 0, limit - 1, { REV: true });
+      return results.map((entry, index) => ({
+        rank: index + 1,
+        wallet: entry.value,
+        totalBurned: entry.score,
+      }));
+    },
+    () => []
+  );
+}
+
+/**
+ * Get total unique burners count
+ */
+async function getBurnerCount() {
+  return withRedis(
+    async (redis) => {
+      return redis.zCard('burn:leaderboard');
+    },
+    () => 0
+  );
+}
+
+// =============================================================================
 // Anomaly Detection State
 // =============================================================================
 
@@ -622,4 +712,9 @@ module.exports = {
   trackWalletActivity,
   getWalletActivity,
   trackIpActivity,
+  // Wallet Burn Tracking
+  incrWalletBurn,
+  getWalletBurnStats,
+  getBurnLeaderboard,
+  getBurnerCount,
 };

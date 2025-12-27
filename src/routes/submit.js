@@ -285,6 +285,11 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     await redis.addPendingSwap(quote.feeAmountLamports);
     await redis.incrTxCount();
 
+    // Track wallet burn contribution (CCM-aligned)
+    // burnAmount is 80% of fee based on 80/20 model
+    const burnAmount = quote.burnAmount || Math.floor(quote.feeAmountLamports * 0.8);
+    await redis.incrWalletBurn(userPubkey, burnAmount);
+
     // Mark as successful
     await txQueue.markSuccess(quoteId, result.signature);
 

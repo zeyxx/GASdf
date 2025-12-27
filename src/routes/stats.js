@@ -38,6 +38,87 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /stats/wallet/:address
+ * Get wallet's burn contribution stats
+ */
+router.get('/wallet/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+
+    // Basic Solana address validation (32-44 chars, base58)
+    if (!address || address.length < 32 || address.length > 44) {
+      return res.status(400).json({ error: 'Invalid wallet address' });
+    }
+
+    const [walletStats, globalStats, burnerCount] = await Promise.all([
+      redis.getWalletBurnStats(address),
+      redis.getStats(),
+      redis.getBurnerCount(),
+    ]);
+
+    // Calculate contribution percentage
+    const contributionPercent = globalStats.burnTotal > 0
+      ? (walletStats.totalBurned / globalStats.burnTotal) * 100
+      : 0;
+
+    res.json({
+      wallet: address,
+      totalBurned: walletStats.totalBurned,
+      burnedFormatted: formatAsdf(walletStats.totalBurned),
+      txCount: walletStats.txCount,
+      rank: walletStats.rank,
+      totalBurners: burnerCount,
+      contributionPercent: contributionPercent.toFixed(4),
+      // CCM-aligned messaging
+      impact: {
+        message: walletStats.totalBurned > 0
+          ? `You've contributed ${formatAsdf(walletStats.totalBurned)} to the burn`
+          : 'Start transacting to contribute to the burn',
+        rankMessage: walletStats.rank
+          ? `Rank #${walletStats.rank} of ${burnerCount} contributors`
+          : 'Not yet ranked',
+      },
+    });
+  } catch (error) {
+    logger.error('STATS', 'Failed to get wallet stats', { error: error.message });
+    res.status(500).json({ error: 'Failed to get wallet stats' });
+  }
+});
+
+/**
+ * GET /stats/leaderboard
+ * Get burn leaderboard (top contributors)
+ */
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+
+    const [leaderboard, globalStats, burnerCount] = await Promise.all([
+      redis.getBurnLeaderboard(limit),
+      redis.getStats(),
+      redis.getBurnerCount(),
+    ]);
+
+    res.json({
+      leaderboard: leaderboard.map(entry => ({
+        ...entry,
+        burnedFormatted: formatAsdf(entry.totalBurned),
+        walletShort: `${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}`,
+        contributionPercent: globalStats.burnTotal > 0
+          ? ((entry.totalBurned / globalStats.burnTotal) * 100).toFixed(2)
+          : '0.00',
+      })),
+      totalBurners: burnerCount,
+      totalBurned: globalStats.burnTotal,
+      totalBurnedFormatted: formatAsdf(globalStats.burnTotal),
+    });
+  } catch (error) {
+    logger.error('STATS', 'Failed to get leaderboard', { error: error.message });
+    res.status(500).json({ error: 'Failed to get leaderboard' });
+  }
+});
+
+/**
  * GET /stats/treasury
  * Get detailed treasury information
  */
