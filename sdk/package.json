@@ -1,6 +1,6 @@
 {
   "name": "@gasdf/sdk",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "GASdf SDK - Gasless transactions for Solana",
   "main": "index.js",
   "types": "index.d.ts",
@@ -13,14 +13,19 @@
     "gasless",
     "transactions",
     "defi",
-    "web3"
+    "web3",
+    "asdf"
   ],
   "author": "GASdf",
   "license": "MIT",
+  "homepage": "https://github.com/zeyxx/GASdf#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gasdf/gasdf.git",
+    "url": "https://github.com/zeyxx/GASdf.git",
     "directory": "sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/zeyxx/GASdf/issues"
   },
   "peerDependencies": {
     "@solana/web3.js": "^1.87.0",
