@@ -103,7 +103,7 @@ async function fetchFromOracle(mint) {
     }
 
     const data = await response.json();
-    return data.k_score ?? data.score ?? 50;
+    return data.k ?? data.k_score ?? data.score ?? 50;
   } finally {
     clearTimeout(timeout);
   }

@@ -8,8 +8,8 @@ const rpc = require('../utils/rpc');
 // Constants
 // =============================================================================
 
-// Minimum balance to consider a payer healthy (0.05 SOL)
-const MIN_HEALTHY_BALANCE = 50_000_000;
+// Minimum balance to consider a payer healthy (0.05 SOL in prod, 0 in dev)
+const MIN_HEALTHY_BALANCE = process.env.NODE_ENV === 'development' ? 0 : 50_000_000;
 
 // Warning balance threshold (0.1 SOL)
 const WARNING_BALANCE = 100_000_000;
