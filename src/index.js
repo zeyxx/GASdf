@@ -70,8 +70,17 @@ app.get('/alerts', (req, res) => {
 });
 
 // Public status page endpoint (for external monitoring)
+// Cache status for 10 seconds to prevent abuse
+let statusCache = { data: null, timestamp: 0 };
+const STATUS_CACHE_TTL = 10000; // 10 seconds
+
 app.get('/status', async (req, res) => {
   try {
+    // Return cached response if fresh
+    if (statusCache.data && Date.now() - statusCache.timestamp < STATUS_CACHE_TTL) {
+      return res.json(statusCache.data);
+    }
+
     const rpc = require('./utils/rpc');
     const redisClient = require('./utils/redis');
     const oracle = require('./services/oracle');
@@ -116,7 +125,7 @@ app.get('/status', async (req, res) => {
     else if (statuses.includes('degraded')) overall = 'degraded';
 
     // Response compatible with common status page formats
-    res.json({
+    const response = {
       status: overall,
       updated_at: new Date().toISOString(),
       response_time_ms: Date.now() - startTime,
@@ -132,7 +141,12 @@ app.get('/status', async (req, res) => {
         degraded: overall === 'degraded',
         outage: overall === 'major_outage',
       },
-    });
+    };
+
+    // Cache the response
+    statusCache = { data: response, timestamp: Date.now() };
+
+    res.json(response);
   } catch (error) {
     res.status(503).json({
       status: 'major_outage',
