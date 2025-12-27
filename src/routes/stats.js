@@ -146,6 +146,89 @@ router.get('/treasury', async (req, res) => {
   }
 });
 
+/**
+ * GET /stats/burns
+ * Get verifiable burn proofs (on-chain transparency)
+ */
+router.get('/burns', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const { proofs, totalCount } = await redis.getBurnProofs(limit);
+
+    res.json({
+      burns: proofs.map(proof => ({
+        ...proof,
+        amountFormatted: formatAsdf(proof.amountBurned),
+        solFormatted: formatSol(proof.solAmount),
+        treasuryFormatted: formatSol(proof.treasuryAmount),
+        age: getTimeAgo(proof.timestamp),
+      })),
+      totalBurns: totalCount,
+      verification: {
+        message: 'All burns are verifiable on-chain via Solscan',
+        howToVerify: 'Click explorerUrl to see the burn transaction on Solana',
+      },
+    });
+  } catch (error) {
+    logger.error('STATS', 'Failed to get burn proofs', { error: error.message });
+    res.status(500).json({ error: 'Failed to get burn proofs' });
+  }
+});
+
+/**
+ * GET /stats/burns/:signature
+ * Verify a specific burn by signature
+ */
+router.get('/burns/:signature', async (req, res) => {
+  try {
+    const { signature } = req.params;
+
+    // Validate signature format (base58, 87-88 chars)
+    if (!signature || signature.length < 80 || signature.length > 90) {
+      return res.status(400).json({ error: 'Invalid signature format' });
+    }
+
+    const proof = await redis.getBurnProofBySignature(signature);
+
+    if (!proof) {
+      return res.status(404).json({
+        error: 'Burn proof not found',
+        suggestion: 'This signature may not be a GASdf burn transaction',
+      });
+    }
+
+    res.json({
+      verified: true,
+      proof: {
+        ...proof,
+        amountFormatted: formatAsdf(proof.amountBurned),
+        solFormatted: formatSol(proof.solAmount),
+        treasuryFormatted: formatSol(proof.treasuryAmount),
+        age: getTimeAgo(proof.timestamp),
+      },
+      verification: {
+        message: 'This burn is verified and recorded by GASdf',
+        explorerUrl: proof.explorerUrl,
+        swapExplorerUrl: `https://solscan.io/tx/${proof.swapSignature}`,
+      },
+    });
+  } catch (error) {
+    logger.error('STATS', 'Failed to verify burn', { error: error.message });
+    res.status(500).json({ error: 'Failed to verify burn' });
+  }
+});
+
+function getTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function formatAsdf(amount) {
   // $ASDF has 6 decimals
   const decimals = 6;

@@ -69,12 +69,99 @@ app.get('/alerts', (req, res) => {
   });
 });
 
-// API Routes
-app.use('/quote', quoteRouter);
-app.use('/submit', submitRouter);
-app.use('/tokens', tokensRouter);
-app.use('/stats', statsRouter);
-app.use('/health', healthRouter);
+// Public status page endpoint (for external monitoring)
+app.get('/status', async (req, res) => {
+  try {
+    const rpc = require('./utils/rpc');
+    const redisClient = require('./utils/redis');
+    const oracle = require('./services/oracle');
+
+    // Gather all health checks in parallel
+    const startTime = Date.now();
+    const [rpcHealth, redisState, oracleHealth] = await Promise.all([
+      (async () => {
+        try {
+          const conn = rpc.getConnection();
+          await conn.getSlot();
+          return { status: 'operational' };
+        } catch {
+          return { status: 'degraded' };
+        }
+      })(),
+      (async () => {
+        const state = redisClient.getConnectionState();
+        if (state.isHealthy) return { status: 'operational' };
+        if (state.isMemoryFallback) return { status: 'degraded' };
+        return { status: 'outage' };
+      })(),
+      (async () => {
+        const health = oracle.getOracleHealth();
+        if (health.status === 'HEALTHY') return { status: 'operational' };
+        if (health.status === 'DEGRADED') return { status: 'degraded' };
+        return { status: 'unknown' };
+      })(),
+    ]);
+
+    // Calculate overall status
+    const components = {
+      api: { status: 'operational' }, // If we got here, API is up
+      rpc: rpcHealth,
+      database: redisState,
+      oracle: oracleHealth,
+    };
+
+    const statuses = Object.values(components).map(c => c.status);
+    let overall = 'operational';
+    if (statuses.includes('outage')) overall = 'major_outage';
+    else if (statuses.includes('degraded')) overall = 'degraded';
+
+    // Response compatible with common status page formats
+    res.json({
+      status: overall,
+      updated_at: new Date().toISOString(),
+      response_time_ms: Date.now() - startTime,
+      components,
+      // Upptime-compatible format
+      page: {
+        name: 'GASdf',
+        url: 'https://gasdf.io',
+      },
+      // Simple status indicators
+      indicators: {
+        operational: overall === 'operational',
+        degraded: overall === 'degraded',
+        outage: overall === 'major_outage',
+      },
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'major_outage',
+      updated_at: new Date().toISOString(),
+      error: 'Health check failed',
+    });
+  }
+});
+
+// API Routes - v1 (versioned)
+app.use('/v1/quote', quoteRouter);
+app.use('/v1/submit', submitRouter);
+app.use('/v1/tokens', tokensRouter);
+app.use('/v1/stats', statsRouter);
+app.use('/v1/health', healthRouter);
+
+// API Routes - legacy (backwards compatibility)
+// Deprecation middleware
+const deprecationWarning = (req, res, next) => {
+  res.set('Deprecation', 'true');
+  res.set('Sunset', 'Sat, 01 Jul 2025 00:00:00 GMT');
+  res.set('Link', `</v1${req.path}>; rel="successor-version"`);
+  next();
+};
+app.use('/quote', deprecationWarning, quoteRouter);
+app.use('/submit', deprecationWarning, submitRouter);
+app.use('/tokens', deprecationWarning, tokensRouter);
+app.use('/stats', deprecationWarning, statsRouter);
+app.use('/health', deprecationWarning, healthRouter);
 
 // Root redirect to dashboard
 app.get('/', (req, res) => {

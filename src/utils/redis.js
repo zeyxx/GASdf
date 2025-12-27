@@ -613,6 +613,93 @@ async function getBurnerCount() {
 }
 
 // =============================================================================
+// Burn Proofs (Verifiable On-Chain)
+// =============================================================================
+
+/**
+ * Record a burn proof with verifiable on-chain signatures
+ */
+async function recordBurnProof(proof) {
+  const entry = {
+    burnSignature: proof.burnSignature,
+    swapSignature: proof.swapSignature,
+    amountBurned: proof.amountBurned,
+    solAmount: proof.solAmount,
+    treasuryAmount: proof.treasuryAmount,
+    method: proof.method, // pumpswap or jupiter
+    timestamp: Date.now(),
+    network: proof.network || 'mainnet-beta',
+    explorerUrl: `https://solscan.io/tx/${proof.burnSignature}`,
+  };
+
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      // Store proof by burn signature for lookup
+      multi.set(`burn:proof:${proof.burnSignature}`, JSON.stringify(entry));
+      // Add to chronological list (newest first)
+      multi.lPush('burn:proofs', JSON.stringify(entry));
+      // Keep last 1000 proofs
+      multi.lTrim('burn:proofs', 0, 999);
+      // Track total verified burns
+      multi.incr('burn:proof:count');
+      await multi.exec();
+      return entry;
+    },
+    () => {
+      // Memory fallback
+      const proofs = JSON.parse(memoryStore.get('burn:proofs') || '[]');
+      proofs.unshift(entry);
+      if (proofs.length > 100) proofs.pop();
+      memoryStore.set('burn:proofs', JSON.stringify(proofs));
+      memoryStore.set(`burn:proof:${proof.burnSignature}`, JSON.stringify(entry));
+      return entry;
+    }
+  );
+}
+
+/**
+ * Get recent burn proofs
+ */
+async function getBurnProofs(limit = 50) {
+  return withRedis(
+    async (redis) => {
+      const [proofs, totalCount] = await Promise.all([
+        redis.lRange('burn:proofs', 0, limit - 1),
+        redis.get('burn:proof:count'),
+      ]);
+      return {
+        proofs: proofs.map(p => JSON.parse(p)),
+        totalCount: parseInt(totalCount) || 0,
+      };
+    },
+    () => {
+      const proofs = JSON.parse(memoryStore.get('burn:proofs') || '[]');
+      return {
+        proofs: proofs.slice(0, limit),
+        totalCount: proofs.length,
+      };
+    }
+  );
+}
+
+/**
+ * Get a specific burn proof by signature
+ */
+async function getBurnProofBySignature(signature) {
+  return withRedis(
+    async (redis) => {
+      const proof = await redis.get(`burn:proof:${signature}`);
+      return proof ? JSON.parse(proof) : null;
+    },
+    () => {
+      const proof = memoryStore.get(`burn:proof:${signature}`);
+      return proof ? JSON.parse(proof) : null;
+    }
+  );
+}
+
+// =============================================================================
 // Anomaly Detection State
 // =============================================================================
 
@@ -717,4 +804,8 @@ module.exports = {
   getWalletBurnStats,
   getBurnLeaderboard,
   getBurnerCount,
+  // Burn Proofs
+  recordBurnProof,
+  getBurnProofs,
+  getBurnProofBySignature,
 };

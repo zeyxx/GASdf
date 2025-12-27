@@ -286,8 +286,7 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     await redis.incrTxCount();
 
     // Track wallet burn contribution (CCM-aligned)
-    // burnAmount is 80% of fee based on 80/20 model
-    const burnAmount = quote.burnAmount || Math.floor(quote.feeAmountLamports * 0.8);
+    const burnAmount = quote.burnAmount || Math.floor(quote.feeAmountLamports * config.BURN_RATIO);
     await redis.incrWalletBurn(userPubkey, burnAmount);
 
     // Mark as successful

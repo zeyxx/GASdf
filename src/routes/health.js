@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
+const oracle = require('../services/oracle');
 
 const router = express.Router();
 
@@ -36,6 +37,12 @@ router.get('/', async (req, res) => {
 
   // Add circuit breaker status
   health.circuitBreakers = getCircuitBreakerStatus();
+
+  // Add oracle health
+  health.oracle = oracle.getOracleHealth();
+
+  // Add RPC pool health
+  health.rpcPool = rpc.getRpcHealth();
 
   // Determine overall status
   // In staging/production, Redis is CRITICAL - treat it as error
@@ -168,9 +175,18 @@ async function checkRedis() {
 
 async function checkRpc() {
   try {
+    const poolHealth = rpc.getRpcHealth();
     const conn = rpc.getConnection();
     const slot = await conn.getSlot();
-    return { status: 'ok', slot, network: config.NETWORK };
+
+    // Determine status based on pool health
+    if (poolHealth.status === 'CRITICAL') {
+      return { status: 'error', slot, network: config.NETWORK, pool: poolHealth.status };
+    }
+    if (poolHealth.status === 'DEGRADED') {
+      return { status: 'warning', slot, network: config.NETWORK, pool: poolHealth.status };
+    }
+    return { status: 'ok', slot, network: config.NETWORK, pool: poolHealth.status };
   } catch (error) {
     return { status: 'error', error: error.message };
   }

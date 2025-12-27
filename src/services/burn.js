@@ -123,11 +123,23 @@ async function checkAndExecuteBurn() {
     await redis.incrBurnTotal(asdfBalance);
     await redis.resetPendingSwap();
 
+    // 6. Record burn proof for transparency
+    const burnProof = await redis.recordBurnProof({
+      burnSignature: burnResult,
+      swapSignature: swapResult.signature,
+      amountBurned: asdfBalance,
+      solAmount: burnAmount,
+      treasuryAmount,
+      method: swapResult.method,
+      network: config.NETWORK,
+    });
+
     logger.info('BURN', 'Burn completed (80/20 model)', {
       asdfBurned: asdfBalance,
       solToBurn: burnAmount,
       solToTreasury: treasuryAmount,
       burnSignature: burnResult,
+      proofRecorded: true,
     });
 
     return {
@@ -137,6 +149,7 @@ async function checkAndExecuteBurn() {
       burnSignature: burnResult,
       method: swapResult.method,
       model: '80/20',
+      proof: burnProof,
     };
   } catch (error) {
     logger.error('BURN', 'Burn failed', { error: error.message });
