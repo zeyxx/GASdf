@@ -80,6 +80,47 @@
       color: #ff6b6b;
     }
 
+    .stat-value.treasury {
+      color: #ffd700;
+    }
+
+    .model-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ff6b6b, #ffd700);
+      color: #000;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+    }
+
+    .split-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .split-burn {
+      background: #ff6b6b;
+      flex: 80;
+    }
+
+    .split-treasury {
+      background: #ffd700;
+      flex: 20;
+    }
+
+    .split-legend {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
     .info-section {
       background: #111;
       border: 1px solid #222;
@@ -197,12 +238,30 @@
         <div class="stat-value burn" id="burned">Loading...</div>
       </div>
       <div class="stat-card">
+        <div class="stat-label">Treasury<span class="model-badge">80/20</span></div>
+        <div class="stat-value treasury" id="treasury">Loading...</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-label">Transactions</div>
         <div class="stat-value" id="txCount">Loading...</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Status</div>
         <div class="stat-value" id="status">...</div>
+      </div>
+    </div>
+
+    <!-- 80/20 Model Visualization -->
+    <div class="info-section">
+      <h2>Economic Model</h2>
+      <p style="color: #888; margin-bottom: 1rem;">Sustainable tokenomics: 80% burn, 20% operations</p>
+      <div class="split-bar">
+        <div class="split-burn"></div>
+        <div class="split-treasury"></div>
+      </div>
+      <div class="split-legend">
+        <span>80% Burn $ASDF</span>
+        <span>20% Treasury</span>
       </div>
     </div>
 
@@ -266,9 +325,15 @@
 
         document.getElementById('burned').textContent = data.burnedFormatted;
         document.getElementById('txCount').textContent = data.totalTransactions.toLocaleString();
+
+        // Treasury stats (80/20 model)
+        if (data.treasury) {
+          document.getElementById('treasury').textContent = data.treasury.balanceFormatted;
+        }
       } catch (err) {
         document.getElementById('burned').textContent = '0 $ASDF';
         document.getElementById('txCount').textContent = '0';
+        document.getElementById('treasury').textContent = '0 SOL';
       }
     }
 
@@ -278,12 +343,15 @@
         const data = await res.json();
 
         const statusEl = document.getElementById('status');
-        if (data.status === 'ok') {
+        if (data.status === 'ok' || data.status === 'healthy') {
           statusEl.textContent = 'Online';
           statusEl.style.color = '#00ff88';
-        } else {
+        } else if (data.status === 'unhealthy') {
           statusEl.textContent = 'Degraded';
           statusEl.style.color = '#ffaa00';
+        } else {
+          statusEl.textContent = 'Unknown';
+          statusEl.style.color = '#888';
         }
       } catch (err) {
         document.getElementById('status').textContent = 'Offline';
