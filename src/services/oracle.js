@@ -1,15 +1,15 @@
 // K-score oracle for dynamic pricing
-// K-score = measure of token "trust" (higher = lower fee multiplier)
+// Security by design: trusted tokens → cache → API → fallback
+// No single point of failure
 
+const config = require('../utils/config');
 const logger = require('../utils/logger');
 
-const BIRDEYE_API = 'https://public-api.birdeye.so';
-
-// Cache K-scores for 5 minutes
+// Cache K-scores (survives API outages)
 const kScoreCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Default K-score tiers
+// K-score tiers
 const K_TIERS = {
   TRUSTED: { minScore: 80, feeMultiplier: 1.0 },
   STANDARD: { minScore: 50, feeMultiplier: 1.25 },
@@ -17,32 +17,34 @@ const K_TIERS = {
   UNKNOWN: { minScore: 0, feeMultiplier: 2.0 },
 };
 
-// Known trusted tokens (skip oracle lookup)
+// Known trusted tokens - instant, no network call
 const TRUSTED_TOKENS = new Set([
   'So11111111111111111111111111111111111111112', // SOL
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
   'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
   'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', // jitoSOL
-  '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', // $ASDF (native token)
+  '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', // $ASDF
 ]);
 
+// Oracle API configuration
+const ORACLE_TIMEOUT = 3000; // 3 seconds max
+
 async function getKScore(mint) {
-  // Check trusted list
+  // 1. Check trusted list (instant)
   if (TRUSTED_TOKENS.has(mint)) {
     return { score: 100, tier: 'TRUSTED', feeMultiplier: 1.0 };
   }
 
-  // Check cache
+  // 2. Check cache (no network)
   const cached = kScoreCache.get(mint);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
 
+  // 3. Try oracle API
   try {
-    // Fetch from Birdeye (would need API key in prod)
-    // For now, return default
-    const score = await fetchTokenScore(mint);
+    const score = await fetchFromOracle(mint);
     const tier = getTierForScore(score);
 
     const result = {
@@ -51,18 +53,60 @@ async function getKScore(mint) {
       feeMultiplier: tier.feeMultiplier,
     };
 
+    // Cache the result
     kScoreCache.set(mint, { data: result, timestamp: Date.now() });
     return result;
   } catch (error) {
-    logger.warn('ORACLE', 'Failed to fetch K-score', { mint, error: error.message });
-    return { score: 0, tier: 'UNKNOWN', feeMultiplier: K_TIERS.UNKNOWN.feeMultiplier };
+    logger.warn('ORACLE', 'API unavailable, using fallback', {
+      mint,
+      error: error.message,
+    });
   }
+
+  // 4. Fallback: STANDARD tier (system continues)
+  const fallback = {
+    score: 50,
+    tier: 'STANDARD',
+    feeMultiplier: K_TIERS.STANDARD.feeMultiplier,
+    fallback: true,
+  };
+
+  // Cache fallback too (prevents hammering dead API)
+  kScoreCache.set(mint, { data: fallback, timestamp: Date.now() });
+
+  return fallback;
 }
 
-async function fetchTokenScore(mint) {
-  // Placeholder - integrate with actual oracle/API
-  // Could use: Birdeye, DexScreener, custom scoring
-  return 50; // Default to STANDARD tier
+async function fetchFromOracle(mint) {
+  const oracleUrl = config.ORACLE_URL || process.env.ORACLE_URL;
+
+  if (!oracleUrl) {
+    throw new Error('ORACLE_URL not configured');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ORACLE_TIMEOUT);
+
+  try {
+    const headers = {};
+    if (config.ORACLE_API_KEY) {
+      headers['X-Oracle-Key'] = config.ORACLE_API_KEY;
+    }
+
+    const response = await fetch(`${oracleUrl}/api/v1/token/${mint}`, {
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Oracle returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.k_score ?? data.score ?? 50;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function getTierForScore(score) {

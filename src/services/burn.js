@@ -5,12 +5,14 @@ const {
 const {
   createBurnInstruction,
   getAssociatedTokenAddress,
+  getAccount,
 } = require('@solana/spl-token');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
-const { getFeePayer } = require('./signer');
+const { getHealthyPayer } = require('./fee-payer-pool');
+const pumpswap = require('./pumpswap');
 const jupiter = require('./jupiter');
 
 // Lazy-load ASDF mint to avoid startup errors in dev
@@ -32,39 +34,131 @@ async function checkAndExecuteBurn() {
     return null;
   }
 
-  logger.info('BURN', 'Burn threshold reached', { pendingAmount });
+  logger.info('BURN', 'Burn threshold reached', {
+    pendingAmount,
+    threshold: config.BURN_THRESHOLD_LAMPORTS,
+  });
 
   try {
-    // 1. Swap accumulated SOL to ASDF
-    const asdfQuote = await jupiter.swapToAsdf(Math.floor(pendingAmount));
-    const asdfAmount = parseInt(asdfQuote.outAmount);
+    // 1. Swap SOL to ASDF (PumpSwap primary, Jupiter fallback)
+    const swapResult = await swapWithFallback(Math.floor(pendingAmount));
 
-    logger.info('BURN', 'Swapping SOL for ASDF', { pendingAmount, asdfAmount });
+    if (!swapResult.success) {
+      logger.warn('BURN', 'Swap failed, keeping pending for retry');
+      return null;
+    }
 
-    // 2. Execute the swap (would need full implementation)
-    // For now, we'll simulate and track
+    logger.info('BURN', 'Swap completed', {
+      signature: swapResult.signature,
+      method: swapResult.method,
+    });
+
+    // 2. Get ASDF balance and burn it all
+    const feePayer = getHealthyPayer();
+    const asdfMint = getAsdfMint();
+    const tokenAccount = await getAssociatedTokenAddress(asdfMint, feePayer.publicKey);
+
+    let asdfBalance;
+    try {
+      const accountInfo = await getAccount(rpc.getConnection(), tokenAccount);
+      asdfBalance = Number(accountInfo.amount);
+    } catch (error) {
+      logger.error('BURN', 'Failed to get ASDF balance', { error: error.message });
+      return null;
+    }
+
+    if (asdfBalance <= 0) {
+      logger.warn('BURN', 'No ASDF to burn');
+      return null;
+    }
 
     // 3. Burn the ASDF
-    const burnResult = await burnAsdf(asdfAmount);
+    const burnResult = await burnAsdf(asdfBalance);
 
     // 4. Update stats
-    await redis.incrBurnTotal(asdfAmount);
+    await redis.incrBurnTotal(asdfBalance);
     await redis.resetPendingSwap();
 
-    logger.info('BURN', 'Burn completed', { asdfAmount, signature: burnResult });
+    logger.info('BURN', 'Burn completed', {
+      asdfAmount: asdfBalance,
+      signature: burnResult,
+    });
 
     return {
-      amountBurned: asdfAmount,
-      signature: burnResult,
+      amountBurned: asdfBalance,
+      swapSignature: swapResult.signature,
+      burnSignature: burnResult,
+      method: swapResult.method,
     };
   } catch (error) {
     logger.error('BURN', 'Burn failed', { error: error.message });
+    // Don't reset pending - will retry next cycle
     return null;
   }
 }
 
+async function swapWithFallback(solAmountLamports) {
+  // Primary: PumpSwap
+  try {
+    logger.info('BURN', 'Attempting PumpSwap', { solAmount: solAmountLamports });
+    const result = await pumpswap.swapSolToAsdf(solAmountLamports);
+    return { ...result, method: 'pumpswap' };
+  } catch (pumpswapError) {
+    logger.warn('BURN', 'PumpSwap failed, trying Jupiter', {
+      error: pumpswapError.message,
+    });
+  }
+
+  // Fallback: Jupiter
+  try {
+    logger.info('BURN', 'Attempting Jupiter', { solAmount: solAmountLamports });
+    const result = await swapViaJupiter(solAmountLamports);
+    return { ...result, method: 'jupiter' };
+  } catch (jupiterError) {
+    logger.error('BURN', 'Jupiter also failed', {
+      error: jupiterError.message,
+    });
+  }
+
+  return { success: false };
+}
+
+async function swapViaJupiter(solAmountLamports) {
+  const feePayer = getHealthyPayer();
+
+  // Get quote
+  const quote = await jupiter.getQuote(
+    config.WSOL_MINT,
+    config.ASDF_MINT,
+    solAmountLamports,
+    100, // 1% slippage
+  );
+
+  // Get swap transaction
+  const swapResponse = await jupiter.getSwapTransaction(
+    quote,
+    feePayer.publicKey.toBase58(),
+  );
+
+  // Deserialize and sign
+  const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
+  const transaction = Transaction.from(swapTxBuf);
+
+  transaction.sign(feePayer);
+
+  // Send and confirm
+  const signature = await rpc.sendTransaction(transaction);
+  const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+  await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+  return {
+    signature,
+    success: true,
+  };
+}
+
 async function burnAsdf(amount) {
-  const feePayer = getFeePayer();
+  const feePayer = getHealthyPayer();
   const asdfMint = getAsdfMint();
 
   // Get fee payer's ASDF token account
@@ -100,6 +194,16 @@ async function burnAsdf(amount) {
 
 // Schedule periodic burn checks
 function startBurnWorker(intervalMs = 60000) {
+  // Initial check after 10 seconds
+  setTimeout(async () => {
+    try {
+      await checkAndExecuteBurn();
+    } catch (error) {
+      logger.error('BURN', 'Initial burn check failed', { error: error.message });
+    }
+  }, 10000);
+
+  // Then check periodically
   setInterval(async () => {
     try {
       await checkAndExecuteBurn();

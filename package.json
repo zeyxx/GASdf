@@ -15,6 +15,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@pump-fun/pump-swap-sdk": "^1.11.0",
     "@solana/spl-token": "^0.4.8",
     "@solana/web3.js": "^1.95.0",
     "bs58": "^6.0.0",

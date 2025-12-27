@@ -87,6 +87,10 @@ const config = {
   // Burn settings
   BURN_THRESHOLD_LAMPORTS: parseInt(process.env.BURN_THRESHOLD_LAMPORTS) || 100000000,
 
+  // Oracle (optional - graceful fallback if not configured)
+  ORACLE_URL: process.env.ORACLE_URL,
+  ORACLE_API_KEY: process.env.ORACLE_API_KEY,
+
   // Phase 3: Monitoring
   PROMETHEUS_ENABLED: process.env.PROMETHEUS_ENABLED === 'true',
   ALERTING_WEBHOOK: process.env.ALERTING_WEBHOOK,
