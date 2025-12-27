@@ -27,6 +27,13 @@ const RESERVATION_TTL_MS = 90_000; // 90 seconds
 // Fee Payer Pool
 // =============================================================================
 
+// Key rotation states
+const KEY_STATUS = {
+  ACTIVE: 'active',       // Normal operation, accepts new quotes
+  RETIRING: 'retiring',   // No new quotes, still processes existing reservations
+  RETIRED: 'retired',     // Fully deprecated, should not be used
+};
+
 class FeePayerPool {
   constructor() {
     this.payers = [];
@@ -44,6 +51,9 @@ class FeePayerPool {
     this.circuitOpen = false;
     this.circuitOpenUntil = 0;
     this.consecutiveFailures = 0;
+
+    // Key rotation state
+    this.keyStatus = new Map(); // pubkey -> { status, retiredAt, reason }
   }
 
   /**
@@ -131,9 +141,15 @@ class FeePayerPool {
   }
 
   /**
-   * Check if a payer is healthy
+   * Check if a payer is healthy (for new quotes)
+   * Considers: balance, temporary unhealthy status, and rotation status
    */
   isPayerHealthy(pubkey) {
+    // Check key rotation status first
+    if (!this.canAcceptNewQuotes(pubkey)) {
+      return false;
+    }
+
     const balance = this.balances.get(pubkey) || 0;
     const unhealthyUntil = this.unhealthyUntil.get(pubkey);
 
@@ -143,6 +159,22 @@ class FeePayerPool {
     }
 
     // Check balance
+    return balance >= MIN_HEALTHY_BALANCE;
+  }
+
+  /**
+   * Check if a payer can process an existing reservation (submit)
+   * More permissive than isPayerHealthy - allows RETIRING keys
+   */
+  canPayerProcessSubmit(pubkey) {
+    // Check key rotation status (ACTIVE or RETIRING allowed)
+    if (!this.canProcessReservations(pubkey)) {
+      return false;
+    }
+
+    const balance = this.balances.get(pubkey) || 0;
+
+    // Still need minimum balance to submit
     return balance >= MIN_HEALTHY_BALANCE;
   }
 
@@ -243,6 +275,189 @@ class FeePayerPool {
     }
 
     return { total, healthy, warning, critical };
+  }
+
+  // ===========================================================================
+  // Key Rotation System
+  // ===========================================================================
+
+  /**
+   * Get current status of a key
+   */
+  getKeyStatus(pubkey) {
+    const status = this.keyStatus.get(pubkey);
+    if (!status) {
+      return { status: KEY_STATUS.ACTIVE };
+    }
+    return status;
+  }
+
+  /**
+   * Check if a key can accept new quotes
+   * Returns true only for ACTIVE keys
+   */
+  canAcceptNewQuotes(pubkey) {
+    const keyInfo = this.getKeyStatus(pubkey);
+    return keyInfo.status === KEY_STATUS.ACTIVE;
+  }
+
+  /**
+   * Check if a key can process existing reservations
+   * Returns true for ACTIVE and RETIRING keys
+   */
+  canProcessReservations(pubkey) {
+    const keyInfo = this.getKeyStatus(pubkey);
+    return keyInfo.status !== KEY_STATUS.RETIRED;
+  }
+
+  /**
+   * Start retiring a key - no new quotes, but existing reservations honored
+   * @param {string} pubkey - The fee payer public key
+   * @param {string} reason - Reason for retirement (e.g., 'scheduled_rotation', 'compromise_suspected')
+   */
+  startKeyRetirement(pubkey, reason = 'scheduled_rotation') {
+    const existingStatus = this.getKeyStatus(pubkey);
+
+    if (existingStatus.status === KEY_STATUS.RETIRED) {
+      logger.warn('FEE_PAYER_POOL', `Cannot retire already retired key: ${pubkey.slice(0, 8)}...`);
+      return false;
+    }
+
+    this.keyStatus.set(pubkey, {
+      status: KEY_STATUS.RETIRING,
+      retirementStartedAt: Date.now(),
+      reason,
+    });
+
+    logger.warn('FEE_PAYER_POOL', `Key rotation started for ${pubkey.slice(0, 8)}...`, { reason });
+
+    // Log to audit if available
+    try {
+      const { logPayerMarkedUnhealthy } = require('./audit');
+      logPayerMarkedUnhealthy({
+        pubkey,
+        reason: `KEY_ROTATION_STARTED: ${reason}`,
+        duration: 'until_manual_completion',
+      });
+    } catch {
+      // Audit service may not be available
+    }
+
+    return true;
+  }
+
+  /**
+   * Complete key retirement - fully remove from active duty
+   * Should be called after all existing reservations are processed
+   */
+  completeKeyRetirement(pubkey) {
+    const existingStatus = this.getKeyStatus(pubkey);
+
+    if (existingStatus.status !== KEY_STATUS.RETIRING) {
+      logger.warn('FEE_PAYER_POOL', `Cannot complete retirement for non-retiring key: ${pubkey.slice(0, 8)}...`);
+      return false;
+    }
+
+    // Check if there are pending reservations
+    const pendingReservations = this.reservationsByPayer.get(pubkey)?.size || 0;
+    if (pendingReservations > 0) {
+      logger.warn('FEE_PAYER_POOL', `Cannot complete retirement: ${pendingReservations} pending reservations`, { pubkey: pubkey.slice(0, 8) });
+      return false;
+    }
+
+    this.keyStatus.set(pubkey, {
+      status: KEY_STATUS.RETIRED,
+      retiredAt: Date.now(),
+      retirementStartedAt: existingStatus.retirementStartedAt,
+      reason: existingStatus.reason,
+    });
+
+    logger.warn('FEE_PAYER_POOL', `Key rotation completed for ${pubkey.slice(0, 8)}...`);
+
+    return true;
+  }
+
+  /**
+   * Emergency: Immediately retire a key (e.g., suspected compromise)
+   * Forces retirement even with pending reservations
+   */
+  emergencyRetireKey(pubkey, reason = 'emergency') {
+    this.keyStatus.set(pubkey, {
+      status: KEY_STATUS.RETIRED,
+      retiredAt: Date.now(),
+      reason: `EMERGENCY: ${reason}`,
+      forced: true,
+    });
+
+    // Cancel all pending reservations for this key
+    const quoteIds = this.reservationsByPayer.get(pubkey);
+    if (quoteIds) {
+      const cancelled = quoteIds.size;
+      for (const quoteId of [...quoteIds]) {
+        this.releaseReservation(quoteId);
+      }
+      logger.error('FEE_PAYER_POOL', `Emergency retirement: cancelled ${cancelled} reservations`, { pubkey: pubkey.slice(0, 8) });
+    }
+
+    logger.error('FEE_PAYER_POOL', `EMERGENCY key retirement for ${pubkey.slice(0, 8)}...`, { reason });
+
+    // Log to audit
+    try {
+      const { logSecurityEvent } = require('./audit');
+      logSecurityEvent('KEY_EMERGENCY_RETIRED', { pubkey, reason });
+    } catch {
+      // Audit service may not be available
+    }
+
+    return true;
+  }
+
+  /**
+   * Reactivate a retired key (use with caution)
+   */
+  reactivateKey(pubkey) {
+    const existingStatus = this.getKeyStatus(pubkey);
+
+    if (existingStatus.status === KEY_STATUS.ACTIVE) {
+      return true; // Already active
+    }
+
+    if (existingStatus.forced) {
+      logger.error('FEE_PAYER_POOL', `Cannot reactivate emergency-retired key: ${pubkey.slice(0, 8)}...`);
+      return false;
+    }
+
+    this.keyStatus.delete(pubkey);
+    logger.info('FEE_PAYER_POOL', `Key reactivated: ${pubkey.slice(0, 8)}...`);
+
+    return true;
+  }
+
+  /**
+   * Get rotation status for all keys
+   */
+  getRotationStatus() {
+    const status = [];
+
+    for (const payer of this.payers) {
+      const pubkey = payer.publicKey.toBase58();
+      const keyInfo = this.getKeyStatus(pubkey);
+      const pendingReservations = this.reservationsByPayer.get(pubkey)?.size || 0;
+
+      status.push({
+        pubkey: pubkey.slice(0, 12) + '...',
+        fullPubkey: pubkey,
+        status: keyInfo.status,
+        canAcceptQuotes: this.canAcceptNewQuotes(pubkey),
+        canProcessReservations: this.canProcessReservations(pubkey),
+        pendingReservations,
+        ...(keyInfo.retirementStartedAt && { retirementStartedAt: new Date(keyInfo.retirementStartedAt).toISOString() }),
+        ...(keyInfo.retiredAt && { retiredAt: new Date(keyInfo.retiredAt).toISOString() }),
+        ...(keyInfo.reason && { reason: keyInfo.reason }),
+      });
+    }
+
+    return status;
   }
 
   // ===========================================================================
@@ -606,6 +821,7 @@ module.exports = {
   getPayerBalances: () => pool.getBalances(),
   markPayerUnhealthy: (pubkey, duration) => pool.markUnhealthy(pubkey, duration),
   getHealthSummary: () => pool.getHealthSummary(),
+  canPayerProcessSubmit: (pubkey) => pool.canPayerProcessSubmit(pubkey),
 
   // Balance reservation system
   reserveBalance: (quoteId, amount) => pool.reserveBalance(quoteId, amount),
@@ -617,8 +833,17 @@ module.exports = {
   getCircuitState: () => pool.getCircuitState(),
   closeCircuit: () => pool.closeCircuit(),
 
+  // Key rotation
+  startKeyRetirement: (pubkey, reason) => pool.startKeyRetirement(pubkey, reason),
+  completeKeyRetirement: (pubkey) => pool.completeKeyRetirement(pubkey),
+  emergencyRetireKey: (pubkey, reason) => pool.emergencyRetireKey(pubkey, reason),
+  reactivateKey: (pubkey) => pool.reactivateKey(pubkey),
+  getRotationStatus: () => pool.getRotationStatus(),
+  getKeyStatus: (pubkey) => pool.getKeyStatus(pubkey),
+
   // Constants
   MIN_HEALTHY_BALANCE,
   WARNING_BALANCE,
   MAX_RESERVATIONS_PER_PAYER,
+  KEY_STATUS,
 };

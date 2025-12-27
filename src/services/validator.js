@@ -1,5 +1,6 @@
 const { Transaction, VersionedTransaction, PublicKey, SystemProgram } = require('@solana/web3.js');
 const crypto = require('crypto');
+const nacl = require('tweetnacl');
 const { getAllFeePayerPublicKeys, getTransactionFeePayer } = require('./signer');
 
 // System Program instruction discriminators
@@ -9,6 +10,35 @@ const SYSTEM_TRANSFER_DISCRIMINATOR = 2; // Transfer instruction index
 // Token Program IDs
 const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+
+// Token Program dangerous instructions (fee payer as authority)
+// Using BLOCKLIST approach - these drain tokens or change ownership
+const TOKEN_DANGEROUS_INSTRUCTIONS = {
+  3: 'Transfer',
+  4: 'Approve',           // Grants delegate access
+  5: 'Revoke',            // Could be part of exploit chain
+  6: 'SetAuthority',      // Changes ownership
+  7: 'MintTo',            // Could mint if fee payer is mint authority
+  8: 'Burn',              // Burns tokens
+  9: 'CloseAccount',      // Closes account, sends SOL to destination
+  12: 'TransferChecked',
+  13: 'ApproveChecked',
+  14: 'MintToChecked',
+  15: 'BurnChecked',
+};
+
+// System Program dangerous instructions
+const SYSTEM_DANGEROUS_INSTRUCTIONS = {
+  2: 'Transfer',
+  3: 'CreateAccountWithSeed',  // Could create account for draining
+  8: 'Allocate',               // Could manipulate account data
+  9: 'AllocateWithSeed',
+  10: 'AssignWithSeed',
+  11: 'TransferWithSeed',
+};
+
+// Durable nonce instruction discriminator
+const ADVANCE_NONCE_DISCRIMINATOR = 4;
 
 // Max compute units we'll pay for
 const MAX_COMPUTE_UNITS = 400000;
@@ -42,27 +72,10 @@ function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
     errors.push('Transaction fee payer must be a GASdf fee payer');
   }
 
-  // Check 2: User must have signed the transaction (verify actual signature, not just presence)
-  if (transaction instanceof VersionedTransaction) {
-    const signerKeys = transaction.message.staticAccountKeys;
-    const userIndex = signerKeys.findIndex(
-      (key) => key.toBase58() === userPubkey
-    );
-    if (userIndex === -1) {
-      errors.push('User public key not found in transaction');
-    } else {
-      const signature = transaction.signatures[userIndex];
-      if (!signature || signature.every((byte) => byte === 0)) {
-        errors.push('Transaction must be signed by user');
-      }
-    }
-  } else {
-    const userSig = transaction.signatures.find(
-      (sig) => sig.publicKey.toBase58() === userPubkey
-    );
-    if (!userSig || !userSig.signature) {
-      errors.push('Transaction must be signed by user');
-    }
+  // Check 2: User must have signed the transaction (cryptographic verification)
+  const signatureVerification = verifyUserSignature(transaction, userPubkey);
+  if (!signatureVerification.valid) {
+    errors.push(signatureVerification.error);
   }
 
   // Check 3: Validate no unauthorized SOL transfers from any fee payer
@@ -83,6 +96,11 @@ function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
 /**
  * Ensures no SOL is transferred out of any fee payer account
  * (except for transaction fees which are handled by the network)
+ *
+ * Checks for all dangerous System Program instructions:
+ * - Transfer, TransferWithSeed
+ * - CreateAccountWithSeed (could be used to drain)
+ * - Allocate/AllocateWithSeed (account manipulation)
  */
 function validateNoFeePayerDrain(transaction, feePayerPubkeys) {
   const errors = [];
@@ -92,17 +110,18 @@ function validateNoFeePayerDrain(transaction, feePayerPubkeys) {
   for (const ix of instructions) {
     const programId = getProgramId(ix, accountKeys);
 
-    // Check System Program transfers
+    // Check System Program for dangerous instructions
     if (programId === SYSTEM_PROGRAM_ID) {
       const ixData = getInstructionData(ix);
-      // System transfer instruction has discriminator 2 as first 4 bytes (little-endian u32)
       if (ixData.length >= 4) {
         const discriminator = ixData.readUInt32LE(0);
-        if (discriminator === SYSTEM_TRANSFER_DISCRIMINATOR) {
-          // Transfer: accounts[0] = from, accounts[1] = to
+        const instructionName = SYSTEM_DANGEROUS_INSTRUCTIONS[discriminator];
+
+        if (instructionName) {
+          // For transfer-type instructions, check the 'from' account (index 0)
           const fromAccount = getAccountAtIndex(ix, 0, accountKeys);
           if (feePayerPubkeys.has(fromAccount)) {
-            errors.push('Unauthorized SOL transfer from fee payer detected');
+            errors.push(`Unauthorized System.${instructionName} from fee payer detected`);
           }
         }
       }
@@ -114,6 +133,14 @@ function validateNoFeePayerDrain(transaction, feePayerPubkeys) {
 
 /**
  * Ensures no tokens are transferred from any fee payer's token accounts
+ *
+ * Comprehensive check for ALL dangerous Token Program instructions:
+ * - Transfer, TransferChecked (drain tokens)
+ * - Approve, ApproveChecked (delegate access)
+ * - Burn, BurnChecked (destroy tokens)
+ * - CloseAccount (close and recover SOL)
+ * - SetAuthority (change ownership)
+ * - MintTo, MintToChecked (if fee payer is mint authority)
  */
 function validateNoFeePayerTokenDrain(transaction, feePayerPubkeys) {
   const errors = [];
@@ -123,17 +150,57 @@ function validateNoFeePayerTokenDrain(transaction, feePayerPubkeys) {
   for (const ix of instructions) {
     const programId = getProgramId(ix, accountKeys);
 
-    // Check Token Program and Token-2022 transfers
+    // Check Token Program and Token-2022
     if (programId === TOKEN_PROGRAM_ID || programId === TOKEN_2022_PROGRAM_ID) {
       const ixData = getInstructionData(ix);
       if (ixData.length >= 1) {
         const discriminator = ixData[0];
-        // Transfer = 3, TransferChecked = 12
-        if (discriminator === 3 || discriminator === 12) {
-          // Token transfer: accounts[2] = authority (owner/delegate)
-          const authority = getAccountAtIndex(ix, 2, accountKeys);
+        const instructionName = TOKEN_DANGEROUS_INSTRUCTIONS[discriminator];
+
+        if (instructionName) {
+          // Different instructions have authority at different positions
+          let authorityIndex;
+
+          switch (discriminator) {
+            case 3:  // Transfer
+            case 4:  // Approve
+            case 5:  // Revoke
+            case 8:  // Burn
+              authorityIndex = 2; // source, (dest|delegate), authority
+              break;
+            case 6:  // SetAuthority
+              authorityIndex = 1; // account, currentAuthority
+              break;
+            case 7:  // MintTo
+              authorityIndex = 2; // mint, dest, mintAuthority
+              break;
+            case 9:  // CloseAccount
+              authorityIndex = 2; // account, dest, authority
+              break;
+            case 12: // TransferChecked
+            case 13: // ApproveChecked
+            case 15: // BurnChecked
+              authorityIndex = 3; // source, mint, dest, authority
+              break;
+            case 14: // MintToChecked
+              authorityIndex = 2; // mint, dest, mintAuthority
+              break;
+            default:
+              authorityIndex = 2; // Default fallback
+          }
+
+          const authority = getAccountAtIndex(ix, authorityIndex, accountKeys);
           if (feePayerPubkeys.has(authority)) {
-            errors.push('Unauthorized token transfer with fee payer as authority');
+            errors.push(`Unauthorized Token.${instructionName} with fee payer as authority`);
+          }
+
+          // Additional check: CloseAccount sends SOL to destination
+          if (discriminator === 9) {
+            const source = getAccountAtIndex(ix, 0, accountKeys);
+            // Block if source is a fee payer account (even if not authority)
+            if (feePayerPubkeys.has(source)) {
+              errors.push('Unauthorized CloseAccount on fee payer token account');
+            }
           }
         }
       }
@@ -141,6 +208,74 @@ function validateNoFeePayerTokenDrain(transaction, feePayerPubkeys) {
   }
 
   return errors;
+}
+
+/**
+ * Cryptographically verify user signature on transaction
+ * Uses Ed25519 verification via tweetnacl
+ */
+function verifyUserSignature(transaction, userPubkey) {
+  try {
+    let messageBytes;
+    let userIndex;
+    let signature;
+    let publicKeyBytes;
+
+    if (transaction instanceof VersionedTransaction) {
+      // VersionedTransaction
+      messageBytes = transaction.message.serialize();
+      const signerKeys = transaction.message.staticAccountKeys;
+      userIndex = signerKeys.findIndex((key) => key.toBase58() === userPubkey);
+
+      if (userIndex === -1) {
+        return { valid: false, error: 'User public key not found in transaction signers' };
+      }
+
+      signature = transaction.signatures[userIndex];
+      if (!signature || signature.length !== 64) {
+        return { valid: false, error: 'Invalid or missing user signature' };
+      }
+
+      // Check for empty signature (all zeros)
+      if (signature.every((byte) => byte === 0)) {
+        return { valid: false, error: 'Transaction must be signed by user' };
+      }
+
+      publicKeyBytes = signerKeys[userIndex].toBytes();
+    } else {
+      // Legacy Transaction
+      messageBytes = transaction.serializeMessage();
+      const userSig = transaction.signatures.find(
+        (sig) => sig.publicKey.toBase58() === userPubkey
+      );
+
+      if (!userSig) {
+        return { valid: false, error: 'User public key not found in transaction signers' };
+      }
+
+      signature = userSig.signature;
+      if (!signature || signature.length !== 64) {
+        return { valid: false, error: 'Invalid or missing user signature' };
+      }
+
+      publicKeyBytes = userSig.publicKey.toBytes();
+    }
+
+    // Cryptographic Ed25519 signature verification
+    const signatureBytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
+    const messageUint8 = messageBytes instanceof Uint8Array ? messageBytes : new Uint8Array(messageBytes);
+    const pubkeyUint8 = publicKeyBytes instanceof Uint8Array ? publicKeyBytes : new Uint8Array(publicKeyBytes);
+
+    const isValid = nacl.sign.detached.verify(messageUint8, signatureBytes, pubkeyUint8);
+
+    if (!isValid) {
+      return { valid: false, error: 'User signature cryptographic verification failed' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, error: `Signature verification error: ${error.message}` };
+  }
 }
 
 /**
@@ -216,6 +351,66 @@ function getTransactionBlockhash(transaction) {
 }
 
 /**
+ * Detect if transaction uses a durable nonce
+ * Durable nonce transactions have AdvanceNonce as first instruction
+ *
+ * Returns: { isDurableNonce: boolean, nonceAccount?: string, nonceAuthority?: string }
+ */
+function detectDurableNonce(transaction) {
+  const instructions = extractInstructions(transaction);
+  const accountKeys = getAccountKeys(transaction);
+
+  if (instructions.length === 0) {
+    return { isDurableNonce: false };
+  }
+
+  const firstIx = instructions[0];
+  const programId = getProgramId(firstIx, accountKeys);
+
+  // Check if first instruction is System Program AdvanceNonce
+  if (programId !== SYSTEM_PROGRAM_ID) {
+    return { isDurableNonce: false };
+  }
+
+  const ixData = getInstructionData(firstIx);
+  if (ixData.length < 4) {
+    return { isDurableNonce: false };
+  }
+
+  const discriminator = ixData.readUInt32LE(0);
+  if (discriminator !== ADVANCE_NONCE_DISCRIMINATOR) {
+    return { isDurableNonce: false };
+  }
+
+  // AdvanceNonce accounts: [nonce_account, recent_blockhashes_sysvar, nonce_authority]
+  const nonceAccount = getAccountAtIndex(firstIx, 0, accountKeys);
+  const nonceAuthority = getAccountAtIndex(firstIx, 2, accountKeys);
+
+  return {
+    isDurableNonce: true,
+    nonceAccount,
+    nonceAuthority,
+  };
+}
+
+/**
+ * Get replay protection key for transaction
+ * Uses durable nonce account if present, otherwise blockhash
+ */
+function getReplayProtectionKey(transaction) {
+  const nonceInfo = detectDurableNonce(transaction);
+
+  if (nonceInfo.isDurableNonce) {
+    // For durable nonce, use nonce account + nonce value (stored in blockhash field)
+    const nonceValue = getTransactionBlockhash(transaction);
+    return `nonce:${nonceInfo.nonceAccount}:${nonceValue}`;
+  }
+
+  // For regular transactions, use blockhash
+  return `blockhash:${getTransactionBlockhash(transaction)}`;
+}
+
+/**
  * Compute SHA256 hash of serialized transaction (for anti-replay)
  * Uses the serialized message to ensure consistent hashing
  */
@@ -234,8 +429,11 @@ function computeTransactionHash(transaction) {
 module.exports = {
   deserializeTransaction,
   validateTransaction,
+  verifyUserSignature,
   extractInstructions,
   getTransactionBlockhash,
+  detectDurableNonce,
+  getReplayProtectionKey,
   computeTransactionHash,
   MAX_COMPUTE_UNITS,
 };

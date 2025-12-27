@@ -1,6 +1,56 @@
+const crypto = require('crypto');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
+
+// =============================================================================
+// PII Protection
+// =============================================================================
+
+// Salt for hashing (in production, use a secure secret from config)
+const PII_SALT = process.env.AUDIT_PII_SALT || 'gasdf-audit-salt-v1';
+
+/**
+ * Hash PII data for privacy-preserving audit logs
+ * Uses SHA256 with salt, returns first 16 chars for readability
+ *
+ * @param {string} data - The data to hash (pubkey, IP, etc.)
+ * @param {string} prefix - Optional prefix for the hash (e.g., 'wallet:', 'ip:')
+ * @returns {string} - Hashed value like "wallet:a1b2c3d4e5f6g7h8"
+ */
+function hashPII(data, prefix = '') {
+  if (!data) return null;
+
+  const hash = crypto
+    .createHmac('sha256', PII_SALT)
+    .update(data)
+    .digest('hex')
+    .slice(0, 16);
+
+  return prefix ? `${prefix}${hash}` : hash;
+}
+
+/**
+ * Anonymize wallet address for audit logs
+ * Returns a consistent hash that can be used for correlation
+ */
+function anonymizeWallet(pubkey) {
+  return hashPII(pubkey, 'w:');
+}
+
+/**
+ * Anonymize IP address for audit logs
+ */
+function anonymizeIP(ip) {
+  return hashPII(ip, 'ip:');
+}
+
+/**
+ * Anonymize token address for audit logs
+ */
+function anonymizeToken(token) {
+  return hashPII(token, 't:');
+}
 
 // =============================================================================
 // Audit Event Types
@@ -234,12 +284,12 @@ const auditService = new AuditService();
 function logQuoteCreated(data) {
   return auditService.log(AUDIT_EVENTS.QUOTE_CREATED, {
     quoteId: data.quoteId,
-    userPubkey: data.userPubkey?.slice(0, 12),
-    feePayer: data.feePayer?.slice(0, 12),
-    paymentToken: data.paymentToken?.slice(0, 12),
+    userPubkey: anonymizeWallet(data.userPubkey),
+    feePayer: anonymizeWallet(data.feePayer),
+    paymentToken: anonymizeToken(data.paymentToken),
     feeAmountLamports: data.feeAmountLamports,
     kTier: data.kTier,
-    ip: data.ip,
+    ip: anonymizeIP(data.ip),
   });
 }
 
@@ -247,20 +297,20 @@ function logQuoteRejected(data) {
   return auditService.log(AUDIT_EVENTS.QUOTE_REJECTED, {
     reason: data.reason,
     code: data.code,
-    userPubkey: data.userPubkey?.slice(0, 12),
-    ip: data.ip,
+    userPubkey: anonymizeWallet(data.userPubkey),
+    ip: anonymizeIP(data.ip),
   });
 }
 
 function logSubmitSuccess(data) {
   return auditService.log(AUDIT_EVENTS.SUBMIT_SUCCESS, {
     quoteId: data.quoteId,
-    signature: data.signature,
-    userPubkey: data.userPubkey?.slice(0, 12),
-    feePayer: data.feePayer?.slice(0, 12),
+    signature: data.signature, // Keep signature for on-chain verification
+    userPubkey: anonymizeWallet(data.userPubkey),
+    feePayer: anonymizeWallet(data.feePayer),
     feeAmountLamports: data.feeAmountLamports,
     attempts: data.attempts,
-    ip: data.ip,
+    ip: anonymizeIP(data.ip),
   });
 }
 
@@ -269,26 +319,34 @@ function logSubmitRejected(data) {
     quoteId: data.quoteId,
     reason: data.reason,
     code: data.code,
-    userPubkey: data.userPubkey?.slice(0, 12),
-    ip: data.ip,
+    userPubkey: anonymizeWallet(data.userPubkey),
+    ip: anonymizeIP(data.ip),
   });
 }
 
 function logSecurityEvent(eventType, data) {
   return auditService.log(eventType, {
     ...data,
-    userPubkey: data.userPubkey?.slice(0, 12),
-    ip: data.ip,
+    userPubkey: anonymizeWallet(data.userPubkey),
+    ip: anonymizeIP(data.ip),
   });
 }
 
 function logRateLimited(type, data) {
   const eventType = type === 'wallet' ? AUDIT_EVENTS.WALLET_RATE_LIMITED : AUDIT_EVENTS.IP_RATE_LIMITED;
   return auditService.log(eventType, {
-    wallet: data.wallet?.slice(0, 12),
-    ip: data.ip,
+    wallet: anonymizeWallet(data.wallet),
+    ip: anonymizeIP(data.ip),
     count: data.count,
     limit: data.limit,
+  });
+}
+
+function logPayerMarkedUnhealthy(data) {
+  return auditService.log(AUDIT_EVENTS.PAYER_MARKED_UNHEALTHY, {
+    pubkey: anonymizeWallet(data.pubkey),
+    reason: data.reason,
+    duration: data.duration,
   });
 }
 
@@ -300,6 +358,12 @@ module.exports = {
   auditService,
   AUDIT_EVENTS,
 
+  // PII anonymization utilities
+  hashPII,
+  anonymizeWallet,
+  anonymizeIP,
+  anonymizeToken,
+
   // Convenience functions
   logQuoteCreated,
   logQuoteRejected,
@@ -307,4 +371,5 @@ module.exports = {
   logSubmitRejected,
   logSecurityEvent,
   logRateLimited,
+  logPayerMarkedUnhealthy,
 };

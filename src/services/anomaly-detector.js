@@ -8,7 +8,8 @@ const { auditService, AUDIT_EVENTS } = require('./audit');
 // Anomaly Thresholds (configurable via env vars)
 // =============================================================================
 
-const THRESHOLDS = {
+// Default thresholds (used until baseline is established)
+const DEFAULT_THRESHOLDS = {
   // Wallet anomalies
   WALLET_QUOTES_5MIN: parseInt(process.env.ANOMALY_WALLET_QUOTES) || 50,
   WALLET_SUBMITS_5MIN: parseInt(process.env.ANOMALY_WALLET_SUBMITS) || 30,
@@ -24,6 +25,14 @@ const THRESHOLDS = {
 
   // Fee payer anomalies
   PAYER_DRAIN_RATE_LAMPORTS_PER_MIN: parseInt(process.env.ANOMALY_DRAIN_RATE) || 100_000_000, // 0.1 SOL/min
+};
+
+// Baseline learning configuration
+const BASELINE_CONFIG = {
+  LEARNING_PERIOD_MS: parseInt(process.env.BASELINE_LEARNING_PERIOD) || 30 * 60 * 1000, // 30 minutes
+  MIN_SAMPLES: parseInt(process.env.BASELINE_MIN_SAMPLES) || 10,
+  STDDEV_MULTIPLIER: parseFloat(process.env.BASELINE_STDDEV_MULTIPLIER) || 3.0, // mean + 3*stddev
+  UPDATE_INTERVAL_MS: parseInt(process.env.BASELINE_UPDATE_INTERVAL) || 5 * 60 * 1000, // 5 minutes
 };
 
 // =============================================================================
@@ -51,6 +60,203 @@ class AnomalyDetector {
     this.detectedAnomalies = new Map(); // For deduplication
     this.anomalyCooldownMs = 5 * 60 * 1000; // 5 minute cooldown per anomaly
     this.payerBalanceHistory = new Map(); // pubkey -> { balance, timestamp }[]
+
+    // Baseline learning state
+    this.baseline = {
+      startedAt: null,
+      isLearning: false,
+      isReady: false,
+      samples: {
+        quotesPerWallet: [],
+        submitsPerWallet: [],
+        quotesPerIP: [],
+        submitsPerIP: [],
+        errorRate: [],
+        securityEvents: [],
+        drainRate: [],
+      },
+      thresholds: { ...DEFAULT_THRESHOLDS },
+      lastUpdateAt: null,
+    };
+  }
+
+  /**
+   * Calculate mean of an array
+   */
+  _mean(arr) {
+    if (arr.length === 0) return 0;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  /**
+   * Calculate standard deviation of an array
+   */
+  _stddev(arr) {
+    if (arr.length < 2) return 0;
+    const mean = this._mean(arr);
+    const squaredDiffs = arr.map(x => Math.pow(x - mean, 2));
+    return Math.sqrt(this._mean(squaredDiffs));
+  }
+
+  /**
+   * Calculate dynamic threshold: mean + (stddev * multiplier)
+   * Falls back to default if not enough samples
+   */
+  _calculateThreshold(samples, defaultValue, minFloor = null) {
+    if (samples.length < BASELINE_CONFIG.MIN_SAMPLES) {
+      return defaultValue;
+    }
+
+    const mean = this._mean(samples);
+    const stddev = this._stddev(samples);
+    let threshold = mean + (stddev * BASELINE_CONFIG.STDDEV_MULTIPLIER);
+
+    // Apply minimum floor if specified (prevents threshold from being too low)
+    if (minFloor !== null) {
+      threshold = Math.max(threshold, minFloor);
+    }
+
+    // Never go below the default (for safety)
+    return Math.max(threshold, defaultValue * 0.5);
+  }
+
+  /**
+   * Start baseline learning
+   */
+  startBaselineLearning() {
+    if (this.baseline.isLearning || this.baseline.isReady) {
+      return;
+    }
+
+    this.baseline.startedAt = Date.now();
+    this.baseline.isLearning = true;
+
+    logger.info('ANOMALY', 'Baseline learning started', {
+      learningPeriodMs: BASELINE_CONFIG.LEARNING_PERIOD_MS,
+      minSamples: BASELINE_CONFIG.MIN_SAMPLES,
+    });
+  }
+
+  /**
+   * Record a sample for baseline learning
+   */
+  recordSample(metricName, value) {
+    if (!this.baseline.isLearning && !this.baseline.isReady) {
+      return;
+    }
+
+    const samples = this.baseline.samples[metricName];
+    if (samples) {
+      samples.push(value);
+
+      // Keep only recent samples (last 1000)
+      if (samples.length > 1000) {
+        samples.shift();
+      }
+    }
+  }
+
+  /**
+   * Update thresholds based on collected samples
+   */
+  updateThresholds() {
+    const s = this.baseline.samples;
+
+    this.baseline.thresholds = {
+      WALLET_QUOTES_5MIN: this._calculateThreshold(
+        s.quotesPerWallet,
+        DEFAULT_THRESHOLDS.WALLET_QUOTES_5MIN,
+        10 // Minimum 10 quotes threshold
+      ),
+      WALLET_SUBMITS_5MIN: this._calculateThreshold(
+        s.submitsPerWallet,
+        DEFAULT_THRESHOLDS.WALLET_SUBMITS_5MIN,
+        5 // Minimum 5 submits threshold
+      ),
+      WALLET_FAILURES_5MIN: this._calculateThreshold(
+        s.quotesPerWallet.map(() => 0), // Not directly sampled
+        DEFAULT_THRESHOLDS.WALLET_FAILURES_5MIN,
+        3
+      ),
+      IP_QUOTES_5MIN: this._calculateThreshold(
+        s.quotesPerIP,
+        DEFAULT_THRESHOLDS.IP_QUOTES_5MIN,
+        20
+      ),
+      IP_SUBMITS_5MIN: this._calculateThreshold(
+        s.submitsPerIP,
+        DEFAULT_THRESHOLDS.IP_SUBMITS_5MIN,
+        10
+      ),
+      GLOBAL_ERROR_RATE_PERCENT: this._calculateThreshold(
+        s.errorRate,
+        DEFAULT_THRESHOLDS.GLOBAL_ERROR_RATE_PERCENT,
+        5 // Minimum 5% error rate threshold
+      ),
+      GLOBAL_SECURITY_EVENTS_5MIN: this._calculateThreshold(
+        s.securityEvents,
+        DEFAULT_THRESHOLDS.GLOBAL_SECURITY_EVENTS_5MIN,
+        5
+      ),
+      PAYER_DRAIN_RATE_LAMPORTS_PER_MIN: this._calculateThreshold(
+        s.drainRate,
+        DEFAULT_THRESHOLDS.PAYER_DRAIN_RATE_LAMPORTS_PER_MIN,
+        10_000_000 // Minimum 0.01 SOL/min
+      ),
+    };
+
+    this.baseline.lastUpdateAt = Date.now();
+
+    logger.info('ANOMALY', 'Thresholds updated from baseline', {
+      sampleCounts: Object.fromEntries(
+        Object.entries(s).map(([k, v]) => [k, v.length])
+      ),
+      newThresholds: this.baseline.thresholds,
+    });
+  }
+
+  /**
+   * Check if baseline learning period is complete
+   */
+  checkBaselineComplete() {
+    if (!this.baseline.isLearning) return;
+
+    const elapsed = Date.now() - this.baseline.startedAt;
+
+    if (elapsed >= BASELINE_CONFIG.LEARNING_PERIOD_MS) {
+      this.baseline.isLearning = false;
+      this.baseline.isReady = true;
+      this.updateThresholds();
+
+      logger.info('ANOMALY', 'Baseline learning complete', {
+        elapsedMs: elapsed,
+        thresholds: this.baseline.thresholds,
+      });
+    }
+  }
+
+  /**
+   * Get current thresholds (dynamic or default)
+   */
+  getThresholds() {
+    return this.baseline.isReady ? this.baseline.thresholds : DEFAULT_THRESHOLDS;
+  }
+
+  /**
+   * Get baseline status
+   */
+  getBaselineStatus() {
+    return {
+      isLearning: this.baseline.isLearning,
+      isReady: this.baseline.isReady,
+      startedAt: this.baseline.startedAt ? new Date(this.baseline.startedAt).toISOString() : null,
+      lastUpdateAt: this.baseline.lastUpdateAt ? new Date(this.baseline.lastUpdateAt).toISOString() : null,
+      sampleCounts: Object.fromEntries(
+        Object.entries(this.baseline.samples).map(([k, v]) => [k, v.length])
+      ),
+      thresholds: this.getThresholds(),
+      usingDynamicThresholds: this.baseline.isReady,
+    };
   }
 
   /**
@@ -59,13 +265,19 @@ class AnomalyDetector {
   start(intervalMs = 30_000) {
     if (this.checkInterval) return;
 
+    // Start baseline learning on first start
+    this.startBaselineLearning();
+
     this.checkInterval = setInterval(() => {
       this.runChecks().catch(err => {
         logger.error('ANOMALY', 'Check failed', { error: err.message });
       });
     }, intervalMs);
 
-    logger.info('ANOMALY', 'Anomaly detection started', { intervalMs });
+    logger.info('ANOMALY', 'Anomaly detection started', {
+      intervalMs,
+      baselineLearning: this.baseline.isLearning,
+    });
   }
 
   /**
@@ -83,6 +295,17 @@ class AnomalyDetector {
    * Run all anomaly checks
    */
   async runChecks() {
+    // Check if baseline learning is complete
+    this.checkBaselineComplete();
+
+    // Periodically update thresholds if baseline is ready
+    if (this.baseline.isReady && this.baseline.lastUpdateAt) {
+      const timeSinceUpdate = Date.now() - this.baseline.lastUpdateAt;
+      if (timeSinceUpdate >= BASELINE_CONFIG.UPDATE_INTERVAL_MS) {
+        this.updateThresholds();
+      }
+    }
+
     await this.checkGlobalAnomalies();
     await this.checkPayerDrainRate();
   }
@@ -91,16 +314,21 @@ class AnomalyDetector {
    * Check for global anomalies
    */
   async checkGlobalAnomalies() {
+    const thresholds = this.getThresholds();
     const securitySummary = auditService.getSecuritySummary(5);
 
     // Check for security event spike
     const totalSecurityEvents = Object.values(securitySummary).reduce((a, b) => a + b, 0);
 
-    if (totalSecurityEvents >= THRESHOLDS.GLOBAL_SECURITY_EVENTS_5MIN) {
+    // Record sample for baseline learning
+    this.recordSample('securityEvents', totalSecurityEvents);
+
+    if (totalSecurityEvents >= thresholds.GLOBAL_SECURITY_EVENTS_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.GLOBAL_SECURITY_SPIKE, {
         totalEvents: totalSecurityEvents,
         breakdown: securitySummary,
-        threshold: THRESHOLDS.GLOBAL_SECURITY_EVENTS_5MIN,
+        threshold: thresholds.GLOBAL_SECURITY_EVENTS_5MIN,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
@@ -113,12 +341,17 @@ class AnomalyDetector {
 
     if (totalSubmits > 10) { // Need minimum sample size
       const errorRate = (failureCount / totalSubmits) * 100;
-      if (errorRate >= THRESHOLDS.GLOBAL_ERROR_RATE_PERCENT) {
+
+      // Record sample for baseline learning
+      this.recordSample('errorRate', errorRate);
+
+      if (errorRate >= thresholds.GLOBAL_ERROR_RATE_PERCENT) {
         await this.reportAnomaly(ANOMALY_TYPES.GLOBAL_HIGH_ERROR_RATE, {
           errorRate: errorRate.toFixed(1),
           successCount,
           failureCount,
-          threshold: THRESHOLDS.GLOBAL_ERROR_RATE_PERCENT,
+          threshold: thresholds.GLOBAL_ERROR_RATE_PERCENT,
+          usingDynamicThreshold: this.baseline.isReady,
         });
       }
     }
@@ -129,6 +362,7 @@ class AnomalyDetector {
    */
   async checkPayerDrainRate() {
     try {
+      const thresholds = this.getThresholds();
       const { getPayerBalances } = require('./fee-payer-pool');
       const balances = await getPayerBalances();
       const now = Date.now();
@@ -155,13 +389,17 @@ class AnomalyDetector {
             // Calculate drain rate per minute
             const drainRatePerMin = (balanceDiff / timeDiffMs) * 60_000;
 
-            if (drainRatePerMin >= THRESHOLDS.PAYER_DRAIN_RATE_LAMPORTS_PER_MIN) {
+            // Record sample for baseline learning (only positive drain rates)
+            this.recordSample('drainRate', drainRatePerMin);
+
+            if (drainRatePerMin >= thresholds.PAYER_DRAIN_RATE_LAMPORTS_PER_MIN) {
               await this.reportAnomaly(ANOMALY_TYPES.PAYER_RAPID_DRAIN, {
                 pubkey: payer.pubkey.slice(0, 8) + '...',
                 drainRatePerMin: Math.round(drainRatePerMin),
                 drainRateSolPerMin: (drainRatePerMin / 1e9).toFixed(4),
                 currentBalance: payer.balance,
-                threshold: THRESHOLDS.PAYER_DRAIN_RATE_LAMPORTS_PER_MIN,
+                threshold: thresholds.PAYER_DRAIN_RATE_LAMPORTS_PER_MIN,
+                usingDynamicThreshold: this.baseline.isReady,
               });
             }
           }
@@ -178,33 +416,44 @@ class AnomalyDetector {
   async trackWallet(wallet, activityType, ip) {
     if (!wallet) return;
 
+    const thresholds = this.getThresholds();
     const count = await redis.trackWalletActivity(wallet, activityType);
 
+    // Record samples for baseline learning
+    if (activityType === 'quote') {
+      this.recordSample('quotesPerWallet', count);
+    } else if (activityType === 'submit') {
+      this.recordSample('submitsPerWallet', count);
+    }
+
     // Check thresholds
-    if (activityType === 'quote' && count >= THRESHOLDS.WALLET_QUOTES_5MIN) {
+    if (activityType === 'quote' && count >= thresholds.WALLET_QUOTES_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.WALLET_HIGH_QUOTE_VOLUME, {
         wallet: wallet.slice(0, 12),
         count,
-        threshold: THRESHOLDS.WALLET_QUOTES_5MIN,
+        threshold: thresholds.WALLET_QUOTES_5MIN,
         ip,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
-    if (activityType === 'submit' && count >= THRESHOLDS.WALLET_SUBMITS_5MIN) {
+    if (activityType === 'submit' && count >= thresholds.WALLET_SUBMITS_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.WALLET_HIGH_SUBMIT_VOLUME, {
         wallet: wallet.slice(0, 12),
         count,
-        threshold: THRESHOLDS.WALLET_SUBMITS_5MIN,
+        threshold: thresholds.WALLET_SUBMITS_5MIN,
         ip,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
-    if (activityType === 'failure' && count >= THRESHOLDS.WALLET_FAILURES_5MIN) {
+    if (activityType === 'failure' && count >= thresholds.WALLET_FAILURES_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.WALLET_HIGH_FAILURE_RATE, {
         wallet: wallet.slice(0, 12),
         count,
-        threshold: THRESHOLDS.WALLET_FAILURES_5MIN,
+        threshold: thresholds.WALLET_FAILURES_5MIN,
         ip,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
@@ -217,22 +466,32 @@ class AnomalyDetector {
   async trackIp(ip, activityType) {
     if (!ip) return;
 
+    const thresholds = this.getThresholds();
     const count = await redis.trackIpActivity(ip, activityType);
 
+    // Record samples for baseline learning
+    if (activityType === 'quote') {
+      this.recordSample('quotesPerIP', count);
+    } else if (activityType === 'submit') {
+      this.recordSample('submitsPerIP', count);
+    }
+
     // Check thresholds
-    if (activityType === 'quote' && count >= THRESHOLDS.IP_QUOTES_5MIN) {
+    if (activityType === 'quote' && count >= thresholds.IP_QUOTES_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.IP_HIGH_QUOTE_VOLUME, {
         ip,
         count,
-        threshold: THRESHOLDS.IP_QUOTES_5MIN,
+        threshold: thresholds.IP_QUOTES_5MIN,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
-    if (activityType === 'submit' && count >= THRESHOLDS.IP_SUBMITS_5MIN) {
+    if (activityType === 'submit' && count >= thresholds.IP_SUBMITS_5MIN) {
       await this.reportAnomaly(ANOMALY_TYPES.IP_HIGH_SUBMIT_VOLUME, {
         ip,
         count,
-        threshold: THRESHOLDS.IP_SUBMITS_5MIN,
+        threshold: thresholds.IP_SUBMITS_5MIN,
+        usingDynamicThreshold: this.baseline.isReady,
       });
     }
 
@@ -285,7 +544,8 @@ class AnomalyDetector {
 
     return {
       activeAnomalies,
-      thresholds: THRESHOLDS,
+      thresholds: this.getThresholds(),
+      baseline: this.getBaselineStatus(),
       securitySummary: auditService.getSecuritySummary(5),
     };
   }
@@ -297,5 +557,6 @@ const anomalyDetector = new AnomalyDetector();
 module.exports = {
   anomalyDetector,
   ANOMALY_TYPES,
-  THRESHOLDS,
+  DEFAULT_THRESHOLDS,
+  BASELINE_CONFIG,
 };
