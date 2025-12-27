@@ -15,6 +15,8 @@ const { submitLimiter, walletSubmitLimiter } = require('../middleware/security')
 const { validate } = require('../middleware/validation');
 const txQueue = require('../services/tx-queue');
 const { submitsTotal, submitDuration, activeQuotes } = require('../utils/metrics');
+const { logSubmitSuccess, logSubmitRejected, logSecurityEvent, AUDIT_EVENTS } = require('../services/audit');
+const { anomalyDetector } = require('../services/anomaly-detector');
 
 const router = express.Router();
 
@@ -28,6 +30,11 @@ router.use(submitLimiter);
 router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
   const { quoteId, transaction, userPubkey } = req.body;
   const startTime = process.hrtime.bigint();
+  const clientIp = req.ip || req.headers['x-forwarded-for'];
+
+  // Track activity for anomaly detection
+  anomalyDetector.trackWallet(userPubkey, 'submit', clientIp).catch(() => {});
+  anomalyDetector.trackIp(clientIp, 'submit').catch(() => {});
 
   try {
     // Get and validate quote
@@ -78,6 +85,17 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         txHash: txHash.slice(0, 16),
         userPubkey,
       });
+
+      logSecurityEvent(AUDIT_EVENTS.REPLAY_ATTACK_DETECTED, {
+        quoteId,
+        txHash: txHash.slice(0, 16),
+        userPubkey,
+        ip: clientIp,
+      });
+
+      // Track failure for anomaly detection
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
+
       return res.status(400).json({
         error: 'Transaction already submitted',
         code: 'REPLAY_DETECTED',
@@ -97,6 +115,14 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         blockhash: blockhash.slice(0, 16),
         userPubkey,
       });
+
+      logSecurityEvent(AUDIT_EVENTS.BLOCKHASH_EXPIRED, {
+        quoteId,
+        blockhash: blockhash.slice(0, 16),
+        userPubkey,
+        ip: clientIp,
+      });
+
       return res.status(400).json({
         error: 'Transaction blockhash expired, please get a new quote',
         code: 'BLOCKHASH_EXPIRED',
@@ -110,6 +136,16 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         requestId: req.requestId,
         errors: validation.errors,
       });
+
+      logSecurityEvent(AUDIT_EVENTS.VALIDATION_FAILED, {
+        quoteId,
+        errors: validation.errors,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
+
       return res.status(400).json({
         error: 'Transaction validation failed',
         code: 'VALIDATION_FAILED',
@@ -128,6 +164,17 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         expected: reservation.pubkey?.slice(0, 8),
         actual: validation.feePayer?.slice(0, 8),
       });
+
+      logSecurityEvent(AUDIT_EVENTS.FEE_PAYER_MISMATCH, {
+        quoteId,
+        expected: reservation.pubkey,
+        actual: validation.feePayer,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
+
       return res.status(400).json({
         error: 'Transaction fee payer does not match quote',
         code: 'FEE_PAYER_MISMATCH',
@@ -142,6 +189,17 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         expected: quote.feePayer?.slice(0, 8),
         actual: validation.feePayer?.slice(0, 8),
       });
+
+      logSecurityEvent(AUDIT_EVENTS.FEE_PAYER_MISMATCH, {
+        quoteId,
+        expected: quote.feePayer,
+        actual: validation.feePayer,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
+
       return res.status(400).json({
         error: 'Transaction fee payer does not match quote',
         code: 'FEE_PAYER_MISMATCH',
@@ -172,6 +230,15 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         error: simulation.error,
         logs: simulation.logs?.slice(-5), // Last 5 log lines
       });
+
+      logSecurityEvent(AUDIT_EVENTS.SIMULATION_FAILED, {
+        quoteId,
+        error: simulation.error,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
 
       // Release reservation since we won't be using this quote
       releaseReservation(quoteId);
@@ -234,6 +301,17 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       userPubkey,
       feeLamports: quote.feeAmountLamports,
       attempts: result.attempts,
+    });
+
+    // Audit log
+    logSubmitSuccess({
+      quoteId,
+      signature: result.signature,
+      userPubkey,
+      feePayer: validation.feePayer,
+      feeAmountLamports: quote.feeAmountLamports,
+      attempts: result.attempts,
+      ip: clientIp,
     });
 
     // Confirm in background (don't block response)

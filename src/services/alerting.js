@@ -54,6 +54,48 @@ const ALERT_TYPES = {
     title: 'Service Recovered',
     message: (data) => `${data.service} has recovered`,
   },
+
+  // Security & Anomaly Alerts
+  ANOMALY_DETECTED: {
+    id: 'anomaly_detected',
+    severity: SEVERITY.WARNING,
+    title: 'Anomaly Detected',
+    message: (data) => {
+      switch (data.type) {
+        case 'anomaly.wallet.high_quote_volume':
+          return `Wallet ${data.wallet} generated ${data.count} quotes in 5min (threshold: ${data.threshold})`;
+        case 'anomaly.wallet.high_submit_volume':
+          return `Wallet ${data.wallet} submitted ${data.count} txs in 5min (threshold: ${data.threshold})`;
+        case 'anomaly.wallet.high_failure_rate':
+          return `Wallet ${data.wallet} has ${data.count} failures in 5min (threshold: ${data.threshold})`;
+        case 'anomaly.ip.high_quote_volume':
+          return `IP ${data.ip} generated ${data.count} quotes in 5min (threshold: ${data.threshold})`;
+        case 'anomaly.global.security_spike':
+          return `Security events spike: ${data.totalEvents} events in 5min (threshold: ${data.threshold})`;
+        case 'anomaly.global.high_error_rate':
+          return `High error rate: ${data.errorRate}% (threshold: ${data.threshold}%)`;
+        case 'anomaly.payer.rapid_drain':
+          return `Rapid drain on ${data.pubkey}: ${data.drainRateSolPerMin} SOL/min`;
+        default:
+          return `Anomaly detected: ${data.type}`;
+      }
+    },
+  },
+  SECURITY_EVENT: {
+    id: 'security_event',
+    severity: SEVERITY.WARNING,
+    title: 'Security Event',
+    message: (data) => {
+      switch (data.type) {
+        case 'security.replay_attack':
+          return `Replay attack blocked from ${data.wallet || data.ip}`;
+        case 'security.fee_payer_mismatch':
+          return `Fee payer mismatch attempt from ${data.wallet || data.ip}`;
+        default:
+          return `Security event: ${data.type}`;
+      }
+    },
+  },
 };
 
 // =============================================================================
@@ -376,6 +418,27 @@ function checkRedisAlerts() {
 }
 
 /**
+ * Check fee payer pool circuit breaker
+ */
+function checkFeePayerPoolCircuitBreaker() {
+  try {
+    const { isCircuitOpen, getCircuitState } = require('./fee-payer-pool');
+
+    if (isCircuitOpen()) {
+      const state = getCircuitState();
+      alertingService.alert('CIRCUIT_BREAKER_OPEN', {
+        name: 'fee_payer_pool',
+        failures: state.consecutiveFailures,
+      });
+    } else {
+      alertingService.recover('CIRCUIT_BREAKER_OPEN', { name: 'fee_payer_pool' });
+    }
+  } catch (error) {
+    logger.error('ALERTING', 'Failed to check fee payer pool circuit breaker', { error: error.message });
+  }
+}
+
+/**
  * Start monitoring loop
  */
 let monitoringInterval = null;
@@ -386,6 +449,22 @@ function startMonitoring(intervalMs = 60000) {
   }
 
   logger.info('ALERTING', 'Starting alert monitoring', { intervalMs });
+
+  // Start anomaly detector
+  try {
+    const { anomalyDetector } = require('./anomaly-detector');
+    anomalyDetector.start(30_000); // Check every 30 seconds
+  } catch (error) {
+    logger.warn('ALERTING', 'Failed to start anomaly detector', { error: error.message });
+  }
+
+  // Start audit service
+  try {
+    const { auditService } = require('./audit');
+    auditService.start();
+  } catch (error) {
+    logger.warn('ALERTING', 'Failed to start audit service', { error: error.message });
+  }
 
   // Run checks immediately
   runAllChecks();
@@ -398,13 +477,31 @@ function stopMonitoring() {
   if (monitoringInterval) {
     clearInterval(monitoringInterval);
     monitoringInterval = null;
-    logger.info('ALERTING', 'Stopped alert monitoring');
   }
+
+  // Stop anomaly detector
+  try {
+    const { anomalyDetector } = require('./anomaly-detector');
+    anomalyDetector.stop();
+  } catch (error) {
+    // Ignore
+  }
+
+  // Stop audit service
+  try {
+    const { auditService } = require('./audit');
+    auditService.stop();
+  } catch (error) {
+    // Ignore
+  }
+
+  logger.info('ALERTING', 'Stopped alert monitoring');
 }
 
 async function runAllChecks() {
   await checkFeePayerAlerts();
   checkCircuitBreakerAlerts();
+  checkFeePayerPoolCircuitBreaker();
   checkRedisAlerts();
 }
 

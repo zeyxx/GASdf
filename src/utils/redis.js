@@ -465,6 +465,128 @@ async function getWalletRateLimit(wallet, type = 'quote') {
   );
 }
 
+// =============================================================================
+// Audit Logging
+// =============================================================================
+
+const AUDIT_KEY = 'audit:log';
+const AUDIT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days retention
+const MAX_AUDIT_ENTRIES = 10000;
+
+/**
+ * Append audit events to the log
+ */
+async function appendAuditLog(events) {
+  if (!events || events.length === 0) return;
+
+  return withRedis(
+    async (redis) => {
+      const serialized = events.map(e => JSON.stringify(e));
+      await redis.lPush(AUDIT_KEY, ...serialized);
+      await redis.lTrim(AUDIT_KEY, 0, MAX_AUDIT_ENTRIES - 1);
+      await redis.expire(AUDIT_KEY, AUDIT_TTL_SECONDS);
+    },
+    () => {
+      // In-memory: just log (no persistence)
+    }
+  );
+}
+
+/**
+ * Get recent audit log entries
+ */
+async function getAuditLog(limit = 100, offset = 0) {
+  return withRedis(
+    async (redis) => {
+      const entries = await redis.lRange(AUDIT_KEY, offset, offset + limit - 1);
+      return entries.map(e => JSON.parse(e));
+    },
+    () => []
+  );
+}
+
+/**
+ * Search audit log by event type
+ */
+async function searchAuditLog(eventType, limit = 100) {
+  return withRedis(
+    async (redis) => {
+      // Get all entries and filter (not efficient for large logs, but simple)
+      const entries = await redis.lRange(AUDIT_KEY, 0, 999);
+      return entries
+        .map(e => JSON.parse(e))
+        .filter(e => e.type === eventType)
+        .slice(0, limit);
+    },
+    () => []
+  );
+}
+
+// =============================================================================
+// Anomaly Detection State
+// =============================================================================
+
+const ANOMALY_WINDOW_SECONDS = 300; // 5 minutes
+
+/**
+ * Track wallet activity for anomaly detection
+ */
+async function trackWalletActivity(wallet, activityType) {
+  const key = `anomaly:wallet:${activityType}:${wallet}`;
+
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      multi.incr(key);
+      multi.expire(key, ANOMALY_WINDOW_SECONDS);
+      const results = await multi.exec();
+      return results[0];
+    },
+    () => {
+      const current = parseInt(memoryStore.get(key)) || 0;
+      memoryStore.set(key, String(current + 1), ANOMALY_WINDOW_SECONDS);
+      return current + 1;
+    }
+  );
+}
+
+/**
+ * Get wallet activity count
+ */
+async function getWalletActivity(wallet, activityType) {
+  const key = `anomaly:wallet:${activityType}:${wallet}`;
+
+  return withRedis(
+    async (redis) => {
+      const count = await redis.get(key);
+      return parseInt(count) || 0;
+    },
+    () => parseInt(memoryStore.get(key)) || 0
+  );
+}
+
+/**
+ * Track IP activity for anomaly detection
+ */
+async function trackIpActivity(ip, activityType) {
+  const key = `anomaly:ip:${activityType}:${ip}`;
+
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      multi.incr(key);
+      multi.expire(key, ANOMALY_WINDOW_SECONDS);
+      const results = await multi.exec();
+      return results[0];
+    },
+    () => {
+      const current = parseInt(memoryStore.get(key)) || 0;
+      memoryStore.set(key, String(current + 1), ANOMALY_WINDOW_SECONDS);
+      return current + 1;
+    }
+  );
+}
+
 module.exports = {
   initializeClient,
   getClient,
@@ -492,4 +614,12 @@ module.exports = {
   // Per-Wallet Rate Limiting
   incrWalletRateLimit,
   getWalletRateLimit,
+  // Audit Logging
+  appendAuditLog,
+  getAuditLog,
+  searchAuditLog,
+  // Anomaly Detection
+  trackWalletActivity,
+  getWalletActivity,
+  trackIpActivity,
 };

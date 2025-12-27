@@ -9,6 +9,8 @@ const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/
 const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
+const { logQuoteCreated, logQuoteRejected, AUDIT_EVENTS } = require('../services/audit');
+const { anomalyDetector } = require('../services/anomaly-detector');
 
 const router = express.Router();
 
@@ -24,6 +26,11 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
   const startTime = process.hrtime.bigint();
 
   try {
+    // Track activity for anomaly detection
+    const clientIp = req.ip || req.headers['x-forwarded-for'];
+    anomalyDetector.trackWallet(userPubkey, 'quote', clientIp).catch(() => {});
+    anomalyDetector.trackIp(clientIp, 'quote').catch(() => {});
+
     // =========================================================================
     // SECURITY: Check circuit breaker first
     // =========================================================================
@@ -34,6 +41,14 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         userPubkey,
         circuitState,
       });
+
+      logQuoteRejected({
+        reason: 'Circuit breaker open',
+        code: 'CIRCUIT_BREAKER_OPEN',
+        userPubkey,
+        ip: clientIp,
+      });
+
       return res.status(503).json({
         error: 'Service temporarily unavailable - fee payer capacity exceeded',
         code: 'CIRCUIT_BREAKER_OPEN',
@@ -69,6 +84,14 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         userPubkey,
         feeAmount: adjustedFee,
       });
+
+      logQuoteRejected({
+        reason: 'No fee payer capacity',
+        code: 'NO_PAYER_CAPACITY',
+        userPubkey,
+        ip: clientIp,
+      });
+
       return res.status(503).json({
         error: 'Service temporarily unavailable - no fee payer capacity',
         code: 'NO_PAYER_CAPACITY',
@@ -98,6 +121,17 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       feePayer: feePayer.slice(0, 8),
       feeAmountSol: adjustedFee,
       kTier: kScore.tier,
+    });
+
+    // Audit log
+    logQuoteCreated({
+      quoteId,
+      userPubkey,
+      feePayer,
+      paymentToken,
+      feeAmountLamports: adjustedFee,
+      kTier: kScore.tier,
+      ip: clientIp,
     });
 
     // Record success metrics
