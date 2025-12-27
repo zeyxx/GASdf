@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-27
+
+### Added
+
+- **Cryptographic Signature Verification**: Ed25519 verification via tweetnacl
+  - Full cryptographic validation of user signatures (not just presence check)
+  - Protects against signature spoofing attacks
+
+- **Expanded Token Drain Protection**: Comprehensive instruction blocking
+  - 11 dangerous Token Program instructions now blocked:
+    - Transfer, TransferChecked, Approve, ApproveChecked
+    - Burn, BurnChecked, CloseAccount, SetAuthority
+    - MintTo, MintToChecked, Revoke
+  - 6 dangerous System Program instructions blocked:
+    - Transfer, TransferWithSeed, CreateAccountWithSeed
+    - Allocate, AllocateWithSeed, AssignWithSeed
+
+- **Durable Nonce Support**: Extended replay protection
+  - Automatic detection of durable nonce transactions
+  - `detectDurableNonce()` and `getReplayProtectionKey()` utilities
+  - Supports offline transaction signing use cases
+
+- **Fee Payer Key Rotation**: Secure key lifecycle management
+  - `startKeyRetirement(pubkey, reason)` - Begin graceful retirement
+  - `completeKeyRetirement(pubkey)` - Finalize after reservations clear
+  - `emergencyRetireKey(pubkey, reason)` - Immediate retirement + cancel reservations
+  - `reactivateKey(pubkey)` - Restore non-emergency retired keys
+  - `getRotationStatus()` - View all keys with rotation state
+
+- **Audit Log PII Anonymization**: GDPR-friendly logging
+  - HMAC-SHA256 hashing replaces truncation
+  - Configurable salt via `AUDIT_PII_SALT` environment variable
+  - Consistent hashes for correlation without exposing raw data
+  - `anonymizeWallet()`, `anonymizeIP()`, `anonymizeToken()` utilities
+
+- **Anomaly Detector Baseline Learning**: Adaptive thresholds
+  - 30-minute learning period on startup (configurable)
+  - Dynamic thresholds using mean + 3σ calculation
+  - Automatic threshold updates every 5 minutes
+  - `getBaselineStatus()` to monitor learning progress
+  - Environment variables: `BASELINE_LEARNING_PERIOD`, `BASELINE_MIN_SAMPLES`, `BASELINE_STDDEV_MULTIPLIER`
+
+### Changed
+
+- `validateTransaction()` now performs cryptographic signature verification
+- Token drain validation checks authority position per instruction type
+- Anomaly detector uses dynamic thresholds when baseline is ready
+- Audit logs use hashed identifiers instead of truncated strings
+
+### Security
+
+- Security stack expanded from 8 to 12 layers
+- All critical gaps from security audit addressed
+- Fee payer protection now covers all known drain vectors
+
 ## [1.1.0] - 2025-12-27
 
 ### Added
