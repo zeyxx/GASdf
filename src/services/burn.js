@@ -34,17 +34,61 @@ async function checkAndExecuteBurn() {
     return null;
   }
 
-  logger.info('BURN', 'Burn threshold reached', {
-    pendingAmount,
-    threshold: config.BURN_THRESHOLD_LAMPORTS,
+  // ==========================================================================
+  // 80/20 Treasury Model
+  // ==========================================================================
+  // 80% → swap to $ASDF → burn (the mission)
+  // 20% → treasury for operations (server, RPC, fee payer refill)
+  // ==========================================================================
+
+  const totalAmount = Math.floor(pendingAmount);
+  const burnAmount = Math.floor(totalAmount * config.BURN_RATIO);
+  const treasuryAmount = totalAmount - burnAmount;
+
+  logger.info('BURN', 'Processing fees with 80/20 split', {
+    totalAmount,
+    burnAmount,
+    treasuryAmount,
+    burnRatio: config.BURN_RATIO,
+    treasuryRatio: config.TREASURY_RATIO,
   });
 
   try {
-    // 1. Swap SOL to ASDF (PumpSwap primary, Jupiter fallback)
-    const swapResult = await swapWithFallback(Math.floor(pendingAmount));
+    // 1. Allocate treasury portion (stays as SOL for operations)
+    if (treasuryAmount > 0) {
+      await redis.incrTreasuryTotal(treasuryAmount);
+      await redis.recordTreasuryEvent({
+        type: 'allocation',
+        amount: treasuryAmount,
+        source: 'fee_split',
+      });
+
+      logger.info('TREASURY', 'Allocated to operations fund', {
+        amount: treasuryAmount,
+        amountSol: treasuryAmount / 1e9,
+      });
+    }
+
+    // 2. Swap burn portion to ASDF (PumpSwap primary, Jupiter fallback)
+    if (burnAmount <= 0) {
+      logger.warn('BURN', 'Burn amount too small after split');
+      await redis.resetPendingSwap();
+      return null;
+    }
+
+    const swapResult = await swapWithFallback(burnAmount);
 
     if (!swapResult.success) {
       logger.warn('BURN', 'Swap failed, keeping pending for retry');
+      // Reverse treasury allocation on failure
+      if (treasuryAmount > 0) {
+        await redis.incrTreasuryTotal(-treasuryAmount);
+        await redis.recordTreasuryEvent({
+          type: 'reversal',
+          amount: -treasuryAmount,
+          reason: 'swap_failed',
+        });
+      }
       return null;
     }
 
@@ -53,7 +97,7 @@ async function checkAndExecuteBurn() {
       method: swapResult.method,
     });
 
-    // 2. Get ASDF balance and burn it all
+    // 3. Get ASDF balance and burn it all
     const feePayer = getHealthyPayer();
     const asdfMint = getAsdfMint();
     const tokenAccount = await getAssociatedTokenAddress(asdfMint, feePayer.publicKey);
@@ -72,23 +116,27 @@ async function checkAndExecuteBurn() {
       return null;
     }
 
-    // 3. Burn the ASDF
+    // 4. Burn the ASDF
     const burnResult = await burnAsdf(asdfBalance);
 
-    // 4. Update stats
+    // 5. Update stats
     await redis.incrBurnTotal(asdfBalance);
     await redis.resetPendingSwap();
 
-    logger.info('BURN', 'Burn completed', {
-      asdfAmount: asdfBalance,
-      signature: burnResult,
+    logger.info('BURN', 'Burn completed (80/20 model)', {
+      asdfBurned: asdfBalance,
+      solToBurn: burnAmount,
+      solToTreasury: treasuryAmount,
+      burnSignature: burnResult,
     });
 
     return {
       amountBurned: asdfBalance,
+      treasuryAllocated: treasuryAmount,
       swapSignature: swapResult.signature,
       burnSignature: burnResult,
       method: swapResult.method,
+      model: '80/20',
     };
   } catch (error) {
     logger.error('BURN', 'Burn failed', { error: error.message });

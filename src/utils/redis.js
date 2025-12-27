@@ -316,6 +316,61 @@ async function resetPendingSwap() {
   );
 }
 
+// =============================================================================
+// Treasury (80/20 model)
+// =============================================================================
+
+async function incrTreasuryTotal(amount) {
+  return withRedis(
+    async (redis) => {
+      return redis.incrByFloat('stats:treasury_total', amount);
+    },
+    () => {
+      const current = parseFloat(memoryStore.get('stats:treasury_total')) || 0;
+      memoryStore.set('stats:treasury_total', String(current + amount));
+      return current + amount;
+    }
+  );
+}
+
+async function getTreasuryBalance() {
+  return withRedis(
+    async (redis) => {
+      const amount = await redis.get('stats:treasury_total');
+      return parseFloat(amount) || 0;
+    },
+    () => parseFloat(memoryStore.get('stats:treasury_total')) || 0
+  );
+}
+
+async function recordTreasuryEvent(event) {
+  const entry = {
+    ...event,
+    timestamp: Date.now(),
+  };
+
+  return withRedis(
+    async (redis) => {
+      // Keep last 100 treasury events
+      await redis.lPush('treasury:history', JSON.stringify(entry));
+      await redis.lTrim('treasury:history', 0, 99);
+    },
+    () => {
+      // In-memory: just log
+    }
+  );
+}
+
+async function getTreasuryHistory(limit = 20) {
+  return withRedis(
+    async (redis) => {
+      const history = await redis.lRange('treasury:history', 0, limit - 1);
+      return history.map(h => JSON.parse(h));
+    },
+    () => []
+  );
+}
+
 /**
  * Graceful shutdown
  */
@@ -343,4 +398,9 @@ module.exports = {
   addPendingSwap,
   getPendingSwapAmount,
   resetPendingSwap,
+  // Treasury (80/20 model)
+  incrTreasuryTotal,
+  getTreasuryBalance,
+  recordTreasuryEvent,
+  getTreasuryHistory,
 };

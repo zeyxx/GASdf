@@ -87,6 +87,12 @@ const config = {
   // Burn settings
   BURN_THRESHOLD_LAMPORTS: parseInt(process.env.BURN_THRESHOLD_LAMPORTS) || 100000000,
 
+  // Treasury model (80/20 split)
+  // 80% of fees → swap to $ASDF → burn
+  // 20% of fees → treasury for operations (server, RPC, fee payer refill)
+  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || 0.80,
+  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || 0.20,
+
   // Oracle (optional - graceful fallback if not configured)
   ORACLE_URL: process.env.ORACLE_URL,
   ORACLE_API_KEY: process.env.ORACLE_API_KEY,
