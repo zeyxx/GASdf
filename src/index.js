@@ -15,6 +15,7 @@ const submitRouter = require('./routes/submit');
 const tokensRouter = require('./routes/tokens');
 const statsRouter = require('./routes/stats');
 const healthRouter = require('./routes/health');
+const ignitionRouter = require('./routes/ignition');
 
 const app = express();
 
@@ -162,6 +163,7 @@ app.use('/v1/submit', submitRouter);
 app.use('/v1/tokens', tokensRouter);
 app.use('/v1/stats', statsRouter);
 app.use('/v1/health', healthRouter);
+app.use('/v1/ignition', ignitionRouter);
 
 // API Routes - legacy (backwards compatibility)
 // Deprecation middleware

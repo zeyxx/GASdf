@@ -108,6 +108,15 @@ const config = {
   // Security: Per-wallet rate limiting (in addition to IP-based)
   WALLET_QUOTE_LIMIT: parseInt(process.env.WALLET_QUOTE_LIMIT) || 20, // quotes/min per wallet
   WALLET_SUBMIT_LIMIT: parseInt(process.env.WALLET_SUBMIT_LIMIT) || 10, // submits/min per wallet
+
+  // HolDex Integration (community verification)
+  HOLDEX_API_URL: process.env.HOLDEX_API_URL || 'https://asdev-backend.onrender.com',
+  HOLDEX_CACHE_TTL: parseInt(process.env.HOLDEX_CACHE_TTL) || 300000, // 5 minutes
+
+  // Ignition Integration (launch fee payment)
+  IGNITION_ENABLED: process.env.IGNITION_ENABLED !== 'false',
+  IGNITION_DEV_WALLET: process.env.IGNITION_DEV_WALLET,
+  IGNITION_FEE_SOL: parseFloat(process.env.IGNITION_FEE_SOL) || 0.02,
 };
 
 // =============================================================================
