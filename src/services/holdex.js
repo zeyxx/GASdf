@@ -2,15 +2,57 @@
  * HolDex Integration Service
  * Verifies community tokens via HolDex API
  *
- * Only HolDex-verified communities can use GASdf services.
- * This ensures quality control and prevents spam/abuse.
+ * Major tokens (SOL, USDC, USDT, $ASDF) are always allowed.
+ * Community tokens require HolDex verification (hasCommunityUpdate = true).
  */
 const config = require('../utils/config');
 const { logger } = require('../utils/logger');
 const { fetchWithTimeout } = require('../utils/fetch-timeout');
 
+// Major tokens always allowed without verification
+const ALLOWED_TOKENS = {
+  // Wrapped SOL
+  'So11111111111111111111111111111111111111112': { symbol: 'SOL', reason: 'Native token' },
+  // USDC (mainnet)
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { symbol: 'USDC', reason: 'Major stablecoin' },
+  // USDT (mainnet)
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', reason: 'Major stablecoin' },
+  // mSOL (Marinade staked SOL)
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', reason: 'Liquid staking' },
+  // jitoSOL (Jito staked SOL)
+  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn': { symbol: 'jitoSOL', reason: 'Liquid staking' },
+};
+
 // Verification cache: mint -> { verified: boolean, timestamp: number, data: object }
 const verificationCache = new Map();
+
+/**
+ * Check if a token is in the always-allowed list
+ * @param {string} mint - Token mint address
+ * @returns {boolean}
+ */
+function isAlwaysAllowed(mint) {
+  return (
+    mint === config.WSOL_MINT ||
+    mint === config.ASDF_MINT ||
+    ALLOWED_TOKENS[mint] !== undefined
+  );
+}
+
+/**
+ * Get info about an always-allowed token
+ * @param {string} mint - Token mint address
+ * @returns {Object|null}
+ */
+function getAllowedTokenInfo(mint) {
+  if (mint === config.WSOL_MINT) {
+    return { symbol: 'SOL', reason: 'Native token' };
+  }
+  if (mint === config.ASDF_MINT) {
+    return { symbol: '$ASDF', reason: 'Ecosystem token' };
+  }
+  return ALLOWED_TOKENS[mint] || null;
+}
 
 /**
  * Check if a token is verified on HolDex
@@ -97,6 +139,9 @@ async function isVerified(mint) {
 /**
  * Express middleware to require HolDex verification
  * Checks the paymentToken in request body
+ *
+ * Always allowed: SOL, USDC, USDT, mSOL, jitoSOL, $ASDF
+ * Community tokens: require HolDex verification
  */
 function requireVerified(req, res, next) {
   const paymentToken = req.body?.paymentToken;
@@ -108,16 +153,17 @@ function requireVerified(req, res, next) {
     });
   }
 
-  // Skip verification for SOL payments (always allowed)
-  if (paymentToken === config.WSOL_MINT) {
+  // Skip verification for always-allowed tokens (SOL, USDC, USDT, $ASDF, etc.)
+  if (isAlwaysAllowed(paymentToken)) {
+    const tokenInfo = getAllowedTokenInfo(paymentToken);
+    logger.debug('[HOLDEX] Token always allowed', {
+      mint: paymentToken.slice(0, 8) + '...',
+      symbol: tokenInfo?.symbol,
+    });
     return next();
   }
 
-  // Skip verification for $ASDF (native token, always allowed)
-  if (paymentToken === config.ASDF_MINT) {
-    return next();
-  }
-
+  // Community tokens require HolDex verification
   isVerified(paymentToken).then((result) => {
     if (result.verified) {
       req.holdexToken = result.token;
@@ -154,4 +200,7 @@ module.exports = {
   isVerified,
   requireVerified,
   clearCache,
+  isAlwaysAllowed,
+  getAllowedTokenInfo,
+  ALLOWED_TOKENS,
 };

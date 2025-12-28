@@ -13,6 +13,7 @@ const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
 const { logQuoteCreated, logQuoteRejected, AUDIT_EVENTS } = require('../services/audit');
 const { anomalyDetector } = require('../services/anomaly-detector');
+const { calculateDiscountedFee } = require('../services/holder-tiers');
 
 const router = express.Router();
 
@@ -76,9 +77,9 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     // Apply K-score multiplier and profit margin with overflow check
     const feeWithMultiplier = safeMul(baseFee, config.FEE_MULTIPLIER);
     const adjustedFeeRaw = safeMul(feeWithMultiplier, kScore.feeMultiplier);
-    const adjustedFee = safeCeil(adjustedFeeRaw);
+    const baseAdjustedFee = safeCeil(adjustedFeeRaw);
 
-    if (adjustedFee === null || adjustedFee <= 0) {
+    if (baseAdjustedFee === null || baseAdjustedFee <= 0) {
       logger.error('QUOTE', 'Fee calculation overflow', {
         requestId: req.requestId,
         baseFee,
@@ -90,6 +91,12 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         code: 'FEE_OVERFLOW',
       });
     }
+
+    // =========================================================================
+    // HOLDER TIER: Apply $ASDF holder discount
+    // =========================================================================
+    const tierInfo = await calculateDiscountedFee(userPubkey, baseAdjustedFee);
+    const adjustedFee = tierInfo.discountedFee;
 
     // Get fee amount in payment token
     const feeInToken = await jupiter.getFeeInToken(paymentToken, adjustedFee);
@@ -215,6 +222,14 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         score: kScore.score,
         tier: kScore.tier,
         feeMultiplier: kScore.feeMultiplier,
+      },
+      holderTier: {
+        tier: tierInfo.tier,
+        emoji: tierInfo.tierEmoji,
+        discountPercent: tierInfo.savingsPercent,
+        savings: tierInfo.savings,
+        asdfBalance: tierInfo.balance,
+        nextTier: tierInfo.nextTier,
       },
       expiresAt,
       ttl,

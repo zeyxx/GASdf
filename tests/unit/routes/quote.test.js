@@ -42,6 +42,19 @@ jest.mock('../../../src/services/oracle', () => ({
   }),
 }));
 
+jest.mock('../../../src/services/holder-tiers', () => ({
+  calculateDiscountedFee: jest.fn().mockResolvedValue({
+    originalFee: 6000,
+    discountedFee: 6000,
+    savings: 0,
+    savingsPercent: 0,
+    tier: 'NORMIE',
+    tierEmoji: '👤',
+    balance: 0,
+    nextTier: { name: 'HOLDER', minHolding: 10000, needed: 10000 },
+  }),
+}));
+
 jest.mock('../../../src/services/fee-payer-pool', () => ({
   reserveBalance: jest.fn().mockResolvedValue('FeePayerPubkey111111111111111111111111111111'),
   isCircuitOpen: jest.fn().mockReturnValue(false),

@@ -2,6 +2,8 @@ const express = require('express');
 const oracle = require('../services/oracle');
 const logger = require('../utils/logger');
 const { scoreLimiter } = require('../middleware/security');
+const { getAllTiers, getHolderTier } = require('../services/holder-tiers');
+const { ALLOWED_TOKENS } = require('../services/holdex');
 
 const router = express.Router();
 
@@ -79,6 +81,62 @@ router.get('/:mint/score', scoreLimiter, async (req, res) => {
     logger.error('TOKENS', 'Token score lookup failed', { mint: req.params.mint, error: error.message });
     res.status(500).json({ error: 'Failed to get token score' });
   }
+});
+
+/**
+ * GET /tokens/tiers
+ * Get $ASDF holder tier structure
+ */
+router.get('/tiers', (req, res) => {
+  res.json({
+    tiers: getAllTiers(),
+    description: 'Hold $ASDF to get fee discounts. The more you hold, the lower your fees.',
+  });
+});
+
+/**
+ * GET /tokens/tiers/:wallet
+ * Get holder tier for a specific wallet
+ */
+router.get('/tiers/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+
+    // Validate wallet address format
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet)) {
+      return res.status(400).json({ error: 'Invalid wallet address format' });
+    }
+
+    const tierInfo = await getHolderTier(wallet);
+
+    res.json({
+      wallet,
+      tier: tierInfo.tier,
+      emoji: tierInfo.emoji,
+      asdfBalance: tierInfo.balance,
+      discountPercent: tierInfo.discountPercent,
+      nextTier: tierInfo.nextTier,
+    });
+  } catch (error) {
+    logger.error('TOKENS', 'Tier lookup failed', { wallet: req.params.wallet, error: error.message });
+    res.status(500).json({ error: 'Failed to get tier info' });
+  }
+});
+
+/**
+ * GET /tokens/allowed
+ * Get list of always-allowed tokens (no HolDex verification required)
+ */
+router.get('/allowed', (req, res) => {
+  const allowed = Object.entries(ALLOWED_TOKENS).map(([mint, info]) => ({
+    mint,
+    ...info,
+  }));
+
+  res.json({
+    tokens: allowed,
+    description: 'These tokens are always accepted without HolDex verification.',
+  });
 });
 
 module.exports = router;
