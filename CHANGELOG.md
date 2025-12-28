@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-12-28
+
+### Added
+
+- **Comprehensive Test Suite**: Expanded test coverage from 51.73% to 60.55%
+  - `routes/quote.test.js`: 19 tests for quote generation, K-score, circuit breaker, fee calculation
+  - `routes/submit.test.js`: 30 tests for transaction submission, validation, anti-replay, blockhash
+  - `middleware/validation.test.js`: 32 tests for Solana address, base64, UUID validation
+  - `middleware/security.test.js`: 22 tests for rate limiting and IP normalization
+  - `services/audit.test.js`: 55 tests for audit logging and PII anonymization
+  - `services/anomaly-detector.test.js`: 37 tests for anomaly detection thresholds
+  - `services/alerting.test.js`: Tests for alert service and webhooks
+  - `services/oracle.test.js`: Tests for K-score oracle
+  - `utils/redis.test.js`: 27 tests for Redis operations and in-memory fallback
+  - `utils/metrics.test.js`: Tests for Prometheus metrics (Counter, Gauge, Histogram)
+  - `utils/circuit-breaker.test.js`: Tests for circuit breaker pattern
+  - `utils/safe-math.test.js`: 73 tests for safe math operations
+
+### Changed
+
+- **Test Infrastructure**: 587 total tests across 19 test suites
+- **Route Coverage**: Improved from 34.93% to 77.02%
+  - `quote.js`: 28.12% → 100%
+  - `submit.js`: 13.57% → 97.14%
+
 ## [1.2.4] - 2025-12-28
 
 ### Added
