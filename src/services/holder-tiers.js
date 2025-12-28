@@ -13,7 +13,7 @@
 const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
 const { getConnection } = require('../utils/rpc');
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 // $ASDF has 6 decimals
 const ASDF_DECIMALS = 6;
