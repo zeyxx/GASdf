@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Distributed Locking**: Race condition prevention for concurrent operations
+  - `acquireLock()`, `releaseLock()`, `isLockHeld()`, `withLock()` utilities
+  - Redis-based with in-memory fallback for development
+  - Lua script for atomic check-and-delete on release
+
+- **Burn Worker Mutex**: Prevents concurrent burn executions
+  - Double-check pattern after lock acquisition
+  - 2-minute TTL prevents deadlocks
+  - Graceful handling when lock is already held
+
+- **Balance Reservation Mutex**: Prevents race conditions in fee payer pool
+  - In-process lock queue for reservation operations
+  - Ensures atomic check-and-reserve operations
+  - Prevents over-commitment of fee payer balances
+
+### Security
+
+- Fixed race condition where concurrent requests could over-reserve fee payer balance
+- Fixed race condition where multiple burn cycles could execute simultaneously
+- Added 12 new tests for distributed locking mechanism
+
 ## [1.2.1] - 2025-12-28
 
 ### Added

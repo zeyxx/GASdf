@@ -764,6 +764,126 @@ async function trackIpActivity(ip, activityType) {
   );
 }
 
+// =============================================================================
+// Distributed Locking (Race Condition Prevention)
+// =============================================================================
+
+// In-memory locks for fallback
+const memoryLocks = new Map();
+
+/**
+ * Acquire a distributed lock using Redis SETNX
+ * @param {string} lockName - Unique name for the lock
+ * @param {number} ttlSeconds - Lock expiration time (prevents deadlocks)
+ * @returns {Promise<string|null>} - Lock token if acquired, null if lock held by another
+ */
+async function acquireLock(lockName, ttlSeconds = 30) {
+  const key = `lock:${lockName}`;
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return withRedis(
+    async (redis) => {
+      // SET key value NX EX ttl - atomic set-if-not-exists with expiry
+      const result = await redis.set(key, token, { NX: true, EX: ttlSeconds });
+      if (result === 'OK') {
+        return token;
+      }
+      return null;
+    },
+    () => {
+      // Memory fallback
+      const existing = memoryLocks.get(key);
+      if (existing && Date.now() < existing.expiresAt) {
+        return null; // Lock held
+      }
+      memoryLocks.set(key, {
+        token,
+        expiresAt: Date.now() + ttlSeconds * 1000,
+      });
+      return token;
+    }
+  );
+}
+
+/**
+ * Release a distributed lock
+ * @param {string} lockName - Lock name
+ * @param {string} token - Token received from acquireLock (ensures only owner releases)
+ * @returns {Promise<boolean>} - True if released, false if lock not held or wrong token
+ */
+async function releaseLock(lockName, token) {
+  const key = `lock:${lockName}`;
+
+  return withRedis(
+    async (redis) => {
+      // Lua script for atomic check-and-delete (only delete if token matches)
+      const script = `
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+          return redis.call("del", KEYS[1])
+        else
+          return 0
+        end
+      `;
+      const result = await redis.eval(script, { keys: [key], arguments: [token] });
+      return result === 1;
+    },
+    () => {
+      // Memory fallback
+      const existing = memoryLocks.get(key);
+      if (existing && existing.token === token) {
+        memoryLocks.delete(key);
+        return true;
+      }
+      return false;
+    }
+  );
+}
+
+/**
+ * Check if a lock is currently held
+ * @param {string} lockName - Lock name
+ * @returns {Promise<boolean>} - True if lock is held
+ */
+async function isLockHeld(lockName) {
+  const key = `lock:${lockName}`;
+
+  return withRedis(
+    async (redis) => {
+      const value = await redis.get(key);
+      return value !== null;
+    },
+    () => {
+      const existing = memoryLocks.get(key);
+      return !!(existing && Date.now() < existing.expiresAt);
+    }
+  );
+}
+
+/**
+ * Execute a function with a distributed lock
+ * Automatically acquires and releases the lock
+ * @param {string} lockName - Lock name
+ * @param {Function} fn - Async function to execute while holding lock
+ * @param {number} ttlSeconds - Lock TTL
+ * @returns {Promise<{success: boolean, result?: any, error?: string}>}
+ */
+async function withLock(lockName, fn, ttlSeconds = 60) {
+  const token = await acquireLock(lockName, ttlSeconds);
+
+  if (!token) {
+    return { success: false, error: 'LOCK_HELD', message: `Lock ${lockName} is held by another process` };
+  }
+
+  try {
+    const result = await fn();
+    return { success: true, result };
+  } catch (error) {
+    return { success: false, error: 'EXECUTION_ERROR', message: error.message };
+  } finally {
+    await releaseLock(lockName, token);
+  }
+}
+
 module.exports = {
   initializeClient,
   getClient,
@@ -808,4 +928,9 @@ module.exports = {
   recordBurnProof,
   getBurnProofs,
   getBurnProofBySignature,
+  // Distributed Locking
+  acquireLock,
+  releaseLock,
+  isLockHeld,
+  withLock,
 };

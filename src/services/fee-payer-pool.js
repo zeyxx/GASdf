@@ -54,6 +54,30 @@ class FeePayerPool {
 
     // Key rotation state
     this.keyStatus = new Map(); // pubkey -> { status, retiredAt, reason }
+
+    // ==========================================================================
+    // RACE CONDITION FIX: In-process mutex for reservation operations
+    // ==========================================================================
+    this._reservationLock = Promise.resolve();
+    this._lockQueue = [];
+  }
+
+  /**
+   * Acquire in-process lock for reservation operations
+   * Prevents race conditions when multiple concurrent requests try to reserve
+   */
+  async _acquireReservationLock() {
+    let release;
+    const lockPromise = new Promise((resolve) => {
+      release = resolve;
+    });
+
+    // Wait for previous lock to release
+    const previousLock = this._reservationLock;
+    this._reservationLock = lockPromise;
+
+    await previousLock;
+    return release;
   }
 
   /**
@@ -520,81 +544,92 @@ class FeePayerPool {
   }
 
   /**
-   * Reserve balance for a quote
+   * Reserve balance for a quote (with mutex protection)
    * Returns the assigned fee payer pubkey, or null if circuit breaker is open
    */
-  reserveBalance(quoteId, amountLamports) {
+  async reserveBalance(quoteId, amountLamports) {
     this.initialize();
-    this.cleanupExpiredReservations();
 
-    // Check circuit breaker
-    if (this.isCircuitOpen()) {
-      logger.warn('FEE_PAYER_POOL', 'Circuit breaker open, rejecting reservation', { quoteId });
-      return null;
-    }
+    // ==========================================================================
+    // RACE CONDITION FIX: Acquire lock before checking/modifying state
+    // ==========================================================================
+    const releaseLock = await this._acquireReservationLock();
 
-    // Find a payer with capacity
-    for (let i = 0; i < this.payers.length; i++) {
-      const index = (this.currentIndex + i) % this.payers.length;
-      const payer = this.payers[index];
-      const pubkey = payer.publicKey.toBase58();
+    try {
+      this.cleanupExpiredReservations();
 
-      // Skip unhealthy payers
-      if (!this.isPayerHealthy(pubkey)) continue;
-
-      // Check reservation count limit
-      const reservationCount = this.getReservationCount(pubkey);
-      if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
-        logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
-        continue;
+      // Check circuit breaker
+      if (this.isCircuitOpen()) {
+        logger.warn('FEE_PAYER_POOL', 'Circuit breaker open, rejecting reservation', { quoteId });
+        return null;
       }
 
-      // Check available balance
-      const availableBalance = this.getAvailableBalance(pubkey);
-      if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
-        logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... insufficient available balance`);
-        continue;
+      // Find a payer with capacity
+      for (let i = 0; i < this.payers.length; i++) {
+        const index = (this.currentIndex + i) % this.payers.length;
+        const payer = this.payers[index];
+        const pubkey = payer.publicKey.toBase58();
+
+        // Skip unhealthy payers
+        if (!this.isPayerHealthy(pubkey)) continue;
+
+        // Check reservation count limit
+        const reservationCount = this.getReservationCount(pubkey);
+        if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
+          logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
+          continue;
+        }
+
+        // Check available balance
+        const availableBalance = this.getAvailableBalance(pubkey);
+        if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
+          logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... insufficient available balance`);
+          continue;
+        }
+
+        // Create reservation
+        const reservation = {
+          pubkey,
+          amount: amountLamports,
+          expiresAt: Date.now() + RESERVATION_TTL_MS,
+          createdAt: Date.now(),
+        };
+
+        this.reservations.set(quoteId, reservation);
+
+        if (!this.reservationsByPayer.has(pubkey)) {
+          this.reservationsByPayer.set(pubkey, new Set());
+        }
+        this.reservationsByPayer.get(pubkey).add(quoteId);
+
+        // Move to next payer for round-robin
+        this.currentIndex = (index + 1) % this.payers.length;
+
+        logger.debug('FEE_PAYER_POOL', 'Reserved balance', {
+          quoteId,
+          pubkey: pubkey.slice(0, 8),
+          amount: amountLamports,
+          availableAfter: availableBalance - amountLamports,
+        });
+
+        // Reset consecutive failures on successful reservation
+        this.consecutiveFailures = 0;
+
+        return pubkey;
       }
 
-      // Create reservation
-      const reservation = {
-        pubkey,
-        amount: amountLamports,
-        expiresAt: Date.now() + RESERVATION_TTL_MS,
-        createdAt: Date.now(),
-      };
-
-      this.reservations.set(quoteId, reservation);
-
-      if (!this.reservationsByPayer.has(pubkey)) {
-        this.reservationsByPayer.set(pubkey, new Set());
-      }
-      this.reservationsByPayer.get(pubkey).add(quoteId);
-
-      // Move to next payer for round-robin
-      this.currentIndex = (index + 1) % this.payers.length;
-
-      logger.debug('FEE_PAYER_POOL', 'Reserved balance', {
+      // No payer available - record failure
+      this.recordFailure();
+      logger.error('FEE_PAYER_POOL', 'No payer available for reservation', {
         quoteId,
-        pubkey: pubkey.slice(0, 8),
         amount: amountLamports,
-        availableAfter: availableBalance - amountLamports,
       });
 
-      // Reset consecutive failures on successful reservation
-      this.consecutiveFailures = 0;
-
-      return pubkey;
+      return null;
+    } finally {
+      // Always release lock
+      releaseLock();
     }
-
-    // No payer available - record failure
-    this.recordFailure();
-    logger.error('FEE_PAYER_POOL', 'No payer available for reservation', {
-      quoteId,
-      amount: amountLamports,
-    });
-
-    return null;
   }
 
   /**

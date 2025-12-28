@@ -27,6 +27,10 @@ function getAsdfMint() {
   return _asdfMint;
 }
 
+// Burn lock name for distributed locking
+const BURN_LOCK_NAME = 'burn-worker';
+const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
+
 async function checkAndExecuteBurn() {
   const pendingAmount = await redis.getPendingSwapAmount();
 
@@ -35,13 +39,42 @@ async function checkAndExecuteBurn() {
   }
 
   // ==========================================================================
+  // RACE CONDITION FIX: Distributed lock prevents concurrent burn executions
+  // ==========================================================================
+  const lockResult = await redis.withLock(BURN_LOCK_NAME, async () => {
+    // Re-check pending amount after acquiring lock (double-check pattern)
+    const confirmedAmount = await redis.getPendingSwapAmount();
+    if (confirmedAmount < config.BURN_THRESHOLD_LAMPORTS) {
+      logger.debug('BURN', 'Pending amount below threshold after lock acquired');
+      return null;
+    }
+
+    return executeBurnWithLock(confirmedAmount);
+  }, BURN_LOCK_TTL);
+
+  if (!lockResult.success) {
+    if (lockResult.error === 'LOCK_HELD') {
+      logger.debug('BURN', 'Burn already in progress, skipping');
+    } else {
+      logger.error('BURN', 'Burn execution failed', { error: lockResult.message });
+    }
+    return null;
+  }
+
+  return lockResult.result;
+}
+
+/**
+ * Execute burn operation (called while holding distributed lock)
+ */
+async function executeBurnWithLock(totalAmount) {
+  // ==========================================================================
   // 80/20 Treasury Model
   // ==========================================================================
   // 80% → swap to $ASDF → burn (the mission)
   // 20% → treasury for operations (server, RPC, fee payer refill)
   // ==========================================================================
 
-  const totalAmount = Math.floor(pendingAmount);
   const burnAmount = Math.floor(totalAmount * config.BURN_RATIO);
   const treasuryAmount = totalAmount - burnAmount;
 

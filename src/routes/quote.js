@@ -75,9 +75,9 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     const ttl = config.QUOTE_TTL_SECONDS;
 
     // =========================================================================
-    // SECURITY: Reserve fee payer balance for this quote
+    // SECURITY: Reserve fee payer balance for this quote (mutex-protected)
     // =========================================================================
-    const feePayer = reserveBalance(quoteId, adjustedFee);
+    const feePayer = await reserveBalance(quoteId, adjustedFee);
     if (!feePayer) {
       logger.warn('QUOTE', 'No fee payer capacity available', {
         requestId: req.requestId,
