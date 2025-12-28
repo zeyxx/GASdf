@@ -6,11 +6,17 @@
 const {
   withTimeout,
   timeoutPromise,
+  fetchWithTimeout,
+  fetchJsonWithTimeout,
+  retryWithTimeout,
   DEFAULT_TIMEOUT,
   JUPITER_TIMEOUT,
   WEBHOOK_TIMEOUT,
   HEALTH_CHECK_TIMEOUT,
 } = require('../../../src/utils/fetch-timeout');
+
+// Mock global fetch
+global.fetch = jest.fn();
 
 describe('Fetch Timeout Utilities', () => {
   describe('timeoutPromise()', () => {
@@ -150,6 +156,201 @@ describe('Fetch Timeout Utilities', () => {
         'Large timeout'
       );
       expect(result).toBe('quick');
+    });
+  });
+
+  describe('fetchWithTimeout()', () => {
+    beforeEach(() => {
+      global.fetch.mockReset();
+    });
+
+    it('should return response on successful fetch', async () => {
+      const mockResponse = { ok: true, status: 200 };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await fetchWithTimeout('https://example.com', {}, 1000);
+      expect(result).toBe(mockResponse);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://example.com',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+
+    it('should pass options to fetch', async () => {
+      const mockResponse = { ok: true };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await fetchWithTimeout('https://example.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true }),
+      }, 1000);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://example.com',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ test: true }),
+        })
+      );
+    });
+
+    it('should throw timeout error on abort', async () => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      global.fetch.mockRejectedValue(abortError);
+
+      await expect(
+        fetchWithTimeout('https://example.com', {}, 100)
+      ).rejects.toMatchObject({
+        code: 'TIMEOUT',
+        url: 'https://example.com',
+        timeoutMs: 100,
+      });
+    });
+
+    it('should rethrow non-abort errors', async () => {
+      const networkError = new Error('Network error');
+      global.fetch.mockRejectedValue(networkError);
+
+      await expect(
+        fetchWithTimeout('https://example.com', {}, 1000)
+      ).rejects.toThrow('Network error');
+    });
+
+    it('should use DEFAULT_TIMEOUT when not specified', async () => {
+      const mockResponse = { ok: true };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await fetchWithTimeout('https://example.com');
+      expect(global.fetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchJsonWithTimeout()', () => {
+    beforeEach(() => {
+      global.fetch.mockReset();
+    });
+
+    it('should return parsed JSON on success', async () => {
+      const jsonData = { message: 'success', value: 42 };
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue(jsonData),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await fetchJsonWithTimeout('https://api.example.com/data', {}, 1000);
+      expect(result).toEqual(jsonData);
+    });
+
+    it('should throw error on non-ok response', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await expect(
+        fetchJsonWithTimeout('https://api.example.com/missing', {}, 1000)
+      ).rejects.toMatchObject({
+        status: 404,
+        statusText: 'Not Found',
+        url: 'https://api.example.com/missing',
+      });
+    });
+
+    it('should throw HTTP error with status', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      try {
+        await fetchJsonWithTimeout('https://api.example.com/error', {}, 1000);
+        fail('Should have thrown');
+      } catch (error) {
+        expect(error.message).toContain('500');
+        expect(error.status).toBe(500);
+      }
+    });
+  });
+
+  describe('retryWithTimeout()', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should return result on first success', async () => {
+      const fn = jest.fn().mockResolvedValue('success');
+
+      const resultPromise = retryWithTimeout(fn, {
+        maxRetries: 3,
+        timeoutMs: 1000,
+        delayMs: 100,
+        operation: 'Test',
+      });
+
+      // Fast-forward past any pending timers
+      jest.runAllTimers();
+
+      const result = await resultPromise;
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry on failure', async () => {
+      jest.useRealTimers(); // Use real timers for this test
+
+      const fn = jest.fn()
+        .mockRejectedValueOnce(new Error('fail 1'))
+        .mockRejectedValueOnce(new Error('fail 2'))
+        .mockResolvedValue('success');
+
+      const result = await retryWithTimeout(fn, {
+        maxRetries: 3,
+        timeoutMs: 1000,
+        delayMs: 10,
+        operation: 'Retry test',
+      });
+
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
+
+    it('should throw after max retries', async () => {
+      jest.useRealTimers();
+
+      const fn = jest.fn().mockRejectedValue(new Error('always fails'));
+
+      await expect(
+        retryWithTimeout(fn, {
+          maxRetries: 2,
+          timeoutMs: 100,
+          delayMs: 10,
+          operation: 'Failing op',
+        })
+      ).rejects.toThrow('always fails');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use default options', async () => {
+      jest.useRealTimers();
+
+      const fn = jest.fn().mockResolvedValue('result');
+
+      const result = await retryWithTimeout(fn);
+      expect(result).toBe('result');
     });
   });
 });

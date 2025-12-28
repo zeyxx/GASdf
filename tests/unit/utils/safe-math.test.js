@@ -14,7 +14,10 @@ const {
   safeProportion,
   calculateTreasurySplit,
   validateSolanaAmount,
+  calculateFee,
+  lamportsToTokens,
   MAX_COMPUTE_UNITS,
+  MAX_SAFE_INTEGER,
   isSafeInteger,
 } = require('../../../src/utils/safe-math');
 
@@ -248,6 +251,217 @@ describe('Safe Math Utilities', () => {
   describe('MAX_COMPUTE_UNITS constant', () => {
     it('should be set to Solana limit', () => {
       expect(MAX_COMPUTE_UNITS).toBe(1_400_000);
+    });
+  });
+
+  describe('safeMul() - additional coverage', () => {
+    it('should return null when result overflows to Infinity', () => {
+      // Large numbers that overflow to Infinity when multiplied
+      expect(safeMul(1e308, 10)).toBeNull();
+      expect(safeMul(Number.MAX_VALUE, 2)).toBeNull();
+    });
+  });
+
+  describe('safeDiv() - additional coverage', () => {
+    it('should return null for non-number inputs', () => {
+      expect(safeDiv('10', 2)).toBeNull();
+      expect(safeDiv(10, {})).toBeNull();
+      expect(safeDiv(undefined, 2)).toBeNull();
+    });
+
+    it('should return null when result overflows', () => {
+      // Dividing by very small number can cause Infinity
+      expect(safeDiv(1e308, 0.1)).toBeNull();
+    });
+  });
+
+  describe('safeAdd() - additional coverage', () => {
+    it('should return null for non-number inputs', () => {
+      expect(safeAdd('10', 5)).toBeNull();
+      expect(safeAdd(10, null)).toBeNull();
+      expect(safeAdd({}, 5)).toBeNull();
+    });
+
+    it('should return null when result overflows', () => {
+      expect(safeAdd(Number.MAX_VALUE, Number.MAX_VALUE)).toBeNull();
+    });
+  });
+
+  describe('safeSub() - additional coverage', () => {
+    it('should return null for non-number inputs', () => {
+      expect(safeSub('10', 5)).toBeNull();
+      expect(safeSub(10, null)).toBeNull();
+      expect(safeSub([], 5)).toBeNull();
+    });
+
+    it('should return null when result overflows', () => {
+      expect(safeSub(-Number.MAX_VALUE, Number.MAX_VALUE)).toBeNull();
+    });
+  });
+
+  describe('safeCeil() - additional coverage', () => {
+    it('should return null for very large positive numbers', () => {
+      // A number larger than MAX_SAFE_INTEGER
+      const veryLarge = MAX_SAFE_INTEGER + 1000.5;
+      expect(safeCeil(veryLarge)).toBeNull();
+    });
+
+    it('should return null for non-number inputs', () => {
+      expect(safeCeil('1.5')).toBeNull();
+      expect(safeCeil(null)).toBeNull();
+    });
+  });
+
+  describe('safeFloor() - additional coverage', () => {
+    it('should return null for very large numbers exceeding safe range', () => {
+      // A number much larger than MAX_SAFE_INTEGER
+      const veryLarge = MAX_SAFE_INTEGER * 2 + 0.5;
+      expect(safeFloor(veryLarge)).toBeNull();
+    });
+
+    it('should return null for non-number inputs', () => {
+      expect(safeFloor('1.5')).toBeNull();
+      expect(safeFloor(undefined)).toBeNull();
+    });
+  });
+
+  describe('calculateFee()', () => {
+    it('should calculate fee with base fee and compute units', () => {
+      const result = calculateFee(200000, 5000, 1);
+      expect(result).not.toBeNull();
+      expect(result.fee).toBeGreaterThan(5000);
+      expect(result.capped).toBe(false);
+    });
+
+    it('should cap compute units at MAX_COMPUTE_UNITS', () => {
+      const result = calculateFee(2_000_000, 5000, 1);
+      expect(result).not.toBeNull();
+      expect(result.capped).toBe(true);
+    });
+
+    it('should apply multiplier correctly', () => {
+      const baseResult = calculateFee(100000, 5000, 1);
+      const multipliedResult = calculateFee(100000, 5000, 2);
+      expect(multipliedResult.fee).toBe(baseResult.fee * 2);
+    });
+
+    it('should handle zero compute units', () => {
+      const result = calculateFee(0, 5000, 1);
+      expect(result).not.toBeNull();
+      expect(result.fee).toBe(5000);
+    });
+
+    it('should handle negative compute units (clamped to 0)', () => {
+      const result = calculateFee(-1000, 5000, 1);
+      expect(result).not.toBeNull();
+      expect(result.capped).toBe(true);
+    });
+
+    it('should ceil the final result', () => {
+      // 0.001 * 100 = 0.1 lamports + 5000 = 5000.1, ceil = 5001
+      const result = calculateFee(100, 5000, 1);
+      expect(result.fee).toBe(5001);
+    });
+
+    it('should default multiplier to 1', () => {
+      const result = calculateFee(100000, 5000);
+      expect(result).not.toBeNull();
+    });
+  });
+
+  describe('lamportsToTokens()', () => {
+    it('should convert lamports to token units', () => {
+      // 1 SOL (1e9 lamports) at rate 1 with 9 decimals = 1e9 tokens
+      const result = lamportsToTokens(1_000_000_000, 9, 1);
+      expect(result).toBe(1_000_000_000);
+    });
+
+    it('should handle different decimal places', () => {
+      // 1 SOL at rate 1 with 6 decimals (USDC-like)
+      const result = lamportsToTokens(1_000_000_000, 6, 1);
+      expect(result).toBe(1_000_000);
+    });
+
+    it('should apply exchange rate', () => {
+      // 1 SOL at rate 100 (e.g., 100 tokens per SOL)
+      const result = lamportsToTokens(1_000_000_000, 6, 100);
+      expect(result).toBe(100_000_000);
+    });
+
+    it('should return 0 for zero lamports', () => {
+      expect(lamportsToTokens(0, 6, 100)).toBe(0);
+    });
+
+    it('should return 0 for negative lamports', () => {
+      expect(lamportsToTokens(-1000, 6, 100)).toBe(0);
+    });
+
+    it('should return 0 for zero rate', () => {
+      expect(lamportsToTokens(1_000_000_000, 6, 0)).toBe(0);
+    });
+
+    it('should return 0 for negative rate', () => {
+      expect(lamportsToTokens(1_000_000_000, 6, -1)).toBe(0);
+    });
+
+    it('should ceil the result', () => {
+      // 0.1 SOL = 1e8 lamports at rate 0.5 with 6 decimals
+      // 1e8 / 1e9 * 0.5 * 1e6 = 50000
+      const result = lamportsToTokens(100_000_000, 6, 0.5);
+      expect(result).toBe(50000);
+    });
+  });
+
+  describe('validateSolanaAmount() - additional coverage', () => {
+    it('should reject amounts exceeding safe integer range', () => {
+      const result = validateSolanaAmount(MAX_SAFE_INTEGER + 1);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('safe integer');
+    });
+
+    it('should accept MAX_SAFE_INTEGER', () => {
+      const result = validateSolanaAmount(MAX_SAFE_INTEGER);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should return value in result object', () => {
+      const result = validateSolanaAmount(12345);
+      expect(result.value).toBe(12345);
+    });
+
+    it('should return 0 for invalid values', () => {
+      const result = validateSolanaAmount('invalid');
+      expect(result.value).toBe(0);
+    });
+  });
+
+  describe('safeProportion() - additional coverage', () => {
+    it('should return null for null divisor', () => {
+      expect(safeProportion(10, 5, null)).toBeNull();
+    });
+
+    it('should return null for undefined divisor', () => {
+      expect(safeProportion(10, 5, undefined)).toBeNull();
+    });
+  });
+
+  describe('calculateTreasurySplit() - additional coverage', () => {
+    it('should handle Infinity total', () => {
+      const { burnAmount, treasuryAmount } = calculateTreasurySplit(Infinity, 0.8);
+      expect(burnAmount).toBe(0);
+      expect(treasuryAmount).toBe(0);
+    });
+
+    it('should handle NaN total', () => {
+      const { burnAmount, treasuryAmount } = calculateTreasurySplit(NaN, 0.8);
+      expect(burnAmount).toBe(0);
+      expect(treasuryAmount).toBe(0);
+    });
+
+    it('should use default 0.8 ratio', () => {
+      const { burnAmount, treasuryAmount } = calculateTreasurySplit(100);
+      expect(burnAmount).toBe(80);
+      expect(treasuryAmount).toBe(20);
     });
   });
 });
