@@ -123,7 +123,10 @@ class RpcPool {
   initialize() {
     if (this.initialized) return;
 
-    const isMainnet = config.NETWORK === 'mainnet-beta';
+    // Detect mainnet from config or explicit RPC_URL
+    const isMainnet = config.NETWORK === 'mainnet' ||
+                      config.USE_MAINNET ||
+                      (config.RPC_URL && config.RPC_URL.includes('mainnet'));
     const heliusKey = config.HELIUS_API_KEY;
 
     // Build endpoint list based on available config
