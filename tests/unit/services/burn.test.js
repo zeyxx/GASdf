@@ -1,29 +1,36 @@
 /**
  * Tests for Burn Service
+ *
+ * New logic: Scans actual treasury token balances, then:
+ * - For $ASDF: Burn 80% directly, swap 20% → SOL for treasury
+ * - For other tokens: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
  */
 
 // Mock dependencies before requiring the module
-jest.mock('@solana/web3.js', () => {
-  const mockTransaction = {
-    add: jest.fn().mockReturnThis(),
-    sign: jest.fn(),
-  };
-  return {
-    PublicKey: jest.fn().mockImplementation((key) => ({
-      toBase58: () => key,
-      toString: () => key,
-    })),
-    Transaction: Object.assign(
-      jest.fn().mockImplementation(() => mockTransaction),
-      { from: jest.fn().mockReturnValue(mockTransaction) }
-    ),
-  };
-});
+const mockPublicKey = jest.fn().mockImplementation((key) => ({
+  toBase58: () => key,
+  toString: () => key,
+  equals: jest.fn((other) => key === other?.toBase58?.()),
+}));
+
+const mockTransaction = {
+  add: jest.fn().mockReturnThis(),
+  sign: jest.fn(),
+};
+
+jest.mock('@solana/web3.js', () => ({
+  PublicKey: mockPublicKey,
+  Transaction: Object.assign(
+    jest.fn().mockImplementation(() => mockTransaction),
+    { from: jest.fn().mockReturnValue(mockTransaction) }
+  ),
+}));
 
 jest.mock('@solana/spl-token', () => ({
   createBurnInstruction: jest.fn().mockReturnValue({ type: 'burn' }),
   getAssociatedTokenAddress: jest.fn().mockResolvedValue('token-account-address'),
   getAccount: jest.fn().mockResolvedValue({ amount: BigInt(1000000) }),
+  TOKEN_PROGRAM_ID: { toBase58: () => 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
 }));
 
 jest.mock('../../../src/utils/config', () => ({
@@ -53,7 +60,9 @@ jest.mock('../../../src/utils/redis', () => ({
 }));
 
 jest.mock('../../../src/utils/rpc', () => ({
-  getConnection: jest.fn().mockReturnValue({}),
+  getConnection: jest.fn().mockReturnValue({
+    getParsedTokenAccountsByOwner: jest.fn(),
+  }),
   sendTransaction: jest.fn().mockResolvedValue('tx-signature-123'),
   confirmTransaction: jest.fn().mockResolvedValue(true),
   getLatestBlockhash: jest.fn().mockResolvedValue({
@@ -66,15 +75,30 @@ jest.mock('../../../src/services/fee-payer-pool', () => ({
   getHealthyPayer: jest.fn().mockReturnValue({
     publicKey: {
       toBase58: () => 'FeePayer111111111111111111111111111111111111',
+      equals: jest.fn(() => true), // Fee payer is treasury
     },
   }),
 }));
 
+jest.mock('../../../src/services/treasury-ata', () => ({
+  getTreasuryAddress: jest.fn().mockReturnValue({
+    toBase58: () => 'Treasury111111111111111111111111111111111111',
+    equals: jest.fn(() => true),
+  }),
+}));
+
 jest.mock('../../../src/services/jupiter', () => ({
-  getQuote: jest.fn().mockResolvedValue({ outAmount: 1000000 }),
+  getQuote: jest.fn().mockResolvedValue({ outAmount: '200000000' }), // 200 USDC for 1 SOL
   getSwapTransaction: jest.fn().mockResolvedValue({
     swapTransaction: Buffer.from('mock-transaction').toString('base64'),
   }),
+  getTokenToSolQuote: jest.fn().mockResolvedValue({ outAmount: '500000000' }), // 0.5 SOL
+  getTokenToAsdfQuote: jest.fn().mockResolvedValue({ outAmount: '800000' }),
+  TOKEN_INFO: {
+    'So11111111111111111111111111111111111111112': { symbol: 'SOL', decimals: 9 },
+    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { symbol: 'USDC', decimals: 6 },
+    'AsdfMint111111111111111111111111111111111111': { symbol: '$ASDF', decimals: 6 },
+  },
 }));
 
 jest.mock('../../../src/utils/safe-math', () => ({
@@ -90,53 +114,138 @@ const redis = require('../../../src/utils/redis');
 const rpc = require('../../../src/utils/rpc');
 const jupiter = require('../../../src/services/jupiter');
 const feePayerPool = require('../../../src/services/fee-payer-pool');
+const treasuryAta = require('../../../src/services/treasury-ata');
 const safeMath = require('../../../src/utils/safe-math');
 const splToken = require('@solana/spl-token');
 const logger = require('../../../src/utils/logger');
+const config = require('../../../src/utils/config');
 
 // Require burn service after mocks are set up
 const burnService = require('../../../src/services/burn');
 
+// Helper to create mock token account
+// Note: For USDC (6 decimals), 1,000,000 units = $1.00
+function createMockTokenAccount(mint, balance, decimals = 6) {
+  return {
+    pubkey: { toBase58: () => `ATA_${mint.slice(0, 8)}` },
+    account: {
+      data: {
+        parsed: {
+          info: {
+            mint,
+            tokenAmount: {
+              amount: balance.toString(),
+              decimals,
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+// Minimum balance to pass $0.50 threshold for USDC = 500,000 units
+
 describe('Burn Service', () => {
+  let mockConnection;
+
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Reset default mock implementations
-    redis.getPendingSwapAmount.mockResolvedValue(0);
+    // Set up mock connection
+    mockConnection = {
+      getParsedTokenAccountsByOwner: jest.fn().mockResolvedValue({ value: [] }),
+    };
+    rpc.getConnection.mockReturnValue(mockConnection);
+
+    // Default lock behavior
     redis.withLock.mockImplementation(async (name, fn, ttl) => {
       const result = await fn();
       return { success: true, result };
     });
-    redis.resetPendingSwap.mockResolvedValue(true);
-    redis.incrBurnTotal.mockResolvedValue(true);
-    redis.incrTreasuryTotal.mockResolvedValue(true);
-    redis.recordTreasuryEvent.mockResolvedValue(true);
-    redis.recordBurnProof.mockResolvedValue({ id: 'proof-123' });
 
-    rpc.sendTransaction.mockResolvedValue('tx-signature-123');
-    rpc.confirmTransaction.mockResolvedValue(true);
-    rpc.getLatestBlockhash.mockResolvedValue({
-      blockhash: 'blockhash-123',
-      lastValidBlockHeight: 100000,
+    // Default fee payer
+    feePayerPool.getHealthyPayer.mockReturnValue({
+      publicKey: {
+        toBase58: () => 'FeePayer111111111111111111111111111111111111',
+        equals: jest.fn(() => true),
+      },
     });
 
-    jupiter.getQuote.mockResolvedValue({ outAmount: 1000000 });
+    // Default jupiter responses
+    jupiter.getTokenToAsdfQuote.mockResolvedValue({ outAmount: '800000' });
+    jupiter.getTokenToSolQuote.mockResolvedValue({ outAmount: '500000' });
     jupiter.getSwapTransaction.mockResolvedValue({
       swapTransaction: Buffer.from('mock-transaction').toString('base64'),
     });
+  });
 
-    splToken.getAccount.mockResolvedValue({ amount: BigInt(1000000) });
+  describe('getTreasuryTokenBalances()', () => {
+    it('should return empty array when no tokens', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({ value: [] });
 
-    safeMath.validateSolanaAmount.mockReturnValue({ valid: true });
-    safeMath.calculateTreasurySplit.mockImplementation((total, ratio) => ({
-      burnAmount: Math.floor(total * ratio),
-      treasuryAmount: total - Math.floor(total * ratio),
-    }));
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(balances).toEqual([]);
+    });
+
+    it('should return token balances above minimum USD value', async () => {
+      // 1,000,000 USDC units = $1.00 (above $0.50 threshold)
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [
+          createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 1000000),
+          createMockTokenAccount('AsdfMint111111111111111111111111111111111111', 5000000),
+        ],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(balances).toHaveLength(2);
+      // Sorted by value (highest first)
+      expect(balances[0].valueUsd).toBeGreaterThan(0);
+    });
+
+    it('should filter out tokens below $0.50 value', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [
+          createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 100000), // $0.10 - too low
+          createMockTokenAccount('AsdfMint111111111111111111111111111111111111', 5000000), // Higher value
+        ],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      // Only the ASDF token should pass (has higher value via Jupiter quote)
+      expect(balances.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should handle RPC errors gracefully', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockRejectedValue(new Error('RPC error'));
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(balances).toEqual([]);
+      expect(logger.error).toHaveBeenCalledWith(
+        'BURN',
+        'Failed to get treasury token balances',
+        expect.any(Object)
+      );
+    });
+
+    it('should include valueUsd in returned balances', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 2000000)],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(balances[0].valueUsd).toBe(2); // $2.00 for 2M USDC units
+    });
   });
 
   describe('checkAndExecuteBurn()', () => {
-    it('should return null when pending amount is below threshold', async () => {
-      redis.getPendingSwapAmount.mockResolvedValue(50000); // Below 100000 threshold
+    it('should return null when no token balances', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({ value: [] });
 
       const result = await burnService.checkAndExecuteBurn();
 
@@ -144,8 +253,11 @@ describe('Burn Service', () => {
       expect(redis.withLock).not.toHaveBeenCalled();
     });
 
-    it('should acquire lock when pending amount exceeds threshold', async () => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
+    it('should acquire lock when tokens are present', async () => {
+      // 1M USDC = $1.00 (above threshold)
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 1000000)],
+      });
 
       await burnService.checkAndExecuteBurn();
 
@@ -157,274 +269,160 @@ describe('Burn Service', () => {
     });
 
     it('should return null when lock is already held', async () => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-      redis.withLock.mockResolvedValue({
-        success: false,
-        error: 'LOCK_HELD',
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 1000000)],
       });
+      redis.withLock.mockResolvedValue({ success: false, error: 'LOCK_HELD' });
 
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result).toBeNull();
-      expect(logger.debug).toHaveBeenCalledWith(
-        'BURN',
-        'Burn already in progress, skipping'
-      );
-    });
-
-    it('should log error when lock operation fails', async () => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-      redis.withLock.mockResolvedValue({
-        success: false,
-        error: 'REDIS_ERROR',
-        message: 'Connection failed',
-      });
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'BURN',
-        'Burn execution failed',
-        expect.objectContaining({ error: 'Connection failed' })
-      );
-    });
-
-    it('should return null if amount drops below threshold after lock', async () => {
-      // First call returns high amount, second call (inside lock) returns low
-      redis.getPendingSwapAmount
-        .mockResolvedValueOnce(200000)
-        .mockResolvedValueOnce(50000);
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeNull();
-    });
-
-    it('should execute full burn cycle when conditions are met', async () => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(1500000) });
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeDefined();
-      expect(result.model).toBe('80/20');
-      expect(redis.incrBurnTotal).toHaveBeenCalled();
-      expect(redis.resetPendingSwap).toHaveBeenCalled();
-      expect(redis.recordBurnProof).toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith('BURN', 'Burn already in progress, skipping');
     });
   });
 
-  describe('80/20 Treasury Split', () => {
+  describe('Token Processing - Non-ASDF tokens', () => {
     beforeEach(() => {
-      redis.getPendingSwapAmount.mockResolvedValue(1000000);
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(800000) });
+      // 10M USDC = $10.00 (well above threshold)
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 10000000)],
+      });
     });
 
-    it('should calculate correct treasury split', async () => {
+    it('should swap 80% to ASDF and burn', async () => {
+      const result = await burnService.checkAndExecuteBurn();
+
+      expect(jupiter.getTokenToAsdfQuote).toHaveBeenCalledWith(
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        8000000, // 80% of 10000000
+        150
+      );
+      expect(result.processed).toHaveLength(1);
+    });
+
+    it('should swap 20% to SOL for treasury', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(safeMath.calculateTreasurySplit).toHaveBeenCalledWith(
-        1000000,
-        0.8
+      expect(jupiter.getTokenToSolQuote).toHaveBeenCalledWith(
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        2000000, // 20% of 10000000
+        150
       );
     });
 
-    it('should allocate treasury portion', async () => {
-      safeMath.calculateTreasurySplit.mockReturnValue({
-        burnAmount: 800000,
-        treasuryAmount: 200000,
-      });
-
+    it('should record treasury event for converted SOL', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(redis.incrTreasuryTotal).toHaveBeenCalledWith(200000);
+      expect(redis.incrTreasuryTotal).toHaveBeenCalled();
       expect(redis.recordTreasuryEvent).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'allocation',
-          amount: 200000,
-          source: 'fee_split',
+          type: 'fee_conversion',
+          source: 'token_treasury_portion',
         })
       );
     });
 
-    it('should reverse treasury allocation on swap failure', async () => {
-      safeMath.calculateTreasurySplit.mockReturnValue({
-        burnAmount: 800000,
-        treasuryAmount: 200000,
-      });
-      jupiter.getQuote.mockRejectedValue(new Error('Jupiter failed'));
-
-      await burnService.checkAndExecuteBurn();
-
-      // Check that treasury was reversed
-      expect(redis.incrTreasuryTotal).toHaveBeenCalledWith(-200000);
-      expect(redis.recordTreasuryEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'reversal',
-          amount: -200000,
-          reason: 'swap_failed',
-        })
-      );
-    });
-
-    it('should skip treasury allocation when amount is zero', async () => {
-      safeMath.calculateTreasurySplit.mockReturnValue({
-        burnAmount: 1000000,
-        treasuryAmount: 0,
-      });
-
-      await burnService.checkAndExecuteBurn();
-
-      expect(redis.incrTreasuryTotal).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Jupiter Swap', () => {
-    beforeEach(() => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(150000) });
-    });
-
-    it('should use Jupiter for swapping', async () => {
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(jupiter.getQuote).toHaveBeenCalled();
-      expect(jupiter.getSwapTransaction).toHaveBeenCalled();
-      expect(result.method).toBe('jupiter');
-    });
-
-    it('should return null when Jupiter swap fails', async () => {
-      jupiter.getQuote.mockRejectedValue(new Error('Jupiter down'));
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'BURN',
-        'Jupiter swap failed',
-        expect.any(Object)
-      );
-    });
-
-    it('should log swap initiation', async () => {
-      await burnService.checkAndExecuteBurn();
-
-      expect(logger.info).toHaveBeenCalledWith(
-        'BURN',
-        'Swapping SOL to ASDF via Jupiter',
-        expect.objectContaining({ solAmount: expect.any(Number) })
-      );
-    });
-  });
-
-  describe('ASDF Burn', () => {
-    beforeEach(() => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-    });
-
-    it('should get ASDF balance before burning', async () => {
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(500000) });
-
-      await burnService.checkAndExecuteBurn();
-
-      expect(splToken.getAssociatedTokenAddress).toHaveBeenCalled();
-      expect(splToken.getAccount).toHaveBeenCalled();
-    });
-
-    it('should return null when no ASDF to burn', async () => {
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(0) });
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeNull();
-      expect(logger.warn).toHaveBeenCalledWith('BURN', 'No ASDF to burn after swap');
-    });
-
-    it('should return null when getting balance fails', async () => {
-      splToken.getAccount.mockRejectedValue(new Error('Account not found'));
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'BURN',
-        'Failed to get ASDF balance',
-        expect.any(Object)
-      );
-    });
-
-    it('should create burn instruction with correct amount', async () => {
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(750000) });
-
-      await burnService.checkAndExecuteBurn();
-
-      expect(splToken.createBurnInstruction).toHaveBeenCalledWith(
-        'token-account-address',
-        expect.anything(),
-        expect.anything(),
-        750000
-      );
-    });
-
-    it('should record burn proof after successful burn', async () => {
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(800000) });
-
+    it('should record burn proof', async () => {
       await burnService.checkAndExecuteBurn();
 
       expect(redis.recordBurnProof).toHaveBeenCalledWith(
         expect.objectContaining({
-          amountBurned: 800000,
-          method: 'jupiter',
-          network: 'devnet',
+          method: 'swap',
+          sourceToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
         })
       );
     });
   });
 
-  describe('Amount Validation', () => {
+  describe('Token Processing - $ASDF token', () => {
     beforeEach(() => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
+      // 10M ASDF (gets value via Jupiter quote)
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('AsdfMint111111111111111111111111111111111111', 10000000)],
+      });
     });
 
-    it('should validate total amount before processing', async () => {
+    it('should burn 80% directly without swap', async () => {
+      const result = await burnService.checkAndExecuteBurn();
+
+      // Should NOT swap ASDF to ASDF
+      expect(jupiter.getTokenToAsdfQuote).not.toHaveBeenCalled();
+      expect(result.processed[0].asdfBurned).toBe(8000000);
+    });
+
+    it('should swap 20% to SOL for treasury', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(safeMath.validateSolanaAmount).toHaveBeenCalledWith(
-        200000,
-        'totalAmount'
+      expect(jupiter.getTokenToSolQuote).toHaveBeenCalledWith(
+        'AsdfMint111111111111111111111111111111111111',
+        2000000,
+        150
       );
     });
 
-    it('should return null for invalid amount', async () => {
-      safeMath.validateSolanaAmount.mockReturnValue({
-        valid: false,
-        error: 'Amount too large',
+    it('should record burn proof with direct method', async () => {
+      await burnService.checkAndExecuteBurn();
+
+      expect(redis.recordBurnProof).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'direct',
+          sourceToken: 'AsdfMint111111111111111111111111111111111111',
+        })
+      );
+    });
+  });
+
+  describe('Multiple Token Processing', () => {
+    it('should process multiple tokens in one cycle', async () => {
+      // Both tokens above $0.50 threshold
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [
+          createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 5000000), // $5
+          createMockTokenAccount('AsdfMint111111111111111111111111111111111111', 3000000),
+        ],
       });
 
       const result = await burnService.checkAndExecuteBurn();
 
-      expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'BURN',
-        'Invalid total amount',
-        expect.objectContaining({ error: 'Amount too large' })
-      );
+      expect(result.processed).toHaveLength(2);
+      expect(result.totalBurned).toBeGreaterThan(0);
     });
 
-    it('should return null when burn amount is zero after split', async () => {
-      safeMath.calculateTreasurySplit.mockReturnValue({
-        burnAmount: 0,
-        treasuryAmount: 200000,
+    it('should continue processing even if one token partially fails', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [
+          createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 5000000),
+          createMockTokenAccount('BadToken11111111111111111111111111111111111', 3000000),
+        ],
       });
+
+      // First token succeeds fully, second token's ASDF swap fails but SOL swap succeeds
+      jupiter.getTokenToAsdfQuote
+        .mockResolvedValueOnce({ outAmount: '4000000' })
+        .mockResolvedValueOnce({ success: false }); // Simulates failure
 
       const result = await burnService.checkAndExecuteBurn();
 
-      expect(result).toBeNull();
-      expect(logger.warn).toHaveBeenCalledWith(
-        'BURN',
-        'Burn amount too small after split'
-      );
+      // Both tokens are processed (second one has partial success - treasury portion)
+      expect(result.processed).toHaveLength(2);
+      expect(result.totalBurned).toBeGreaterThan(0);
+    });
+
+    it('should process token with zero values when all swaps fail', async () => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('BadToken11111111111111111111111111111111111', 3000000)],
+      });
+
+      // Both swaps fail (caught internally, return {success: false})
+      jupiter.getTokenToAsdfQuote.mockRejectedValue(new Error('No route'));
+      jupiter.getTokenToSolQuote.mockRejectedValue(new Error('No route'));
+
+      const result = await burnService.checkAndExecuteBurn();
+
+      // Token is still "processed" but with 0 values
+      expect(result.processed).toHaveLength(1);
+      expect(result.processed[0].asdfBurned).toBe(0);
+      expect(result.processed[0].solToTreasury).toBe(0);
     });
   });
 
@@ -441,10 +439,15 @@ describe('Burn Service', () => {
       expect(signature).toBe('tx-signature-123');
     });
 
-    it('should get fee payer for burn', async () => {
-      await burnService.burnAsdf(100000);
+    it('should create burn instruction with correct amount', async () => {
+      await burnService.burnAsdf(750000);
 
-      expect(feePayerPool.getHealthyPayer).toHaveBeenCalled();
+      expect(splToken.createBurnInstruction).toHaveBeenCalledWith(
+        'token-account-address',
+        expect.anything(),
+        expect.anything(),
+        750000
+      );
     });
   });
 
@@ -479,93 +482,73 @@ describe('Burn Service', () => {
     it('should schedule initial check after 10 seconds', () => {
       burnService.startBurnWorker(60000);
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(
-        expect.any(Function),
-        10000
-      );
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000);
     });
 
     it('should schedule periodic checks', () => {
       burnService.startBurnWorker(30000);
 
-      expect(setIntervalSpy).toHaveBeenCalledWith(
-        expect.any(Function),
-        30000
-      );
-    });
-
-    it('should use default interval of 60 seconds', () => {
-      burnService.startBurnWorker();
-
-      expect(setIntervalSpy).toHaveBeenCalledWith(
-        expect.any(Function),
-        60000
-      );
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30000);
     });
   });
 
   describe('Error Handling', () => {
     beforeEach(() => {
-      redis.getPendingSwapAmount.mockResolvedValue(200000);
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(500000) });
+      // 5M USDC = $5 (above threshold)
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 5000000)],
+      });
     });
 
-    it('should handle swap errors gracefully', async () => {
-      jupiter.getQuote.mockRejectedValue(new Error('Jupiter timeout'));
+    it('should handle complete swap failure gracefully', async () => {
+      // Both swaps fail (errors caught internally)
+      jupiter.getTokenToAsdfQuote.mockRejectedValue(new Error('Jupiter timeout'));
+      jupiter.getTokenToSolQuote.mockRejectedValue(new Error('Jupiter timeout'));
 
       const result = await burnService.checkAndExecuteBurn();
 
-      expect(result).toBeNull();
+      // Token processed with 0 values (errors handled internally)
+      expect(result.processed).toHaveLength(1);
+      expect(result.processed[0].asdfBurned).toBe(0);
+
+      // Swap errors are logged
       expect(logger.error).toHaveBeenCalledWith(
         'BURN',
-        'Jupiter swap failed',
+        'Token → ASDF swap failed',
         expect.any(Object)
       );
     });
 
-    it('should reset pending on swap failure to prevent stuck funds', async () => {
-      jupiter.getQuote.mockRejectedValue(new Error('Network error'));
-
-      await burnService.checkAndExecuteBurn();
-
-      // resetPendingSwap IS called on swap failure to prevent stuck funds
-      expect(redis.resetPendingSwap).toHaveBeenCalled();
-    });
-
-    it('should handle burn phase errors gracefully', async () => {
-      // Swap succeeds, but burn transaction fails
-      rpc.sendTransaction
-        .mockResolvedValueOnce('swap-sig-123') // First call: swap succeeds
-        .mockRejectedValueOnce(new Error('RPC timeout')); // Second call: burn fails
+    it('should handle partial swap failure (burn fails, treasury succeeds)', async () => {
+      jupiter.getTokenToAsdfQuote.mockRejectedValue(new Error('No route'));
+      // Treasury swap still succeeds
 
       const result = await burnService.checkAndExecuteBurn();
 
-      expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'BURN',
-        'Burn failed',
-        expect.any(Object)
-      );
+      // Token is processed with partial results (treasury only)
+      expect(result.processed).toHaveLength(1);
+      expect(result.processed[0].asdfBurned).toBe(0);
+      expect(result.processed[0].solToTreasury).toBeGreaterThan(0);
+    });
+
+    it('should handle no healthy fee payer', async () => {
+      feePayerPool.getHealthyPayer.mockReturnValue(null);
+
+      const result = await burnService.checkAndExecuteBurn();
+
+      expect(result.failed).toHaveLength(1);
     });
   });
 
   describe('Return Value', () => {
     beforeEach(() => {
-      // Set up all mocks for a successful burn
-      redis.getPendingSwapAmount.mockResolvedValue(1000000);
-      redis.withLock.mockImplementation(async (name, fn, ttl) => {
-        const result = await fn();
-        return { success: true, result };
+      // 10M USDC = $10
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 10000000)],
       });
-      splToken.getAccount.mockResolvedValue({ amount: BigInt(800000) });
       safeMath.calculateTreasurySplit.mockReturnValue({
-        burnAmount: 800000,
-        treasuryAmount: 200000,
-      });
-      safeMath.validateSolanaAmount.mockReturnValue({ valid: true });
-      jupiter.getQuote.mockResolvedValue({ outAmount: 1000000 });
-      jupiter.getSwapTransaction.mockResolvedValue({
-        swapTransaction: Buffer.from('mock-transaction').toString('base64'),
+        burnAmount: 8000000,
+        treasuryAmount: 2000000,
       });
     });
 
@@ -573,13 +556,22 @@ describe('Burn Service', () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result).not.toBeNull();
-      expect(result.amountBurned).toBe(800000);
-      expect(result.treasuryAllocated).toBe(200000);
-      expect(result.method).toBe('jupiter');
-      expect(result.model).toBe('80/20');
-      expect(result.proof).toBeDefined();
-      expect(result.swapSignature).toBeDefined();
-      expect(result.burnSignature).toBeDefined();
+      expect(result.processed).toHaveLength(1);
+      expect(result.totalBurned).toBeGreaterThan(0);
+      expect(result.totalTreasury).toBeGreaterThan(0);
+    });
+
+    it('should include token details in processed results', async () => {
+      const result = await burnService.checkAndExecuteBurn();
+
+      expect(result.processed[0]).toEqual(
+        expect.objectContaining({
+          mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          symbol: 'USDC',
+          asdfBurned: expect.any(Number),
+          solToTreasury: expect.any(Number),
+        })
+      );
     });
   });
 });

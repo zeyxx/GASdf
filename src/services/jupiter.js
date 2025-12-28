@@ -162,9 +162,50 @@ async function swapToAsdf(solAmount) {
   return quote;
 }
 
+/**
+ * Get quote for swapping any token to SOL
+ * Used by burn worker to convert collected fees to SOL
+ */
+async function getTokenToSolQuote(tokenMint, tokenAmount, slippageBps = 100) {
+  // If already SOL, no swap needed
+  if (tokenMint === config.WSOL_MINT) {
+    return {
+      inputMint: tokenMint,
+      outputMint: config.WSOL_MINT,
+      inAmount: tokenAmount.toString(),
+      outAmount: tokenAmount.toString(),
+      noSwapNeeded: true,
+    };
+  }
+
+  return getQuote(tokenMint, config.WSOL_MINT, tokenAmount, slippageBps);
+}
+
+/**
+ * Get quote for swapping any token directly to ASDF
+ * More efficient than Token → SOL → ASDF (single swap)
+ */
+async function getTokenToAsdfQuote(tokenMint, tokenAmount, slippageBps = 100) {
+  // If already ASDF, no swap needed
+  if (tokenMint === config.ASDF_MINT) {
+    return {
+      inputMint: tokenMint,
+      outputMint: config.ASDF_MINT,
+      inAmount: tokenAmount.toString(),
+      outAmount: tokenAmount.toString(),
+      noSwapNeeded: true,
+    };
+  }
+
+  return getQuote(tokenMint, config.ASDF_MINT, tokenAmount, slippageBps);
+}
+
 module.exports = {
   getQuote,
   getSwapTransaction,
   getFeeInToken,
   swapToAsdf,
+  getTokenToSolQuote,
+  getTokenToAsdfQuote,
+  TOKEN_INFO,
 };

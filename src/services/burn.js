@@ -6,12 +6,14 @@ const {
   createBurnInstruction,
   getAssociatedTokenAddress,
   getAccount,
+  TOKEN_PROGRAM_ID,
 } = require('@solana/spl-token');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { getHealthyPayer } = require('./fee-payer-pool');
+const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
 const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
 
@@ -31,10 +33,175 @@ function getAsdfMint() {
 const BURN_LOCK_NAME = 'burn-worker';
 const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
 
-async function checkAndExecuteBurn() {
-  const pendingAmount = await redis.getPendingSwapAmount();
+// =============================================================================
+// ECONOMIC EFFICIENCY: Minimum USD value to process
+// =============================================================================
+// Swap costs: ~0.1-0.3% Jupiter fee + slippage
+// TX costs: ~0.000005 SOL (~$0.001) per transaction
+// We do 2-3 swaps per token, so ~$0.003-0.005 in TX fees
+// To be efficient, we want fees to be <5% of value
+// Minimum: $0.50 ensures fees are ~1% of value (efficient)
+const MIN_VALUE_USD = 0.50;
 
-  if (pendingAmount < config.BURN_THRESHOLD_LAMPORTS) {
+// SOL price cache (refreshed each burn cycle)
+let cachedSolPrice = null;
+let solPriceTimestamp = 0;
+const SOL_PRICE_TTL = 60000; // 1 minute
+
+/**
+ * Get current SOL price in USD via Jupiter
+ */
+async function getSolPriceUsd() {
+  // Use cache if fresh
+  if (cachedSolPrice && Date.now() - solPriceTimestamp < SOL_PRICE_TTL) {
+    return cachedSolPrice;
+  }
+
+  try {
+    // Get quote: 1 SOL → USDC
+    const quote = await jupiter.getQuote(
+      config.WSOL_MINT,
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+      1_000_000_000, // 1 SOL in lamports
+      50
+    );
+
+    // outAmount is in USDC (6 decimals)
+    const solPrice = parseInt(quote.outAmount) / 1_000_000;
+    cachedSolPrice = solPrice;
+    solPriceTimestamp = Date.now();
+
+    logger.debug('BURN', 'SOL price fetched', { solPrice });
+    return solPrice;
+  } catch (error) {
+    logger.warn('BURN', 'Failed to get SOL price, using fallback', { error: error.message });
+    return cachedSolPrice || 200; // Fallback to ~$200
+  }
+}
+
+/**
+ * Get USD value of a token amount
+ */
+async function getTokenValueUsd(mint, amount, decimals) {
+  if (amount <= 0) return 0;
+
+  try {
+    // For USDC/USDT, value is direct (1:1 with USD)
+    if (mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
+        mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') {  // USDT
+      return amount / Math.pow(10, decimals);
+    }
+
+    // For SOL, use cached price
+    if (mint === config.WSOL_MINT) {
+      const solPrice = await getSolPriceUsd();
+      return (amount / 1_000_000_000) * solPrice;
+    }
+
+    // For other tokens, get quote to USDC
+    const quote = await jupiter.getQuote(mint, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', amount, 100);
+    return parseInt(quote.outAmount) / 1_000_000;
+  } catch (error) {
+    logger.debug('BURN', 'Failed to get token value, estimating via SOL', {
+      mint: mint.slice(0, 8),
+      error: error.message,
+    });
+
+    // Fallback: try to get value via SOL
+    try {
+      const solQuote = await jupiter.getTokenToSolQuote(mint, amount, 100);
+      const solAmount = parseInt(solQuote.outAmount);
+      const solPrice = await getSolPriceUsd();
+      return (solAmount / 1_000_000_000) * solPrice;
+    } catch {
+      return 0; // Can't determine value
+    }
+  }
+}
+
+/**
+ * Get all token accounts owned by treasury with balances
+ * Filters by USD value for economic efficiency
+ */
+async function getTreasuryTokenBalances() {
+  const treasury = getTreasuryAddress();
+  if (!treasury) {
+    logger.warn('BURN', 'Treasury address not configured');
+    return [];
+  }
+
+  try {
+    const connection = rpc.getConnection();
+
+    // Get all token accounts owned by treasury
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      treasury,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+
+    const balances = [];
+    for (const { account, pubkey } of tokenAccounts.value) {
+      const parsed = account.data.parsed;
+      if (parsed?.info) {
+        const mint = parsed.info.mint;
+        const balance = parseInt(parsed.info.tokenAmount?.amount || '0');
+        const decimals = parsed.info.tokenAmount?.decimals || 0;
+
+        if (balance <= 0) continue;
+
+        // Get USD value for economic efficiency check
+        const valueUsd = await getTokenValueUsd(mint, balance, decimals);
+
+        if (valueUsd >= MIN_VALUE_USD) {
+          balances.push({
+            mint,
+            balance,
+            decimals,
+            valueUsd,
+            ataAddress: pubkey.toBase58(),
+            symbol: jupiter.TOKEN_INFO[mint]?.symbol || 'UNKNOWN',
+          });
+
+          logger.debug('BURN', 'Token eligible for processing', {
+            symbol: jupiter.TOKEN_INFO[mint]?.symbol || 'UNKNOWN',
+            balance,
+            valueUsd: valueUsd.toFixed(2),
+          });
+        } else if (valueUsd > 0) {
+          logger.debug('BURN', 'Token below minimum value', {
+            mint: mint.slice(0, 8),
+            valueUsd: valueUsd.toFixed(4),
+            minRequired: MIN_VALUE_USD,
+          });
+        }
+      }
+    }
+
+    // Sort by value (highest first) for optimal processing
+    balances.sort((a, b) => b.valueUsd - a.valueUsd);
+
+    logger.info('BURN', 'Treasury token balances scanned', {
+      totalAccounts: tokenAccounts.value.length,
+      eligibleTokens: balances.length,
+      totalValueUsd: balances.reduce((sum, b) => sum + b.valueUsd, 0).toFixed(2),
+    });
+
+    return balances;
+  } catch (error) {
+    logger.error('BURN', 'Failed to get treasury token balances', { error: error.message });
+    return [];
+  }
+}
+
+/**
+ * Main burn check and execution
+ * Now scans actual treasury token balances instead of tracked amounts
+ */
+async function checkAndExecuteBurn() {
+  // Get actual token balances in treasury
+  const tokenBalances = await getTreasuryTokenBalances();
+
+  if (tokenBalances.length === 0) {
     return null;
   }
 
@@ -42,14 +209,14 @@ async function checkAndExecuteBurn() {
   // RACE CONDITION FIX: Distributed lock prevents concurrent burn executions
   // ==========================================================================
   const lockResult = await redis.withLock(BURN_LOCK_NAME, async () => {
-    // Re-check pending amount after acquiring lock (double-check pattern)
-    const confirmedAmount = await redis.getPendingSwapAmount();
-    if (confirmedAmount < config.BURN_THRESHOLD_LAMPORTS) {
-      logger.debug('BURN', 'Pending amount below threshold after lock acquired');
+    // Re-check balances after acquiring lock (double-check pattern)
+    const confirmedBalances = await getTreasuryTokenBalances();
+    if (confirmedBalances.length === 0) {
+      logger.debug('BURN', 'No token balances after lock acquired');
       return null;
     }
 
-    return executeBurnWithLock(confirmedAmount);
+    return executeBurnWithLock(confirmedBalances);
   }, BURN_LOCK_TTL);
 
   if (!lockResult.success) {
@@ -65,195 +232,270 @@ async function checkAndExecuteBurn() {
 }
 
 /**
- * Execute burn operation (called while holding distributed lock)
+ * Execute burn operation for all collected tokens
+ *
+ * Flow for each token:
+ * - If $ASDF: Burn 80% directly, swap 20% → SOL for treasury
+ * - If other: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
  */
-async function executeBurnWithLock(totalAmount) {
-  // ==========================================================================
-  // 80/20 Treasury Model
-  // ==========================================================================
-  // 80% → swap to $ASDF → burn (the mission)
-  // 20% → treasury for operations (server, RPC, fee payer refill)
-  // ==========================================================================
+async function executeBurnWithLock(tokenBalances) {
+  const results = {
+    processed: [],
+    failed: [],
+    totalBurned: 0,
+    totalTreasury: 0,
+  };
 
-  // Validate total amount
-  const validation = validateSolanaAmount(totalAmount, 'totalAmount');
-  if (!validation.valid) {
-    logger.error('BURN', 'Invalid total amount', { error: validation.error, totalAmount });
-    return null;
+  for (const token of tokenBalances) {
+    try {
+      const result = await processTokenBurn(token);
+      if (result) {
+        results.processed.push(result);
+        results.totalBurned += result.asdfBurned || 0;
+        results.totalTreasury += result.solToTreasury || 0;
+      }
+    } catch (error) {
+      logger.error('BURN', 'Failed to process token', {
+        mint: token.mint.slice(0, 8),
+        symbol: token.symbol,
+        error: error.message,
+      });
+      results.failed.push({ mint: token.mint, error: error.message });
+    }
   }
 
-  // Use safe treasury split calculation (ensures no lamports lost)
-  const { burnAmount, treasuryAmount } = calculateTreasurySplit(totalAmount, config.BURN_RATIO);
+  if (results.processed.length > 0) {
+    logger.info('BURN', 'Burn cycle completed', {
+      tokensProcessed: results.processed.length,
+      tokensFailed: results.failed.length,
+      totalAsdfBurned: results.totalBurned,
+      totalSolToTreasury: results.totalTreasury,
+    });
+  }
 
-  logger.info('BURN', 'Processing fees with 80/20 split', {
-    totalAmount,
-    burnAmount,
-    treasuryAmount,
-    burnRatio: config.BURN_RATIO,
-    treasuryRatio: config.TREASURY_RATIO,
+  return results;
+}
+
+/**
+ * Process a single token type for burning
+ */
+async function processTokenBurn(token) {
+  const { mint, balance, symbol, decimals, valueUsd } = token;
+  const isAsdf = mint === config.ASDF_MINT;
+
+  // Calculate 80/20 split
+  const { burnAmount, treasuryAmount } = calculateTreasurySplit(balance, config.BURN_RATIO);
+
+  logger.info('BURN', `Processing ${symbol}`, {
+    mint: mint.slice(0, 8),
+    totalBalance: balance,
+    valueUsd: valueUsd?.toFixed(2) || 'unknown',
+    burnPortion: burnAmount,
+    treasuryPortion: treasuryAmount,
+    isAsdf,
   });
 
-  try {
-    // 1. Allocate treasury portion (stays as SOL for operations)
+  let asdfBurned = 0;
+  let solToTreasury = 0;
+  let burnSignature = null;
+  let swapSignatures = [];
+
+  const feePayer = getHealthyPayer();
+  if (!feePayer) {
+    throw new Error('No healthy fee payer available');
+  }
+
+  if (isAsdf) {
+    // ==========================================================================
+    // $ASDF TOKEN: Burn 80% directly, swap 20% → SOL for treasury
+    // ==========================================================================
+
+    // 1. Burn 80% directly
+    if (burnAmount > 0) {
+      burnSignature = await burnAsdfFromTreasury(burnAmount);
+      asdfBurned = burnAmount;
+      logger.info('BURN', 'Direct ASDF burn', {
+        amount: burnAmount,
+        signature: burnSignature,
+      });
+    }
+
+    // 2. Swap 20% → SOL for treasury operations
     if (treasuryAmount > 0) {
-      await redis.incrTreasuryTotal(treasuryAmount);
-      await redis.recordTreasuryEvent({
-        type: 'allocation',
-        amount: treasuryAmount,
-        source: 'fee_split',
-      });
+      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
+      if (treasurySwap.success) {
+        solToTreasury = parseInt(treasurySwap.solReceived);
+        swapSignatures.push(treasurySwap.signature);
 
-      logger.info('TREASURY', 'Allocated to operations fund', {
-        amount: treasuryAmount,
-        amountSol: treasuryAmount / 1e9,
-      });
-    }
-
-    // 2. Swap burn portion to ASDF via Jupiter
-    if (burnAmount <= 0) {
-      logger.warn('BURN', 'Burn amount too small after split');
-      await redis.resetPendingSwap();
-      return null;
-    }
-
-    const swapResult = await swapWithFallback(burnAmount);
-
-    if (!swapResult.success) {
-      logger.warn('BURN', 'Swap failed', { error: swapResult.error });
-
-      // Reverse treasury allocation on failure
-      if (treasuryAmount > 0) {
-        await redis.incrTreasuryTotal(-treasuryAmount);
+        await redis.incrTreasuryTotal(solToTreasury);
         await redis.recordTreasuryEvent({
-          type: 'reversal',
-          amount: -treasuryAmount,
-          reason: 'swap_failed',
+          type: 'fee_conversion',
+          tokenMint: mint,
+          tokenAmount: treasuryAmount,
+          solAmount: solToTreasury,
+          source: 'asdf_treasury_portion',
         });
       }
-
-      // Reset pending swap to prevent stuck funds
-      // The fees will be re-accumulated on next transactions
-      await redis.resetPendingSwap();
-      logger.warn('BURN', 'Reset pending swap amount after failure');
-
-      return null;
     }
 
-    logger.info('BURN', 'Swap completed', {
-      signature: swapResult.signature,
-      method: swapResult.method,
-    });
+  } else {
+    // ==========================================================================
+    // OTHER TOKENS: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
+    // ==========================================================================
 
-    // 3. Get ASDF balance and burn it all
-    const feePayer = getHealthyPayer();
-    const asdfMint = getAsdfMint();
-    const tokenAccount = await getAssociatedTokenAddress(asdfMint, feePayer.publicKey);
+    // 1. Swap 80% → ASDF and burn
+    if (burnAmount > 0) {
+      const burnSwap = await swapTokenToAsdf(mint, burnAmount, feePayer);
+      if (burnSwap.success) {
+        const asdfToBurn = parseInt(burnSwap.asdfReceived);
+        swapSignatures.push(burnSwap.signature);
 
-    let asdfBalance;
-    try {
-      const accountInfo = await getAccount(rpc.getConnection(), tokenAccount);
-      asdfBalance = Number(accountInfo.amount);
-    } catch (error) {
-      logger.error('BURN', 'Failed to get ASDF balance', { error: error.message });
-      // Swap succeeded but can't verify balance - reset pending to avoid double processing
-      await redis.resetPendingSwap();
-      return null;
+        // Burn the ASDF we received
+        burnSignature = await burnAsdf(asdfToBurn);
+        asdfBurned = asdfToBurn;
+
+        logger.info('BURN', 'Swap and burn completed', {
+          tokenIn: burnAmount,
+          asdfBurned: asdfToBurn,
+          swapSignature: burnSwap.signature,
+          burnSignature,
+        });
+      }
     }
 
-    if (asdfBalance <= 0) {
-      logger.warn('BURN', 'No ASDF to burn after swap');
-      // Swap may have failed silently - reset pending
-      await redis.resetPendingSwap();
-      return null;
+    // 2. Swap 20% → SOL for treasury operations
+    if (treasuryAmount > 0) {
+      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
+      if (treasurySwap.success) {
+        solToTreasury = parseInt(treasurySwap.solReceived);
+        swapSignatures.push(treasurySwap.signature);
+
+        await redis.incrTreasuryTotal(solToTreasury);
+        await redis.recordTreasuryEvent({
+          type: 'fee_conversion',
+          tokenMint: mint,
+          tokenAmount: treasuryAmount,
+          solAmount: solToTreasury,
+          source: 'token_treasury_portion',
+        });
+
+        logger.info('TREASURY', 'Token converted to SOL', {
+          tokenMint: mint.slice(0, 8),
+          tokenAmount: treasuryAmount,
+          solReceived: solToTreasury,
+        });
+      }
     }
+  }
 
-    // 4. Burn the ASDF
-    const burnResult = await burnAsdf(asdfBalance);
+  // Update burn stats
+  if (asdfBurned > 0) {
+    await redis.incrBurnTotal(asdfBurned);
 
-    // 5. Update stats
-    await redis.incrBurnTotal(asdfBalance);
-    await redis.resetPendingSwap();
-
-    // 6. Record burn proof for transparency
-    const burnProof = await redis.recordBurnProof({
-      burnSignature: burnResult,
-      swapSignature: swapResult.signature,
-      amountBurned: asdfBalance,
-      solAmount: burnAmount,
-      treasuryAmount,
-      method: swapResult.method,
+    // Record burn proof for transparency
+    await redis.recordBurnProof({
+      burnSignature,
+      swapSignatures,
+      amountBurned: asdfBurned,
+      sourceToken: mint,
+      sourceAmount: burnAmount,
+      treasuryAmount: solToTreasury,
+      method: isAsdf ? 'direct' : 'swap',
       network: config.NETWORK,
     });
-
-    logger.info('BURN', 'Burn completed (80/20 model)', {
-      asdfBurned: asdfBalance,
-      solToBurn: burnAmount,
-      solToTreasury: treasuryAmount,
-      burnSignature: burnResult,
-      proofRecorded: true,
-    });
-
-    return {
-      amountBurned: asdfBalance,
-      treasuryAllocated: treasuryAmount,
-      swapSignature: swapResult.signature,
-      burnSignature: burnResult,
-      method: swapResult.method,
-      model: '80/20',
-      proof: burnProof,
-    };
-  } catch (error) {
-    logger.error('BURN', 'Burn failed', { error: error.message });
-    // Don't reset pending - will retry next cycle
-    return null;
   }
-}
-
-async function swapWithFallback(solAmountLamports) {
-  try {
-    logger.info('BURN', 'Swapping SOL to ASDF via Jupiter', { solAmount: solAmountLamports });
-    const result = await swapViaJupiter(solAmountLamports);
-    return { ...result, method: 'jupiter' };
-  } catch (error) {
-    logger.error('BURN', 'Jupiter swap failed', { error: error.message });
-    return { success: false };
-  }
-}
-
-async function swapViaJupiter(solAmountLamports) {
-  const feePayer = getHealthyPayer();
-
-  // Get quote
-  const quote = await jupiter.getQuote(
-    config.WSOL_MINT,
-    config.ASDF_MINT,
-    solAmountLamports,
-    100, // 1% slippage
-  );
-
-  // Get swap transaction
-  const swapResponse = await jupiter.getSwapTransaction(
-    quote,
-    feePayer.publicKey.toBase58(),
-  );
-
-  // Deserialize and sign
-  const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
-  const transaction = Transaction.from(swapTxBuf);
-
-  transaction.sign(feePayer);
-
-  // Send and confirm
-  const signature = await rpc.sendTransaction(transaction);
-  const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
-  await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
 
   return {
-    signature,
-    success: true,
+    mint,
+    symbol,
+    asdfBurned,
+    solToTreasury,
+    burnSignature,
+    swapSignatures,
   };
 }
 
+/**
+ * Swap token → ASDF via Jupiter
+ */
+async function swapTokenToAsdf(tokenMint, amount, feePayer) {
+  try {
+    // Get quote
+    const quote = await jupiter.getTokenToAsdfQuote(tokenMint, amount, 150); // 1.5% slippage
+
+    if (quote.noSwapNeeded) {
+      return { success: true, asdfReceived: amount, signature: null };
+    }
+
+    // Get swap transaction
+    const swapResponse = await jupiter.getSwapTransaction(quote, feePayer.publicKey.toBase58());
+
+    // Deserialize, sign, and send
+    const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
+    const transaction = Transaction.from(swapTxBuf);
+    transaction.sign(feePayer);
+
+    const signature = await rpc.sendTransaction(transaction);
+    const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+    await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+    return {
+      success: true,
+      asdfReceived: quote.outAmount,
+      signature,
+    };
+  } catch (error) {
+    logger.error('BURN', 'Token → ASDF swap failed', {
+      tokenMint: tokenMint.slice(0, 8),
+      amount,
+      error: error.message,
+    });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Swap token → SOL via Jupiter
+ */
+async function swapTokenToSol(tokenMint, amount, feePayer) {
+  try {
+    // Get quote
+    const quote = await jupiter.getTokenToSolQuote(tokenMint, amount, 150); // 1.5% slippage
+
+    if (quote.noSwapNeeded) {
+      return { success: true, solReceived: amount, signature: null };
+    }
+
+    // Get swap transaction
+    const swapResponse = await jupiter.getSwapTransaction(quote, feePayer.publicKey.toBase58());
+
+    // Deserialize, sign, and send
+    const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
+    const transaction = Transaction.from(swapTxBuf);
+    transaction.sign(feePayer);
+
+    const signature = await rpc.sendTransaction(transaction);
+    const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+    await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+    return {
+      success: true,
+      solReceived: quote.outAmount,
+      signature,
+    };
+  } catch (error) {
+    logger.error('BURN', 'Token → SOL swap failed', {
+      tokenMint: tokenMint.slice(0, 8),
+      amount,
+      error: error.message,
+    });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Burn ASDF from fee payer's token account
+ */
 async function burnAsdf(amount) {
   const feePayer = getHealthyPayer();
   const asdfMint = getAsdfMint();
@@ -269,6 +511,60 @@ async function burnAsdf(amount) {
     tokenAccount,
     asdfMint,
     feePayer.publicKey,
+    amount
+  );
+
+  // Build and send transaction
+  const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+
+  const transaction = new Transaction({
+    feePayer: feePayer.publicKey,
+    blockhash,
+    lastValidBlockHeight,
+  }).add(burnIx);
+
+  transaction.sign(feePayer);
+
+  const signature = await rpc.sendTransaction(transaction);
+  await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+  return signature;
+}
+
+/**
+ * Burn ASDF directly from treasury token account
+ * Used when treasury already holds ASDF
+ */
+async function burnAsdfFromTreasury(amount) {
+  const feePayer = getHealthyPayer();
+  const treasury = getTreasuryAddress();
+  const asdfMint = getAsdfMint();
+
+  // Get treasury's ASDF token account
+  const treasuryAta = await getAssociatedTokenAddress(
+    asdfMint,
+    treasury
+  );
+
+  // Check if fee payer is the treasury (can burn directly)
+  const feePayerIsTreasury = feePayer.publicKey.equals(treasury);
+
+  if (!feePayerIsTreasury) {
+    // Treasury and fee payer are different - need to transfer first
+    // For now, log warning and skip (requires multi-sig or treasury signing)
+    logger.warn('BURN', 'Treasury differs from fee payer, cannot burn directly');
+
+    // Alternative: Transfer to fee payer, then burn
+    // This requires treasury to sign, which we may not have
+    // For now, we'll swap ASDF → SOL → ASDF burn via fee payer
+    return null;
+  }
+
+  // Create burn instruction (treasury is fee payer, so we have authority)
+  const burnIx = createBurnInstruction(
+    treasuryAta,
+    asdfMint,
+    treasury,
     amount
   );
 
@@ -316,4 +612,5 @@ module.exports = {
   checkAndExecuteBurn,
   burnAsdf,
   startBurnWorker,
+  getTreasuryTokenBalances,
 };
