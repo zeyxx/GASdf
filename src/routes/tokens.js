@@ -3,11 +3,10 @@ const oracle = require('../services/oracle');
 const logger = require('../utils/logger');
 const { scoreLimiter } = require('../middleware/security');
 const { getAllTiers, getHolderTier } = require('../services/holder-tiers');
-const { ALLOWED_TOKENS } = require('../services/holdex');
 
 const router = express.Router();
 
-// Popular tokens for the dropdown
+// Supported payment tokens
 const POPULAR_TOKENS = [
   {
     mint: 'So11111111111111111111111111111111111111112',
@@ -122,22 +121,6 @@ router.get('/tiers/:wallet', async (req, res) => {
     logger.error('TOKENS', 'Tier lookup failed', { wallet: req.params.wallet, error: error.message });
     res.status(500).json({ error: 'Failed to get tier info' });
   }
-});
-
-/**
- * GET /tokens/allowed
- * Get list of always-allowed tokens (no HolDex verification required)
- */
-router.get('/allowed', (req, res) => {
-  const allowed = Object.entries(ALLOWED_TOKENS).map(([mint, info]) => ({
-    mint,
-    ...info,
-  }));
-
-  res.json({
-    tokens: allowed,
-    description: 'These tokens are always accepted without HolDex verification.',
-  });
 });
 
 module.exports = router;
