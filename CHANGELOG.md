@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2025-12-28
+
+### Added
+
+- **Fetch Timeout Utilities**: HTTP request timeout protection (`src/utils/fetch-timeout.js`)
+  - `fetchWithTimeout()` - Fetch with AbortController-based timeout
+  - `fetchJsonWithTimeout()` - Combined fetch + JSON parsing with timeout
+  - `withTimeout()` - Race any promise against a timeout
+  - `timeoutPromise()` - Create a rejecting timeout promise
+  - `retryWithTimeout()` - Retry function with per-attempt timeout
+
+- **Timeout Constants**: Service-specific timeout values
+  - `DEFAULT_TIMEOUT`: 10 seconds for general requests
+  - `JUPITER_TIMEOUT`: 15 seconds for Jupiter API (can be slow)
+  - `WEBHOOK_TIMEOUT`: 5 seconds for alerting webhooks
+  - `HEALTH_CHECK_TIMEOUT`: 3 seconds for health checks
+
+### Changed
+
+- **Jupiter Integration**: All API calls now have 15-second timeout
+  - `getQuote()` uses `fetchWithTimeout()` with `JUPITER_TIMEOUT`
+  - `getSwapTransaction()` protected against hanging requests
+  - Timeout errors include URL and duration for debugging
+
+- **Alerting Service**: Webhook requests have 5-second timeout
+  - Prevents hanging on unresponsive webhook endpoints
+  - Logs timeout errors with alert context
+
+- **Health Checks**: Individual 3-second timeouts per check
+  - Redis, RPC, and fee payer checks wrapped with `withTimeout()`
+  - Readiness probe also uses timeout protection
+  - Graceful degradation on timeout (returns error status)
+
+### Security
+
+- Prevents service hangs from unresponsive external APIs
+- Protects against slow loris-style attacks on health endpoints
+- Added 15 new tests for timeout behavior
+
 ## [1.2.3] - 2025-12-28
 
 ### Added

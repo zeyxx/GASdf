@@ -4,6 +4,7 @@ const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
+const { withTimeout, HEALTH_CHECK_TIMEOUT } = require('../utils/fetch-timeout');
 
 const router = express.Router();
 
@@ -25,10 +26,13 @@ router.get('/', async (req, res) => {
     checks: {},
   };
 
+  // ==========================================================================
+  // TIMEOUT PROTECTION: Each health check has individual timeout
+  // ==========================================================================
   const checks = await Promise.allSettled([
-    checkRedis(),
-    checkRpc(),
-    checkFeePayer(),
+    withTimeout(checkRedis(), HEALTH_CHECK_TIMEOUT, 'Redis health check'),
+    withTimeout(checkRpc(), HEALTH_CHECK_TIMEOUT, 'RPC health check'),
+    withTimeout(checkFeePayer(), HEALTH_CHECK_TIMEOUT, 'Fee payer health check'),
   ]);
 
   health.checks.redis = checks[0].status === 'fulfilled' ? checks[0].value : { status: 'error', error: checks[0].reason?.message };
@@ -70,11 +74,11 @@ router.get('/', async (req, res) => {
  */
 router.get('/ready', async (req, res) => {
   try {
-    // Check critical dependencies
+    // Check critical dependencies with timeout protection
     const [redisCheck, rpcCheck, feePayerCheck] = await Promise.all([
-      checkRedis(),
-      checkRpc(),
-      checkFeePayer(),
+      withTimeout(checkRedis(), HEALTH_CHECK_TIMEOUT, 'Redis').catch(() => ({ status: 'error', message: 'timeout' })),
+      withTimeout(checkRpc(), HEALTH_CHECK_TIMEOUT, 'RPC').catch(() => ({ status: 'error', message: 'timeout' })),
+      withTimeout(checkFeePayer(), HEALTH_CHECK_TIMEOUT, 'FeePayer').catch(() => ({ status: 'error', message: 'timeout' })),
     ]);
 
     // In staging/production, Redis is required

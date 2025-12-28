@@ -1,5 +1,6 @@
 const config = require('../utils/config');
 const logger = require('../utils/logger');
+const { fetchWithTimeout, WEBHOOK_TIMEOUT } = require('../utils/fetch-timeout');
 
 // =============================================================================
 // Alert Definitions
@@ -211,11 +212,18 @@ class AlertingService {
       // Detect webhook type and format accordingly
       const payload = this.formatWebhookPayload(alert);
 
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      // ==========================================================================
+      // TIMEOUT PROTECTION: Prevents hanging on slow/unresponsive webhook endpoints
+      // ==========================================================================
+      const response = await fetchWithTimeout(
+        this.webhookUrl,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+        WEBHOOK_TIMEOUT
+      );
 
       if (!response.ok) {
         logger.warn('ALERTING', 'Webhook request failed', {
@@ -226,6 +234,7 @@ class AlertingService {
     } catch (error) {
       logger.error('ALERTING', 'Failed to send webhook', {
         error: error.message,
+        code: error.code,
         alertId: alert.id,
       });
     }

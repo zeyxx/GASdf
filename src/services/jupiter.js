@@ -1,6 +1,7 @@
 const config = require('../utils/config');
 const { jupiterBreaker } = require('../utils/circuit-breaker');
 const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
+const { fetchWithTimeout, JUPITER_TIMEOUT } = require('../utils/fetch-timeout');
 
 const JUPITER_API = 'https://quote-api.jup.ag/v6';
 
@@ -23,7 +24,15 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
       slippageBps: slippageBps.toString(),
     });
 
-    const response = await fetch(`${JUPITER_API}/quote?${params}`);
+    // ==========================================================================
+    // TIMEOUT PROTECTION: Prevents hanging on slow/unresponsive Jupiter API
+    // ==========================================================================
+    const response = await fetchWithTimeout(
+      `${JUPITER_API}/quote?${params}`,
+      {},
+      JUPITER_TIMEOUT
+    );
+
     if (!response.ok) {
       throw new Error(`Jupiter quote failed: ${response.statusText}`);
     }
@@ -34,15 +43,22 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
 
 async function getSwapTransaction(quoteResponse, userPublicKey) {
   return jupiterBreaker.execute(async () => {
-    const response = await fetch(`${JUPITER_API}/swap`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        quoteResponse,
-        userPublicKey,
-        wrapAndUnwrapSol: true,
-      }),
-    });
+    // ==========================================================================
+    // TIMEOUT PROTECTION: Prevents hanging on slow/unresponsive Jupiter API
+    // ==========================================================================
+    const response = await fetchWithTimeout(
+      `${JUPITER_API}/swap`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteResponse,
+          userPublicKey,
+          wrapAndUnwrapSol: true,
+        }),
+      },
+      JUPITER_TIMEOUT
+    );
 
     if (!response.ok) {
       throw new Error(`Jupiter swap failed: ${response.statusText}`);
