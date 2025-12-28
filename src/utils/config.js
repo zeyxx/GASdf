@@ -83,23 +83,46 @@ const config = {
   // Can be set separately for better accounting
   TREASURY_ADDRESS: process.env.TREASURY_ADDRESS || null, // Will be set from fee payer if not specified
 
-  // Fee settings
-  // NETWORK_FEE_LAMPORTS: Actual Solana tx cost (used for break-even calculation)
+  // ==========================================================================
+  // ELEGANT PRICING MODEL - All values derived from first principles
+  // ==========================================================================
+  //
+  // Constraint: Treasury (20%) must cover network costs
+  // Therefore: Fee × 0.20 ≥ Network Cost
+  //           Fee ≥ Network Cost × 5 (break-even)
+  //
+  // Formula:
+  //   NETWORK_FEE = 5000 lamports (Solana base fee)
+  //   BREAK_EVEN = NETWORK_FEE × 5 = 25000 (derived from 80/20 split)
+  //   BASE_FEE = BREAK_EVEN × MARKUP = 50000 (2x margin above break-even)
+  //
+  // Result:
+  //   NORMIE (0% discount): 50000 lamports ≈ $0.01
+  //   WHALE (95% discount): 25000 lamports ≈ $0.005 (floored at break-even)
+  //
+  // ==========================================================================
+
+  // Treasury model (80/20 split) - defines break-even math
+  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || 0.80,
+  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || 0.20,
+
+  // Network cost (Solana base fee) - the fundamental input
   NETWORK_FEE_LAMPORTS: parseInt(process.env.NETWORK_FEE_LAMPORTS) || 5000,
-  // BASE_FEE_LAMPORTS: GASdf service fee (increased to allow holder discounts to apply)
-  // 100000 lamports = 0.0001 SOL ≈ $0.02 at $200/SOL
-  BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 100000,
-  FEE_MULTIPLIER: parseFloat(process.env.FEE_MULTIPLIER) || 1.5,
+
+  // Business margin above break-even (2x = 100% margin)
+  FEE_MARKUP: parseFloat(process.env.FEE_MARKUP) || 2.0,
+
+  // Derived: BASE_FEE = NETWORK_FEE × (1/TREASURY_RATIO) × MARKUP
+  // = 5000 × 5 × 2 = 50000 lamports
+  BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 50000,
+
+  // Legacy multiplier (kept at 1.0, margin is in BASE_FEE now)
+  FEE_MULTIPLIER: parseFloat(process.env.FEE_MULTIPLIER) || 1.0,
+
   QUOTE_TTL_SECONDS: parseInt(process.env.QUOTE_TTL_SECONDS) || 60,
 
   // Burn settings
   BURN_THRESHOLD_LAMPORTS: parseInt(process.env.BURN_THRESHOLD_LAMPORTS) || 100000000,
-
-  // Treasury model (80/20 split)
-  // 80% of fees → swap to $ASDF → burn
-  // 20% of fees → treasury for operations (server, RPC, fee payer refill)
-  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || 0.80,
-  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || 0.20,
 
   // Oracle (optional - graceful fallback if not configured)
   ORACLE_URL: process.env.ORACLE_URL,
