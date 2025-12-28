@@ -10,7 +10,7 @@ jest.mock('../../../src/utils/config', () => ({
 
 jest.mock('../../../src/utils/rpc', () => ({
   getConnection: jest.fn().mockReturnValue({
-    getTokenAccountBalance: jest.fn(),
+    getParsedTokenAccountsByOwner: jest.fn(),
     getTokenSupply: jest.fn(),
   }),
 }));
@@ -22,10 +22,6 @@ jest.mock('../../../src/utils/logger', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   },
-}));
-
-jest.mock('@solana/spl-token', () => ({
-  getAssociatedTokenAddress: jest.fn().mockResolvedValue('MockATA'),
 }));
 
 const {
@@ -200,11 +196,11 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
       // Set up mock for circulating supply
       setCirculatingSupply(930_000_000); // 930M (7% burned)
 
-      // Mock balance lookup to return 0 (NORMIE)
+      // Mock balance lookup to return 0 token accounts (NORMIE)
       const mockConnection = getConnection();
-      mockConnection.getTokenAccountBalance.mockRejectedValue(
-        new Error('could not find account')
-      );
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [], // No token accounts = 0 balance
+      });
     });
 
     it('should return fee info with all required fields', async () => {

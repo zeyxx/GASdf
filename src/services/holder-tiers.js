@@ -11,7 +11,6 @@
  * Hold → Burns happen → Your share grows → Better discount → More hold
  */
 const { PublicKey } = require('@solana/web3.js');
-const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const config = require('../utils/config');
 const { getConnection } = require('../utils/rpc');
 const { logger } = require('../utils/logger');
@@ -74,6 +73,7 @@ async function getCirculatingSupply() {
 
 /**
  * Get $ASDF balance for a wallet
+ * Checks ALL token accounts owned by the wallet, not just the standard ATA
  * @param {string} walletAddress - User's wallet public key
  * @returns {Promise<number>} - $ASDF balance in whole tokens
  */
@@ -91,29 +91,33 @@ async function getAsdfBalance(walletAddress) {
     const wallet = new PublicKey(walletAddress);
     const asdfMint = new PublicKey(config.ASDF_MINT);
 
-    // Get the associated token account for $ASDF
-    const ata = await getAssociatedTokenAddress(asdfMint, wallet);
+    // Get ALL token accounts for this wallet holding $ASDF
+    // This catches non-standard token accounts (not just the ATA)
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(wallet, {
+      mint: asdfMint,
+    });
 
-    // Get token account balance
-    const accountInfo = await connection.getTokenAccountBalance(ata);
-    const balance = parseInt(accountInfo.value.amount) / ASDF_UNIT;
-
-    // Cache the result
-    balanceCache.set(walletAddress, { balance, timestamp: Date.now() });
-
-    return balance;
-  } catch (error) {
-    // Account doesn't exist or error - assume 0 balance
-    if (error.message?.includes('could not find account')) {
-      balanceCache.set(walletAddress, { balance: 0, timestamp: Date.now() });
-      return 0;
+    // Sum balances from all token accounts
+    let totalBalance = 0;
+    for (const account of tokenAccounts.value) {
+      const amount = account.account.data.parsed?.info?.tokenAmount?.amount;
+      if (amount) {
+        totalBalance += parseInt(amount) / ASDF_UNIT;
+      }
     }
 
+    // Cache the result
+    balanceCache.set(walletAddress, { balance: totalBalance, timestamp: Date.now() });
+
+    return totalBalance;
+  } catch (error) {
+    // Error fetching accounts - assume 0 balance
     logger.warn('[HOLDER-TIERS] Balance check failed', {
       wallet: walletAddress.slice(0, 8) + '...',
       error: error.message,
     });
 
+    balanceCache.set(walletAddress, { balance: 0, timestamp: Date.now() });
     return 0;
   }
 }
