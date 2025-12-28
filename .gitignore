@@ -6,3 +6,6 @@ node_modules/
 
 # Wallet keys
 .keys/
+
+# Test coverage
+coverage/
