@@ -79,6 +79,10 @@ const config = {
   // Wrapped SOL mint (same on all networks)
   WSOL_MINT: 'So11111111111111111111111111111111111111112',
 
+  // Treasury address for fee collection (defaults to primary fee payer)
+  // Can be set separately for better accounting
+  TREASURY_ADDRESS: process.env.TREASURY_ADDRESS || null, // Will be set from fee payer if not specified
+
   // Fee settings
   BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 5000,
   FEE_MULTIPLIER: parseFloat(process.env.FEE_MULTIPLIER) || 1.5,

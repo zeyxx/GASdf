@@ -6,6 +6,7 @@ const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
 const oracle = require('../services/oracle');
 const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/fee-payer-pool');
+const { ensureTreasuryAta, getTreasuryAddress } = require('../services/treasury-ata');
 const { clamp, safeMul, safeCeil, MAX_COMPUTE_UNITS } = require('../utils/safe-math');
 const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
@@ -123,11 +124,39 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       });
     }
 
-    // Store quote with assigned fee payer
+    // =========================================================================
+    // ENSURE: Treasury ATA exists for payment token
+    // Creates the ATA if it doesn't exist (GASdf pays creation cost)
+    // =========================================================================
+    let treasuryAta = null;
+    const treasuryAddress = getTreasuryAddress()?.toBase58() || feePayer;
+
+    try {
+      treasuryAta = await ensureTreasuryAta(paymentToken);
+      if (treasuryAta) {
+        logger.debug('QUOTE', 'Treasury ATA ready', {
+          requestId: req.requestId,
+          mint: paymentToken.slice(0, 8),
+          ata: treasuryAta.slice(0, 8),
+        });
+      }
+    } catch (ataError) {
+      logger.error('QUOTE', 'Failed to ensure treasury ATA', {
+        requestId: req.requestId,
+        paymentToken: paymentToken.slice(0, 8),
+        error: ataError.message,
+      });
+      // Continue anyway - user will need to include ATA creation in their transaction
+    }
+
+    // Store quote with assigned fee payer and treasury info
     await redis.setQuote(quoteId, {
       paymentToken,
       userPubkey,
       feePayer, // Store the assigned fee payer
+      treasuryAddress,
+      treasuryAta: treasuryAta || null,
+      feeAmount: feeInToken.inputAmount.toString(),
       feeAmountLamports: adjustedFee,
       feeAmountToken: feeInToken.inputAmount,
       kScore: kScore.score,
@@ -171,6 +200,10 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     res.json({
       quoteId,
       feePayer, // Return the reserved fee payer
+      treasury: {
+        address: treasuryAddress,
+        ata: treasuryAta, // Token account for fee payment (null for native SOL)
+      },
       feeAmount: feeInToken.inputAmount.toString(),
       feeFormatted,
       paymentToken: {

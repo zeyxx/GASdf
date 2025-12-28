@@ -120,7 +120,8 @@ async function executeBurnWithLock(totalAmount) {
     const swapResult = await swapWithFallback(burnAmount);
 
     if (!swapResult.success) {
-      logger.warn('BURN', 'Swap failed, keeping pending for retry');
+      logger.warn('BURN', 'Swap failed', { error: swapResult.error });
+
       // Reverse treasury allocation on failure
       if (treasuryAmount > 0) {
         await redis.incrTreasuryTotal(-treasuryAmount);
@@ -130,6 +131,12 @@ async function executeBurnWithLock(totalAmount) {
           reason: 'swap_failed',
         });
       }
+
+      // Reset pending swap to prevent stuck funds
+      // The fees will be re-accumulated on next transactions
+      await redis.resetPendingSwap();
+      logger.warn('BURN', 'Reset pending swap amount after failure');
+
       return null;
     }
 
@@ -149,11 +156,15 @@ async function executeBurnWithLock(totalAmount) {
       asdfBalance = Number(accountInfo.amount);
     } catch (error) {
       logger.error('BURN', 'Failed to get ASDF balance', { error: error.message });
+      // Swap succeeded but can't verify balance - reset pending to avoid double processing
+      await redis.resetPendingSwap();
       return null;
     }
 
     if (asdfBalance <= 0) {
-      logger.warn('BURN', 'No ASDF to burn');
+      logger.warn('BURN', 'No ASDF to burn after swap');
+      // Swap may have failed silently - reset pending
+      await redis.resetPendingSwap();
       return null;
     }
 

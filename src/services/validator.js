@@ -1,7 +1,9 @@
 const { Transaction, VersionedTransaction, PublicKey, SystemProgram } = require('@solana/web3.js');
+const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const crypto = require('crypto');
 const nacl = require('tweetnacl');
 const { getAllFeePayerPublicKeys, getTransactionFeePayer } = require('./signer');
+const config = require('../utils/config');
 
 // System Program instruction discriminators
 const SYSTEM_PROGRAM_ID = SystemProgram.programId.toBase58();
@@ -462,16 +464,142 @@ function computeTransactionHash(transaction) {
   return crypto.createHash('sha256').update(messageBytes).digest('hex');
 }
 
+/**
+ * Validate that transaction contains a fee payment instruction
+ *
+ * Checks for:
+ * - SPL Token Transfer or TransferChecked to treasury ATA
+ * - System Program Transfer (for SOL payments) to treasury
+ *
+ * @param {Transaction|VersionedTransaction} transaction - The transaction to validate
+ * @param {Object} quote - The quote object containing fee details
+ * @param {string} userPubkey - The user's public key
+ * @returns {{ valid: boolean, error?: string, actualAmount?: number }}
+ */
+async function validateFeePayment(transaction, quote, userPubkey) {
+  const instructions = extractInstructions(transaction);
+  const accountKeys = getAccountKeys(transaction);
+
+  const treasuryAddress = config.TREASURY_ADDRESS || getAllFeePayerPublicKeys()[0]?.toBase58();
+  if (!treasuryAddress) {
+    return { valid: false, error: 'Treasury address not configured' };
+  }
+
+  const expectedAmount = parseInt(quote.feeAmount);
+  const paymentToken = quote.paymentToken?.mint || quote.paymentToken;
+  const isSOL = paymentToken === config.WSOL_MINT || paymentToken === 'So11111111111111111111111111111111111111112';
+
+  let foundPayment = false;
+  let actualAmount = 0;
+
+  for (const ix of instructions) {
+    const programId = getProgramId(ix, accountKeys);
+    const ixData = getInstructionData(ix);
+
+    // Check for SOL transfer (System Program)
+    if (isSOL && programId === SYSTEM_PROGRAM_ID) {
+      if (ixData.length >= 12) {
+        const discriminator = ixData.readUInt32LE(0);
+        if (discriminator === SYSTEM_TRANSFER_DISCRIMINATOR) {
+          const fromAccount = getAccountAtIndex(ix, 0, accountKeys);
+          const toAccount = getAccountAtIndex(ix, 1, accountKeys);
+          const amount = ixData.readBigUInt64LE(4);
+
+          if (fromAccount === userPubkey && toAccount === treasuryAddress) {
+            actualAmount = Number(amount);
+            foundPayment = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Check for SPL Token Transfer or TransferChecked
+    if (programId === TOKEN_PROGRAM_ID || programId === TOKEN_2022_PROGRAM_ID) {
+      if (ixData.length >= 1) {
+        const discriminator = ixData[0];
+
+        // Transfer (3) or TransferChecked (12)
+        if (discriminator === 3 || discriminator === 12) {
+          const sourceAccount = getAccountAtIndex(ix, 0, accountKeys);
+          const destAccount = discriminator === 3
+            ? getAccountAtIndex(ix, 1, accountKeys)
+            : getAccountAtIndex(ix, 2, accountKeys); // TransferChecked has mint at index 1
+          const authority = discriminator === 3
+            ? getAccountAtIndex(ix, 2, accountKeys)
+            : getAccountAtIndex(ix, 3, accountKeys);
+
+          // Verify authority is the user
+          if (authority !== userPubkey) continue;
+
+          // Get expected treasury ATA for this token
+          let expectedTreasuryAta;
+          try {
+            expectedTreasuryAta = await getAssociatedTokenAddress(
+              new PublicKey(paymentToken),
+              new PublicKey(treasuryAddress)
+            );
+          } catch (e) {
+            continue; // Skip if we can't compute ATA
+          }
+
+          // Check if destination matches treasury ATA
+          if (destAccount === expectedTreasuryAta.toBase58()) {
+            // Parse amount based on instruction type
+            if (discriminator === 3) {
+              // Transfer: amount is u64 at offset 1
+              actualAmount = Number(ixData.readBigUInt64LE(1));
+            } else {
+              // TransferChecked: amount is u64 at offset 1
+              actualAmount = Number(ixData.readBigUInt64LE(1));
+            }
+            foundPayment = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!foundPayment) {
+    return {
+      valid: false,
+      error: `No fee payment found. Expected ${expectedAmount} of ${paymentToken} to treasury`,
+    };
+  }
+
+  // Allow 1% tolerance for rounding
+  const tolerance = Math.max(1, Math.floor(expectedAmount * 0.01));
+  if (actualAmount < expectedAmount - tolerance) {
+    return {
+      valid: false,
+      error: `Insufficient fee payment: got ${actualAmount}, expected ${expectedAmount}`,
+      actualAmount,
+    };
+  }
+
+  return { valid: true, actualAmount };
+}
+
+/**
+ * Get treasury address (from config or primary fee payer)
+ */
+function getTreasuryAddress() {
+  return config.TREASURY_ADDRESS || getAllFeePayerPublicKeys()[0]?.toBase58();
+}
+
 module.exports = {
   deserializeTransaction,
   validateTransaction,
   validateTransactionSize,
+  validateFeePayment,
   verifyUserSignature,
   extractInstructions,
   getTransactionBlockhash,
   detectDurableNonce,
   getReplayProtectionKey,
   computeTransactionHash,
+  getTreasuryAddress,
   MAX_COMPUTE_UNITS,
   MAX_TRANSACTION_SIZE,
   SIGNATURE_SIZE,

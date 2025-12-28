@@ -1,9 +1,46 @@
 const express = require('express');
+const { PublicKey } = require('@solana/web3.js');
+const { getAccount, getAssociatedTokenAddress } = require('@solana/spl-token');
 const config = require('../utils/config');
 const redis = require('../utils/redis');
+const rpc = require('../utils/rpc');
 const logger = require('../utils/logger');
+const { getTreasuryAddress } = require('../services/treasury-ata');
 
 const router = express.Router();
+
+/**
+ * Get real on-chain treasury balances
+ */
+async function getOnChainTreasuryBalances() {
+  const treasury = getTreasuryAddress();
+  if (!treasury) {
+    return { sol: 0, asdf: 0 };
+  }
+
+  try {
+    const connection = rpc.getConnection();
+
+    // Get SOL balance
+    const solBalance = await connection.getBalance(treasury);
+
+    // Get $ASDF balance
+    let asdfBalance = 0;
+    try {
+      const asdfMint = new PublicKey(config.ASDF_MINT);
+      const asdfAta = await getAssociatedTokenAddress(asdfMint, treasury);
+      const asdfAccount = await getAccount(connection, asdfAta);
+      asdfBalance = Number(asdfAccount.amount);
+    } catch (e) {
+      // No ASDF account or zero balance
+    }
+
+    return { sol: solBalance, asdf: asdfBalance };
+  } catch (error) {
+    logger.error('STATS', 'Failed to get on-chain balances', { error: error.message });
+    return { sol: 0, asdf: 0 };
+  }
+}
 
 /**
  * GET /stats
@@ -11,9 +48,10 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
   try {
-    const [stats, treasuryBalance] = await Promise.all([
+    const [stats, treasuryBalance, onChainBalances] = await Promise.all([
       redis.getStats(),
       redis.getTreasuryBalance(),
+      getOnChainTreasuryBalances(),
     ]);
 
     res.json({
@@ -24,8 +62,16 @@ router.get('/', async (req, res) => {
 
       // Treasury stats (80/20 model)
       treasury: {
-        balance: treasuryBalance,
-        balanceFormatted: formatSol(treasuryBalance),
+        // Redis-tracked balance (internal accounting)
+        trackedBalance: treasuryBalance,
+        trackedBalanceFormatted: formatSol(treasuryBalance),
+        // On-chain balances (source of truth)
+        onChain: {
+          sol: onChainBalances.sol,
+          solFormatted: formatSol(onChainBalances.sol),
+          asdf: onChainBalances.asdf,
+          asdfFormatted: formatAsdf(onChainBalances.asdf),
+        },
         model: '80/20',
         burnRatio: config.BURN_RATIO,
         treasuryRatio: config.TREASURY_RATIO,

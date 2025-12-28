@@ -9,6 +9,7 @@ const {
   deserializeTransaction,
   validateTransaction,
   validateTransactionSize,
+  validateFeePayment,
   getTransactionBlockhash,
   computeTransactionHash,
 } = require('../services/validator');
@@ -236,6 +237,45 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         code: 'FEE_PAYER_MISMATCH',
       });
     }
+
+    // =========================================================================
+    // SECURITY: Validate fee payment instruction exists
+    // Ensures user actually pays the quoted fee to treasury
+    // =========================================================================
+    const feeValidation = await validateFeePayment(tx, quote, userPubkey);
+    if (!feeValidation.valid) {
+      logger.warn('SUBMIT', 'Fee payment validation failed', {
+        requestId: req.requestId,
+        quoteId,
+        error: feeValidation.error,
+        userPubkey,
+      });
+
+      logSecurityEvent(AUDIT_EVENTS.VALIDATION_FAILED, {
+        quoteId,
+        reason: 'fee_payment_missing',
+        error: feeValidation.error,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
+
+      return res.status(400).json({
+        error: feeValidation.error,
+        code: 'FEE_PAYMENT_INVALID',
+        expected: quote.feeAmount,
+        actual: feeValidation.actualAmount || 0,
+      });
+    }
+
+    logger.info('SUBMIT', 'Fee payment validated', {
+      requestId: req.requestId,
+      quoteId,
+      expectedFee: quote.feeAmount,
+      actualFee: feeValidation.actualAmount,
+      paymentToken: quote.paymentToken?.symbol || quote.paymentToken,
+    });
 
     // Enqueue transaction for tracking
     const txEntry = await txQueue.enqueue({
