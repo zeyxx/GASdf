@@ -4,7 +4,6 @@ const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
-const oracle = require('../services/oracle');
 const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/fee-payer-pool');
 const { ensureTreasuryAta, getTreasuryAddress } = require('../services/treasury-ata');
 const { clamp, safeMul, safeCeil, MAX_COMPUTE_UNITS } = require('../utils/safe-math');
@@ -14,6 +13,7 @@ const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics')
 const { logQuoteCreated, logQuoteRejected, AUDIT_EVENTS } = require('../services/audit');
 const { anomalyDetector } = require('../services/anomaly-detector');
 const { calculateDiscountedFee } = require('../services/holder-tiers');
+const { isTokenAccepted } = require('../services/token-gate');
 
 const router = express.Router();
 
@@ -59,38 +59,51 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       });
     }
 
+    // =========================================================================
+    // SECURITY: Token gating - only accept verified tokens
+    // =========================================================================
+    const tokenCheck = await isTokenAccepted(paymentToken);
+    if (!tokenCheck.accepted) {
+      logger.info('QUOTE', 'Token rejected by gate', {
+        requestId: req.requestId,
+        paymentToken: paymentToken.slice(0, 8),
+        reason: tokenCheck.reason,
+        userPubkey,
+      });
+
+      logQuoteRejected({
+        reason: `Token not accepted: ${tokenCheck.reason}`,
+        code: 'TOKEN_NOT_ACCEPTED',
+        paymentToken,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      return res.status(400).json({
+        error: 'Payment token not accepted. Use SOL, USDC, USDT, or a HolDex-verified token.',
+        code: 'TOKEN_NOT_ACCEPTED',
+        reason: tokenCheck.reason,
+      });
+    }
+
     // ==========================================================================
-    // NUMERIC PRECISION: Safe fee calculation with overflow protection
+    // FEE CALCULATION - Derived from first principles, no magic numbers
+    // ==========================================================================
+    //
+    // BASE_FEE = NETWORK_FEE × (1/TREASURY_RATIO) × MARKUP
+    //          = 5000 × 5 × 2 = 50000 lamports (~$0.01)
+    //
+    // All accepted tokens pay the same fee (token gating handles risk)
     // ==========================================================================
 
     // Clamp compute units to valid Solana range
     const clampedCU = clamp(estimatedComputeUnits, 1, MAX_COMPUTE_UNITS);
 
     // Priority fee: CU * micro-lamports (0.000001 SOL = 1000 lamports per 1M CU)
-    // Using safeMul to prevent overflow
     const priorityFee = safeCeil(safeMul(clampedCU, 0.001)) || 0;
-    const baseFee = config.BASE_FEE_LAMPORTS + priorityFee;
 
-    // Get K-score for payment token
-    const kScore = await oracle.getKScore(paymentToken);
-
-    // Apply K-score multiplier and profit margin with overflow check
-    const feeWithMultiplier = safeMul(baseFee, config.FEE_MULTIPLIER);
-    const adjustedFeeRaw = safeMul(feeWithMultiplier, kScore.feeMultiplier);
-    const baseAdjustedFee = safeCeil(adjustedFeeRaw);
-
-    if (baseAdjustedFee === null || baseAdjustedFee <= 0) {
-      logger.error('QUOTE', 'Fee calculation overflow', {
-        requestId: req.requestId,
-        baseFee,
-        multiplier: config.FEE_MULTIPLIER,
-        kScoreMultiplier: kScore.feeMultiplier,
-      });
-      return res.status(500).json({
-        error: 'Fee calculation error',
-        code: 'FEE_OVERFLOW',
-      });
-    }
+    // Total base fee (before holder discount)
+    const baseAdjustedFee = config.BASE_FEE_LAMPORTS + priorityFee;
 
     // =========================================================================
     // HOLDER TIER: Apply $ASDF holder discount (floored at break-even)
@@ -169,8 +182,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       feeAmount: feeInToken.inputAmount.toString(),
       feeAmountLamports: adjustedFee,
       feeAmountToken: feeInToken.inputAmount,
-      kScore: kScore.score,
-      kTier: kScore.tier,
+      tokenAcceptReason: tokenCheck.reason, // 'trusted' or 'holdex_verified'
       estimatedComputeUnits,
       expiresAt,
       createdAt: Date.now(),
@@ -183,7 +195,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       userPubkey,
       feePayer: feePayer.slice(0, 8),
       feeAmountSol: adjustedFee,
-      kTier: kScore.tier,
+      tokenAccepted: tokenCheck.reason,
     });
 
     // Audit log
@@ -193,7 +205,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       feePayer,
       paymentToken,
       feeAmountLamports: adjustedFee,
-      kTier: kScore.tier,
+      tokenAccepted: tokenCheck.reason,
       ip: clientIp,
     });
 
@@ -220,11 +232,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
         decimals: feeInToken.decimals || 6,
-      },
-      kScore: {
-        score: kScore.score,
-        tier: kScore.tier,
-        feeMultiplier: kScore.feeMultiplier,
+        accepted: tokenCheck.reason, // 'trusted' or 'holdex_verified'
       },
       holderTier: {
         tier: tierInfo.tier,

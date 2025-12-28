@@ -128,6 +128,14 @@ const config = {
   ORACLE_URL: process.env.ORACLE_URL,
   ORACLE_API_KEY: process.env.ORACLE_API_KEY,
 
+  // HolDex - Community verification service ($ASDF ecosystem)
+  HOLDEX_URL: process.env.HOLDEX_URL,
+
+  // Minimum K-score for token acceptance (0-100)
+  // K-score = (accumulators + maintained) / total_holders
+  // Measures holder conviction - reject tokens where holders are fleeing
+  MIN_KSCORE: parseInt(process.env.MIN_KSCORE) || 50,
+
   // Phase 3: Monitoring
   PROMETHEUS_ENABLED: process.env.PROMETHEUS_ENABLED === 'true',
   ALERTING_WEBHOOK: process.env.ALERTING_WEBHOOK,

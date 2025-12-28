@@ -8,8 +8,8 @@ const express = require('express');
 // Mock dependencies before requiring the route
 jest.mock('../../../src/utils/config', () => ({
   IS_DEV: true,
-  BASE_FEE_LAMPORTS: 5000,
-  FEE_MULTIPLIER: 1.2,
+  BASE_FEE_LAMPORTS: 50000,
+  NETWORK_FEE_LAMPORTS: 5000,
   QUOTE_TTL_SECONDS: 60,
 }));
 
@@ -34,27 +34,26 @@ jest.mock('../../../src/services/jupiter', () => ({
   }),
 }));
 
-jest.mock('../../../src/services/oracle', () => ({
-  getKScore: jest.fn().mockResolvedValue({
-    score: 85,
-    tier: 'TRUSTED',
-    feeMultiplier: 1.0,
+jest.mock('../../../src/services/token-gate', () => ({
+  isTokenAccepted: jest.fn().mockResolvedValue({
+    accepted: true,
+    reason: 'trusted',
   }),
 }));
 
 jest.mock('../../../src/services/holder-tiers', () => ({
   calculateDiscountedFee: jest.fn().mockResolvedValue({
-    originalFee: 6000,
-    discountedFee: 25000, // Floored at break-even
+    originalFee: 50000,
+    discountedFee: 50000,
     breakEvenFee: 25000,
-    savings: -19000, // 6000 - 25000
+    savings: 0,
     savingsPercent: 0,
-    maxDiscountPercent: 0,
+    maxDiscountPercent: 50,
     tier: 'NORMIE',
     tierEmoji: '👤',
     balance: 0,
     nextTier: { name: 'HOLDER', minHolding: 10000, needed: 10000 },
-    isAtBreakEven: true,
+    isAtBreakEven: false,
   }),
 }));
 
@@ -64,6 +63,13 @@ jest.mock('../../../src/services/fee-payer-pool', () => ({
   getCircuitState: jest.fn().mockReturnValue({
     open: false,
     closesAt: null,
+  }),
+}));
+
+jest.mock('../../../src/services/treasury-ata', () => ({
+  ensureTreasuryAta: jest.fn().mockResolvedValue('TreasuryAtaPubkey11111111111111111111111111'),
+  getTreasuryAddress: jest.fn().mockReturnValue({
+    toBase58: () => 'TreasuryPubkey11111111111111111111111111111',
   }),
 }));
 
@@ -114,7 +120,7 @@ describe('Quote Route', () => {
   let app;
   let quoteRouter;
   let jupiter;
-  let oracle;
+  let tokenGate;
   let feePayerPool;
   let redis;
   let safeMath;
@@ -126,7 +132,7 @@ describe('Quote Route', () => {
 
     // Get mocked modules
     jupiter = require('../../../src/services/jupiter');
-    oracle = require('../../../src/services/oracle');
+    tokenGate = require('../../../src/services/token-gate');
     feePayerPool = require('../../../src/services/fee-payer-pool');
     redis = require('../../../src/utils/redis');
     safeMath = require('../../../src/utils/safe-math');
@@ -139,10 +145,9 @@ describe('Quote Route', () => {
       symbol: 'USDC',
       decimals: 6,
     });
-    oracle.getKScore.mockResolvedValue({
-      score: 85,
-      tier: 'TRUSTED',
-      feeMultiplier: 1.0,
+    tokenGate.isTokenAccepted.mockResolvedValue({
+      accepted: true,
+      reason: 'trusted',
     });
     feePayerPool.isCircuitOpen.mockReturnValue(false);
     feePayerPool.reserveBalance.mockResolvedValue('FeePayerPubkey111111111111111111111111111111');
@@ -182,25 +187,12 @@ describe('Quote Route', () => {
       expect(response.body).toHaveProperty('feePayer');
       expect(response.body).toHaveProperty('feeAmount');
       expect(response.body).toHaveProperty('paymentToken');
-      expect(response.body).toHaveProperty('kScore');
+      expect(response.body).toHaveProperty('holderTier');
       expect(response.body).toHaveProperty('expiresAt');
       expect(response.body).toHaveProperty('ttl');
     });
 
-    it('should include kScore info in response', async () => {
-      const response = await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
-
-      expect(response.body.kScore).toEqual({
-        score: 85,
-        tier: 'TRUSTED',
-        feeMultiplier: 1.0,
-      });
-    });
-
-    it('should include payment token info in response', async () => {
+    it('should include payment token info with acceptance reason', async () => {
       const response = await request(app)
         .post('/quote')
         .send(validRequest)
@@ -210,15 +202,16 @@ describe('Quote Route', () => {
         mint: validRequest.paymentToken,
         symbol: 'USDC',
         decimals: 6,
+        accepted: 'trusted',
       });
     });
 
-    it('should call oracle for K-score', async () => {
+    it('should check token acceptance via token-gate', async () => {
       await request(app)
         .post('/quote')
         .send(validRequest);
 
-      expect(oracle.getKScore).toHaveBeenCalledWith(validRequest.paymentToken);
+      expect(tokenGate.isTokenAccepted).toHaveBeenCalledWith(validRequest.paymentToken);
     });
 
     it('should call jupiter for fee conversion', async () => {
@@ -244,6 +237,7 @@ describe('Quote Route', () => {
           paymentToken: validRequest.paymentToken,
           userPubkey: validRequest.userPubkey,
           feePayer: expect.any(String),
+          tokenAcceptReason: 'trusted',
         })
       );
     });
@@ -270,6 +264,7 @@ describe('Quote Route', () => {
           quoteId: expect.any(String),
           userPubkey: validRequest.userPubkey,
           paymentToken: validRequest.paymentToken,
+          tokenAccepted: 'trusted',
         })
       );
     });
@@ -286,6 +281,54 @@ describe('Quote Route', () => {
 
         expect(response.body.quoteId).toBeDefined();
         expect(safeMath.clamp).toHaveBeenCalled();
+      });
+    });
+
+    describe('token gating', () => {
+      it('should reject unverified tokens', async () => {
+        tokenGate.isTokenAccepted.mockResolvedValue({
+          accepted: false,
+          reason: 'not_verified',
+        });
+
+        const response = await request(app)
+          .post('/quote')
+          .send(validRequest)
+          .expect(400);
+
+        expect(response.body.code).toBe('TOKEN_NOT_ACCEPTED');
+        expect(response.body.reason).toBe('not_verified');
+      });
+
+      it('should accept HolDex verified tokens', async () => {
+        tokenGate.isTokenAccepted.mockResolvedValue({
+          accepted: true,
+          reason: 'holdex_verified',
+        });
+
+        const response = await request(app)
+          .post('/quote')
+          .send(validRequest)
+          .expect(200);
+
+        expect(response.body.paymentToken.accepted).toBe('holdex_verified');
+      });
+
+      it('should log rejection for unverified tokens', async () => {
+        tokenGate.isTokenAccepted.mockResolvedValue({
+          accepted: false,
+          reason: 'not_verified',
+        });
+
+        await request(app)
+          .post('/quote')
+          .send(validRequest);
+
+        expect(audit.logQuoteRejected).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'TOKEN_NOT_ACCEPTED',
+          })
+        );
       });
     });
 
@@ -356,30 +399,6 @@ describe('Quote Route', () => {
       });
     });
 
-    describe('fee calculation overflow', () => {
-      it('should return 500 on fee overflow', async () => {
-        safeMath.safeCeil.mockReturnValue(null);
-
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(500);
-
-        expect(response.body.code).toBe('FEE_OVERFLOW');
-      });
-
-      it('should return 500 on zero fee', async () => {
-        safeMath.safeCeil.mockReturnValue(0);
-
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(500);
-
-        expect(response.body.code).toBe('FEE_OVERFLOW');
-      });
-    });
-
     describe('error handling', () => {
       it('should return 500 on jupiter error', async () => {
         jupiter.getFeeInToken.mockRejectedValue(new Error('Jupiter API error'));
@@ -393,8 +412,8 @@ describe('Quote Route', () => {
         expect(response.body.code).toBe('QUOTE_FAILED');
       });
 
-      it('should return 500 on oracle error', async () => {
-        oracle.getKScore.mockRejectedValue(new Error('Oracle error'));
+      it('should return 500 on token-gate error', async () => {
+        tokenGate.isTokenAccepted.mockRejectedValue(new Error('Token gate error'));
 
         const response = await request(app)
           .post('/quote')
@@ -404,21 +423,8 @@ describe('Quote Route', () => {
         expect(response.body.code).toBe('QUOTE_FAILED');
       });
 
-      it('should return 503 on circuit breaker exception', async () => {
-        const error = new Error('Circuit open');
-        error.code = 'CIRCUIT_OPEN';
-        oracle.getKScore.mockRejectedValue(error);
-
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(503);
-
-        expect(response.body.code).toBe('SERVICE_UNAVAILABLE');
-      });
-
-      it('should increment error metrics', async () => {
-        oracle.getKScore.mockRejectedValue(new Error('Test error'));
+      it('should increment error metrics on failure', async () => {
+        jupiter.getFeeInToken.mockRejectedValue(new Error('Test error'));
 
         await request(app)
           .post('/quote')
