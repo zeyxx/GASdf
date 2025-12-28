@@ -60,7 +60,7 @@ export interface BurnProof {
   solFormatted: string;
   treasuryAmount: number;
   treasuryFormatted: string;
-  method: 'pumpswap' | 'jupiter';
+  method: 'jupiter';
   timestamp: number;
   network: string;
   explorerUrl: string;

@@ -4,13 +4,6 @@
 
 const request = require('supertest');
 
-// Mock pump-swap-sdk first (before any imports)
-jest.mock('@pump-fun/pump-swap-sdk', () => ({
-  PumpAmmSdk: jest.fn().mockImplementation(() => ({
-    swap: jest.fn().mockResolvedValue({ signature: 'mock_sig' }),
-  })),
-}));
-
 // Mock Solana dependencies before requiring app
 jest.mock('@solana/web3.js', () => {
   const mockPublicKey = jest.fn().mockImplementation((key) => ({

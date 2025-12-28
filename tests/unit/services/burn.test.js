@@ -70,10 +70,6 @@ jest.mock('../../../src/services/fee-payer-pool', () => ({
   }),
 }));
 
-jest.mock('../../../src/services/pumpswap', () => ({
-  swapSolToAsdf: jest.fn(),
-}));
-
 jest.mock('../../../src/services/jupiter', () => ({
   getQuote: jest.fn().mockResolvedValue({ outAmount: 1000000 }),
   getSwapTransaction: jest.fn().mockResolvedValue({
@@ -92,7 +88,6 @@ jest.mock('../../../src/utils/safe-math', () => ({
 // Get references to mocked modules
 const redis = require('../../../src/utils/redis');
 const rpc = require('../../../src/utils/rpc');
-const pumpswap = require('../../../src/services/pumpswap');
 const jupiter = require('../../../src/services/jupiter');
 const feePayerPool = require('../../../src/services/fee-payer-pool');
 const safeMath = require('../../../src/utils/safe-math');
@@ -123,11 +118,6 @@ describe('Burn Service', () => {
     rpc.getLatestBlockhash.mockResolvedValue({
       blockhash: 'blockhash-123',
       lastValidBlockHeight: 100000,
-    });
-
-    pumpswap.swapSolToAsdf.mockResolvedValue({
-      success: true,
-      signature: 'pumpswap-sig-123',
     });
 
     jupiter.getQuote.mockResolvedValue({ outAmount: 1000000 });
@@ -263,7 +253,6 @@ describe('Burn Service', () => {
         burnAmount: 800000,
         treasuryAmount: 200000,
       });
-      pumpswap.swapSolToAsdf.mockRejectedValue(new Error('Swap failed'));
       jupiter.getQuote.mockRejectedValue(new Error('Jupiter failed'));
 
       await burnService.checkAndExecuteBurn();
@@ -291,35 +280,21 @@ describe('Burn Service', () => {
     });
   });
 
-  describe('Swap with Fallback', () => {
+  describe('Jupiter Swap', () => {
     beforeEach(() => {
       redis.getPendingSwapAmount.mockResolvedValue(200000);
       splToken.getAccount.mockResolvedValue({ amount: BigInt(150000) });
     });
 
-    it('should use PumpSwap as primary method', async () => {
+    it('should use Jupiter for swapping', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
-      expect(pumpswap.swapSolToAsdf).toHaveBeenCalled();
-      expect(result.method).toBe('pumpswap');
-    });
-
-    it('should fallback to Jupiter when PumpSwap fails', async () => {
-      pumpswap.swapSolToAsdf.mockRejectedValue(new Error('PumpSwap down'));
-      jupiter.getQuote.mockResolvedValue({ outAmount: 1000000 });
-      jupiter.getSwapTransaction.mockResolvedValue({
-        swapTransaction: Buffer.from('mock-tx').toString('base64'),
-      });
-
-      const result = await burnService.checkAndExecuteBurn();
-
-      expect(pumpswap.swapSolToAsdf).toHaveBeenCalled();
       expect(jupiter.getQuote).toHaveBeenCalled();
+      expect(jupiter.getSwapTransaction).toHaveBeenCalled();
       expect(result.method).toBe('jupiter');
     });
 
-    it('should return null when both swap methods fail', async () => {
-      pumpswap.swapSolToAsdf.mockRejectedValue(new Error('PumpSwap down'));
+    it('should return null when Jupiter swap fails', async () => {
       jupiter.getQuote.mockRejectedValue(new Error('Jupiter down'));
 
       const result = await burnService.checkAndExecuteBurn();
@@ -327,20 +302,18 @@ describe('Burn Service', () => {
       expect(result).toBeNull();
       expect(logger.error).toHaveBeenCalledWith(
         'BURN',
-        'Jupiter also failed',
+        'Jupiter swap failed',
         expect.any(Object)
       );
     });
 
-    it('should log warning when falling back to Jupiter', async () => {
-      pumpswap.swapSolToAsdf.mockRejectedValue(new Error('Network error'));
-
+    it('should log swap initiation', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(logger.warn).toHaveBeenCalledWith(
+      expect(logger.info).toHaveBeenCalledWith(
         'BURN',
-        'PumpSwap failed, trying Jupiter',
-        expect.objectContaining({ error: 'Network error' })
+        'Swapping SOL to ASDF via Jupiter',
+        expect.objectContaining({ solAmount: expect.any(Number) })
       );
     });
   });
@@ -402,7 +375,7 @@ describe('Burn Service', () => {
       expect(redis.recordBurnProof).toHaveBeenCalledWith(
         expect.objectContaining({
           amountBurned: 800000,
-          method: 'pumpswap',
+          method: 'jupiter',
           network: 'devnet',
         })
       );
@@ -537,8 +510,33 @@ describe('Burn Service', () => {
       splToken.getAccount.mockResolvedValue({ amount: BigInt(500000) });
     });
 
-    it('should handle RPC errors gracefully', async () => {
-      rpc.sendTransaction.mockRejectedValue(new Error('RPC timeout'));
+    it('should handle swap errors gracefully', async () => {
+      jupiter.getQuote.mockRejectedValue(new Error('Jupiter timeout'));
+
+      const result = await burnService.checkAndExecuteBurn();
+
+      expect(result).toBeNull();
+      expect(logger.error).toHaveBeenCalledWith(
+        'BURN',
+        'Jupiter swap failed',
+        expect.any(Object)
+      );
+    });
+
+    it('should reset pending on swap failure to prevent stuck funds', async () => {
+      jupiter.getQuote.mockRejectedValue(new Error('Network error'));
+
+      await burnService.checkAndExecuteBurn();
+
+      // resetPendingSwap IS called on swap failure to prevent stuck funds
+      expect(redis.resetPendingSwap).toHaveBeenCalled();
+    });
+
+    it('should handle burn phase errors gracefully', async () => {
+      // Swap succeeds, but burn transaction fails
+      rpc.sendTransaction
+        .mockResolvedValueOnce('swap-sig-123') // First call: swap succeeds
+        .mockRejectedValueOnce(new Error('RPC timeout')); // Second call: burn fails
 
       const result = await burnService.checkAndExecuteBurn();
 
@@ -548,15 +546,6 @@ describe('Burn Service', () => {
         'Burn failed',
         expect.any(Object)
       );
-    });
-
-    it('should not reset pending on error (will retry)', async () => {
-      rpc.sendTransaction.mockRejectedValue(new Error('Network error'));
-
-      await burnService.checkAndExecuteBurn();
-
-      // resetPendingSwap should NOT be called on error
-      expect(redis.resetPendingSwap).not.toHaveBeenCalled();
     });
   });
 
@@ -574,9 +563,9 @@ describe('Burn Service', () => {
         treasuryAmount: 200000,
       });
       safeMath.validateSolanaAmount.mockReturnValue({ valid: true });
-      pumpswap.swapSolToAsdf.mockResolvedValue({
-        success: true,
-        signature: 'pumpswap-sig-123',
+      jupiter.getQuote.mockResolvedValue({ outAmount: 1000000 });
+      jupiter.getSwapTransaction.mockResolvedValue({
+        swapTransaction: Buffer.from('mock-transaction').toString('base64'),
       });
     });
 
@@ -586,7 +575,7 @@ describe('Burn Service', () => {
       expect(result).not.toBeNull();
       expect(result.amountBurned).toBe(800000);
       expect(result.treasuryAllocated).toBe(200000);
-      expect(result.method).toBe('pumpswap');
+      expect(result.method).toBe('jupiter');
       expect(result.model).toBe('80/20');
       expect(result.proof).toBeDefined();
       expect(result.swapSignature).toBeDefined();

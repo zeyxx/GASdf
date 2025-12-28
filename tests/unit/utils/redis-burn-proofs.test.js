@@ -26,7 +26,7 @@ describe('Burn Proofs', () => {
     amountBurned: 1500000000,
     solAmount: 50000000,
     treasuryAmount: 12500000,
-    method: 'pumpswap',
+    method: 'jupiter',
     network: 'devnet',
   };
 

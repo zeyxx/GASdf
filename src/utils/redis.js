@@ -626,7 +626,7 @@ async function recordBurnProof(proof) {
     amountBurned: proof.amountBurned,
     solAmount: proof.solAmount,
     treasuryAmount: proof.treasuryAmount,
-    method: proof.method, // pumpswap or jupiter
+    method: proof.method, // jupiter
     timestamp: Date.now(),
     network: proof.network || 'mainnet-beta',
     explorerUrl: `https://solscan.io/tx/${proof.burnSignature}`,

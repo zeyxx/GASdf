@@ -12,7 +12,6 @@ const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { getHealthyPayer } = require('./fee-payer-pool');
-const pumpswap = require('./pumpswap');
 const jupiter = require('./jupiter');
 const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
 
@@ -110,7 +109,7 @@ async function executeBurnWithLock(totalAmount) {
       });
     }
 
-    // 2. Swap burn portion to ASDF (PumpSwap primary, Jupiter fallback)
+    // 2. Swap burn portion to ASDF via Jupiter
     if (burnAmount <= 0) {
       logger.warn('BURN', 'Burn amount too small after split');
       await redis.resetPendingSwap();
@@ -211,29 +210,14 @@ async function executeBurnWithLock(totalAmount) {
 }
 
 async function swapWithFallback(solAmountLamports) {
-  // Primary: PumpSwap
   try {
-    logger.info('BURN', 'Attempting PumpSwap', { solAmount: solAmountLamports });
-    const result = await pumpswap.swapSolToAsdf(solAmountLamports);
-    return { ...result, method: 'pumpswap' };
-  } catch (pumpswapError) {
-    logger.warn('BURN', 'PumpSwap failed, trying Jupiter', {
-      error: pumpswapError.message,
-    });
-  }
-
-  // Fallback: Jupiter
-  try {
-    logger.info('BURN', 'Attempting Jupiter', { solAmount: solAmountLamports });
+    logger.info('BURN', 'Swapping SOL to ASDF via Jupiter', { solAmount: solAmountLamports });
     const result = await swapViaJupiter(solAmountLamports);
     return { ...result, method: 'jupiter' };
-  } catch (jupiterError) {
-    logger.error('BURN', 'Jupiter also failed', {
-      error: jupiterError.message,
-    });
+  } catch (error) {
+    logger.error('BURN', 'Jupiter swap failed', { error: error.message });
+    return { success: false };
   }
-
-  return { success: false };
 }
 
 async function swapViaJupiter(solAmountLamports) {
