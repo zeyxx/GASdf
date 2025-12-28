@@ -95,8 +95,9 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     // =========================================================================
     // HOLDER TIER: Apply $ASDF holder discount (floored at break-even)
     // =========================================================================
-    // Estimate transaction cost based on compute units
-    const estimatedTxCost = config.BASE_FEE_LAMPORTS + priorityFee;
+    // Estimate actual network tx cost (not service fee) for break-even calculation
+    // This ensures discounts can apply while treasury still covers network costs
+    const estimatedTxCost = config.NETWORK_FEE_LAMPORTS + priorityFee;
     const tierInfo = await calculateDiscountedFee(userPubkey, baseAdjustedFee, estimatedTxCost);
     const adjustedFee = tierInfo.discountedFee;
 

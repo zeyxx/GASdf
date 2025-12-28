@@ -84,7 +84,11 @@ const config = {
   TREASURY_ADDRESS: process.env.TREASURY_ADDRESS || null, // Will be set from fee payer if not specified
 
   // Fee settings
-  BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 5000,
+  // NETWORK_FEE_LAMPORTS: Actual Solana tx cost (used for break-even calculation)
+  NETWORK_FEE_LAMPORTS: parseInt(process.env.NETWORK_FEE_LAMPORTS) || 5000,
+  // BASE_FEE_LAMPORTS: GASdf service fee (increased to allow holder discounts to apply)
+  // 100000 lamports = 0.0001 SOL ≈ $0.02 at $200/SOL
+  BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 100000,
   FEE_MULTIPLIER: parseFloat(process.env.FEE_MULTIPLIER) || 1.5,
   QUOTE_TTL_SECONDS: parseInt(process.env.QUOTE_TTL_SECONDS) || 60,
 
