@@ -8,6 +8,7 @@ const { releaseReservation, getReservation } = require('../services/fee-payer-po
 const {
   deserializeTransaction,
   validateTransaction,
+  validateTransactionSize,
   getTransactionBlockhash,
   computeTransactionHash,
 } = require('../services/validator');
@@ -53,6 +54,36 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       return res.status(400).json({
         error: 'Quote expired',
         code: 'QUOTE_EXPIRED',
+      });
+    }
+
+    // =========================================================================
+    // SECURITY: Validate transaction size (Solana limit: 1,232 bytes)
+    // =========================================================================
+    const sizeValidation = validateTransactionSize(transaction);
+    if (!sizeValidation.valid) {
+      logger.warn('SUBMIT', 'Transaction too large', {
+        requestId: req.requestId,
+        quoteId,
+        size: sizeValidation.size,
+        maxSize: sizeValidation.maxSize,
+        userPubkey,
+      });
+
+      logSecurityEvent(AUDIT_EVENTS.VALIDATION_FAILED, {
+        quoteId,
+        reason: 'transaction_size_exceeded',
+        size: sizeValidation.size,
+        maxSize: sizeValidation.maxSize,
+        userPubkey,
+        ip: clientIp,
+      });
+
+      return res.status(400).json({
+        error: sizeValidation.error,
+        code: 'TX_TOO_LARGE',
+        size: sizeValidation.size,
+        maxSize: sizeValidation.maxSize,
       });
     }
 

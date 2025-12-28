@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Transaction Size Validation**: Solana mainnet compliance
+  - Validates transaction size against 1,232 byte limit before processing
+  - Returns clear error with actual vs max size on rejection
+  - Prevents network rejection after fee payer signs
+
+### Changed
+
+- **MAX_COMPUTE_UNITS**: Updated from 400,000 to 1,400,000 (Solana mainnet limit)
+  - Allows processing of more complex transactions
+  - Aligns with official Solana specifications
+
+### Security
+
+- Added `TX_TOO_LARGE` error code for oversized transactions
+- Transaction size check happens before deserialization (defense in depth)
+
 ## [1.2.0] - 2025-12-27
 
 ### Added

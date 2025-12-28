@@ -40,8 +40,19 @@ const SYSTEM_DANGEROUS_INSTRUCTIONS = {
 // Durable nonce instruction discriminator
 const ADVANCE_NONCE_DISCRIMINATOR = 4;
 
-// Max compute units we'll pay for
-const MAX_COMPUTE_UNITS = 400000;
+// =========================================================================
+// Solana Mainnet Specifications (2025)
+// =========================================================================
+
+// Maximum transaction size in bytes (MTU constraint: 1500 - 48 headers - 220 overhead)
+// See: https://solana.com/docs/core/transactions
+const MAX_TRANSACTION_SIZE = 1232;
+
+// Maximum compute units per transaction (Solana mainnet limit)
+const MAX_COMPUTE_UNITS = 1_400_000;
+
+// Signature size in bytes (Ed25519)
+const SIGNATURE_SIZE = 64;
 
 function deserializeTransaction(serializedTx) {
   const buffer = Buffer.from(serializedTx, 'base64');
@@ -51,6 +62,31 @@ function deserializeTransaction(serializedTx) {
   } catch {
     return Transaction.from(buffer);
   }
+}
+
+/**
+ * Validate transaction size against Solana mainnet limit
+ * @param {string} serializedTx - Base64 encoded transaction
+ * @returns {{ valid: boolean, size: number, maxSize: number, error?: string }}
+ */
+function validateTransactionSize(serializedTx) {
+  const buffer = Buffer.from(serializedTx, 'base64');
+  const size = buffer.length;
+
+  if (size > MAX_TRANSACTION_SIZE) {
+    return {
+      valid: false,
+      size,
+      maxSize: MAX_TRANSACTION_SIZE,
+      error: `Transaction size ${size} bytes exceeds Solana limit of ${MAX_TRANSACTION_SIZE} bytes`,
+    };
+  }
+
+  return {
+    valid: true,
+    size,
+    maxSize: MAX_TRANSACTION_SIZE,
+  };
 }
 
 function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
@@ -429,6 +465,7 @@ function computeTransactionHash(transaction) {
 module.exports = {
   deserializeTransaction,
   validateTransaction,
+  validateTransactionSize,
   verifyUserSignature,
   extractInstructions,
   getTransactionBlockhash,
@@ -436,4 +473,6 @@ module.exports = {
   getReplayProtectionKey,
   computeTransactionHash,
   MAX_COMPUTE_UNITS,
+  MAX_TRANSACTION_SIZE,
+  SIGNATURE_SIZE,
 };
