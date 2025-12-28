@@ -1,5 +1,6 @@
 const config = require('../utils/config');
 const { jupiterBreaker } = require('../utils/circuit-breaker');
+const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
 
 const JUPITER_API = 'https://quote-api.jup.ag/v6';
 
@@ -75,16 +76,34 @@ async function getFeeInToken(inputMint, solAmountLamports) {
       100
     );
 
-    // Calculate proportional input amount
-    const inputAmount = Math.ceil(
-      (parseInt(quote.inAmount) * solAmountLamports) /
-        parseInt(quote.outAmount)
-    );
+    // ==========================================================================
+    // NUMERIC PRECISION: Safe proportional calculation with zero-division check
+    // ==========================================================================
+    const inAmount = parseInt(quote.inAmount) || 0;
+    const outAmount = parseInt(quote.outAmount) || 0;
+
+    // Check for zero output (would cause division by zero)
+    if (outAmount === 0) {
+      throw new Error('Jupiter returned zero output amount');
+    }
+
+    // Safe proportional calculation: (inAmount * solAmountLamports) / outAmount
+    const inputAmountRaw = safeProportion(inAmount, solAmountLamports, outAmount);
+
+    if (inputAmountRaw === null) {
+      throw new Error('Fee calculation overflow or invalid');
+    }
+
+    const inputAmount = safeCeil(inputAmountRaw);
+
+    if (inputAmount === null || inputAmount <= 0) {
+      throw new Error('Invalid input amount calculated');
+    }
 
     return {
       inputAmount,
       outputAmount: solAmountLamports,
-      priceImpactPct: parseFloat(quote.priceImpactPct),
+      priceImpactPct: parseFloat(quote.priceImpactPct) || 0,
       symbol: tokenInfo.symbol,
       decimals: tokenInfo.decimals,
       route: quote,

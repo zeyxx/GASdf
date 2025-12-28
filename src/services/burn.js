@@ -14,6 +14,7 @@ const rpc = require('../utils/rpc');
 const { getHealthyPayer } = require('./fee-payer-pool');
 const pumpswap = require('./pumpswap');
 const jupiter = require('./jupiter');
+const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
 
 // Lazy-load ASDF mint to avoid startup errors in dev
 let _asdfMint = null;
@@ -75,8 +76,15 @@ async function executeBurnWithLock(totalAmount) {
   // 20% → treasury for operations (server, RPC, fee payer refill)
   // ==========================================================================
 
-  const burnAmount = Math.floor(totalAmount * config.BURN_RATIO);
-  const treasuryAmount = totalAmount - burnAmount;
+  // Validate total amount
+  const validation = validateSolanaAmount(totalAmount, 'totalAmount');
+  if (!validation.valid) {
+    logger.error('BURN', 'Invalid total amount', { error: validation.error, totalAmount });
+    return null;
+  }
+
+  // Use safe treasury split calculation (ensures no lamports lost)
+  const { burnAmount, treasuryAmount } = calculateTreasurySplit(totalAmount, config.BURN_RATIO);
 
   logger.info('BURN', 'Processing fees with 80/20 split', {
     totalAmount,

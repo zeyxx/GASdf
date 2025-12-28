@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2025-12-28
+
+### Added
+
+- **Safe Math Utilities**: Numeric overflow/underflow protection (`src/utils/safe-math.js`)
+  - `safeMul()`, `safeDiv()`, `safeAdd()`, `safeSub()` with null return on overflow
+  - `safeCeil()`, `safeFloor()` with edge case handling
+  - `clamp()` for value range enforcement
+  - `safeProportion()` for (a * b) / c with zero-division protection
+  - `calculateTreasurySplit()` ensures no lamports lost in 80/20 split
+  - `validateSolanaAmount()` for input validation
+
+### Changed
+
+- **Fee Calculation**: Now uses safe math with overflow protection
+  - Compute units clamped to Solana max (1,400,000)
+  - Fee multiplier calculations protected against overflow
+  - Returns `FEE_OVERFLOW` error instead of corrupt values
+
+- **Jupiter Integration**: Safe proportional calculations
+  - Division by zero protection on quote responses
+  - Validates inAmount/outAmount before calculation
+  - Graceful error handling for invalid quote data
+
+- **Burn Worker**: Improved treasury split precision
+  - Uses `calculateTreasurySplit()` to prevent lamport loss
+  - Validates total amount before processing
+  - Floor for burn, remainder for treasury (conservative approach)
+
+### Security
+
+- Fixed potential overflow in priority fee calculation
+- Fixed division by zero vulnerability in Jupiter fee conversion
+- Added 38 new tests for numeric edge cases
+
 ## [1.2.2] - 2025-12-28
 
 ### Added

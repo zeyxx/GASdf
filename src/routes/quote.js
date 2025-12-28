@@ -6,6 +6,7 @@ const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
 const oracle = require('../services/oracle');
 const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/fee-payer-pool');
+const { clamp, safeMul, safeCeil, MAX_COMPUTE_UNITS } = require('../utils/safe-math');
 const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
@@ -56,15 +57,38 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       });
     }
 
-    // Calculate base fee in lamports
-    const priorityFee = Math.ceil(estimatedComputeUnits * 0.000001 * 1e9);
+    // ==========================================================================
+    // NUMERIC PRECISION: Safe fee calculation with overflow protection
+    // ==========================================================================
+
+    // Clamp compute units to valid Solana range
+    const clampedCU = clamp(estimatedComputeUnits, 1, MAX_COMPUTE_UNITS);
+
+    // Priority fee: CU * micro-lamports (0.000001 SOL = 1000 lamports per 1M CU)
+    // Using safeMul to prevent overflow
+    const priorityFee = safeCeil(safeMul(clampedCU, 0.001)) || 0;
     const baseFee = config.BASE_FEE_LAMPORTS + priorityFee;
 
     // Get K-score for payment token
     const kScore = await oracle.getKScore(paymentToken);
 
-    // Apply K-score multiplier and profit margin
-    const adjustedFee = Math.ceil(baseFee * config.FEE_MULTIPLIER * kScore.feeMultiplier);
+    // Apply K-score multiplier and profit margin with overflow check
+    const feeWithMultiplier = safeMul(baseFee, config.FEE_MULTIPLIER);
+    const adjustedFeeRaw = safeMul(feeWithMultiplier, kScore.feeMultiplier);
+    const adjustedFee = safeCeil(adjustedFeeRaw);
+
+    if (adjustedFee === null || adjustedFee <= 0) {
+      logger.error('QUOTE', 'Fee calculation overflow', {
+        requestId: req.requestId,
+        baseFee,
+        multiplier: config.FEE_MULTIPLIER,
+        kScoreMultiplier: kScore.feeMultiplier,
+      });
+      return res.status(500).json({
+        error: 'Fee calculation error',
+        code: 'FEE_OVERFLOW',
+      });
+    }
 
     // Get fee amount in payment token
     const feeInToken = await jupiter.getFeeInToken(paymentToken, adjustedFee);
