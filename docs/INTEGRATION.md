@@ -1,17 +1,17 @@
 # GASdf Integration Guide
 
-> Pour gcrtrd - Intégration dans HolDex / ASDev / ASDForecast
+> For gcrtrd - Integration into HolDex / ASDev / ASDForecast
 
 ## TL;DR
 
 ```javascript
-// 3 lignes pour une transaction gasless
+// 3 lines for a gasless transaction
 const quote = await gasdf.quote(paymentToken, userWallet);
 const tx = buildTransaction(quote.feePayer, instructions);
 const result = await gasdf.submit(quote.quoteId, signedTx);
 ```
 
-**Résultat:** L'utilisateur paie en n'importe quel token, 80% burn $ASDF.
+**Result:** User pays with any token, 80% burns $ASDF.
 
 ---
 
@@ -110,12 +110,12 @@ async function executeGaslessTransaction(
 
 ---
 
-## Intégration par App
+## Integration by App
 
 ### HolDex - Gasless Token Swaps
 
 ```javascript
-// Dans ton swap handler
+// In your swap handler
 async function handleSwap(tokenIn, tokenOut, amount, userWallet) {
   // 1. Build swap instructions (Jupiter, Raydium, etc.)
   const swapIxs = await buildSwapInstructions(tokenIn, tokenOut, amount);
@@ -135,7 +135,7 @@ async function handleSwap(tokenIn, tokenOut, amount, userWallet) {
 ### ASDev - Gasless Token Launch
 
 ```javascript
-// Dans ton launch handler
+// In your launch handler
 async function handleTokenLaunch(tokenParams, userWallet) {
   // 1. Build launch instructions
   const launchIxs = await buildLaunchInstructions(tokenParams);
@@ -157,7 +157,7 @@ async function handleTokenLaunch(tokenParams, userWallet) {
 ### ASDForecast - Gasless Predictions
 
 ```javascript
-// Dans ton bet handler
+// In your bet handler
 async function handlePlaceBet(marketId, outcome, amount, userWallet) {
   // 1. Build bet instruction
   const betIx = await buildBetInstruction(marketId, outcome, amount);
@@ -165,7 +165,7 @@ async function handlePlaceBet(marketId, outcome, amount, userWallet) {
   // 2. Execute gasless - user pays with their betting token
   const result = await executeGaslessTransaction(
     userWallet,
-    USDC_MINT,  // ou le token du market
+    USDC_MINT,  // or the market's token
     [betIx]
   );
 
@@ -451,11 +451,11 @@ curl http://localhost:3000/v1/tokens
 
 ## Questions?
 
-Ping @zeyxx sur X ou ouvre une issue sur le repo.
+Ping @zeyxx on X or open an issue on the repo.
 
 ---
 
-## Le Flow Complet (Visuel)
+## Complete Flow (Visual)
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
