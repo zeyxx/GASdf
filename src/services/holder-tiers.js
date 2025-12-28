@@ -153,40 +153,72 @@ function getNextTier(currentBalance) {
 }
 
 /**
+ * Calculate minimum fee to ensure treasury breaks even
+ *
+ * Treasury receives 20% of fee, and must cover transaction costs.
+ * Formula: minFee = txCost / treasuryRatio
+ *
+ * @param {number} txCost - Estimated transaction cost in lamports
+ * @returns {number} - Minimum fee to break even
+ */
+function calculateBreakEvenFee(txCost = 5000) {
+  const TREASURY_RATIO = 0.20;
+  return Math.ceil(txCost / TREASURY_RATIO);
+}
+
+// Default break-even fee (5000 lamports tx cost → 25000 min fee)
+const DEFAULT_BREAK_EVEN_FEE = calculateBreakEvenFee(5000);
+
+/**
  * Apply tier discount to a fee amount
+ *
+ * IMPORTANT: Fee is floored at break-even point to ensure treasury neutrality.
+ * Even whales must pay enough to cover transaction costs.
+ *
  * @param {number} baseFee - Original fee in lamports
  * @param {number} discount - Discount percentage (0-0.95)
- * @returns {number} - Discounted fee in lamports
+ * @param {number} txCost - Transaction cost in lamports (for break-even calc)
+ * @returns {number} - Discounted fee in lamports (never below break-even)
  */
-function applyDiscount(baseFee, discount) {
-  if (discount <= 0) return baseFee;
-  if (discount >= 1) return Math.ceil(baseFee * 0.05); // Never less than 5%
+function applyDiscount(baseFee, discount, txCost = 5000) {
+  // Calculate break-even floor for this transaction
+  const breakEvenFee = calculateBreakEvenFee(txCost);
+
+  if (discount <= 0) return Math.max(baseFee, breakEvenFee);
+  if (discount >= 1) discount = 0.95; // Cap at 95%
 
   const discountedFee = Math.ceil(baseFee * (1 - discount));
-  // Minimum fee: 500 lamports (0.0000005 SOL)
-  return Math.max(discountedFee, 500);
+
+  // Floor at break-even to ensure treasury neutrality
+  return Math.max(discountedFee, breakEvenFee);
 }
 
 /**
  * Calculate fee with holder discount
  * @param {string} walletAddress - User's wallet public key
  * @param {number} baseFee - Original fee in lamports
+ * @param {number} txCost - Estimated transaction cost (for break-even floor)
  * @returns {Promise<Object>} - Fee info with tier and discount applied
  */
-async function calculateDiscountedFee(walletAddress, baseFee) {
+async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
   const tierInfo = await getHolderTier(walletAddress);
-  const discountedFee = applyDiscount(baseFee, tierInfo.discount);
+  const breakEvenFee = calculateBreakEvenFee(txCost);
+  const discountedFee = applyDiscount(baseFee, tierInfo.discount, txCost);
   const savings = baseFee - discountedFee;
+  const actualDiscount = baseFee > 0 ? Math.round((savings / baseFee) * 100) : 0;
 
   return {
     originalFee: baseFee,
     discountedFee,
+    breakEvenFee,
     savings,
-    savingsPercent: tierInfo.discountPercent,
+    savingsPercent: actualDiscount, // Actual discount after break-even floor
+    maxDiscountPercent: tierInfo.discountPercent, // Tier's max discount
     tier: tierInfo.tier,
     tierEmoji: tierInfo.emoji,
     balance: tierInfo.balance,
     nextTier: tierInfo.nextTier,
+    isAtBreakEven: discountedFee === breakEvenFee, // True if floored at break-even
   };
 }
 
@@ -215,8 +247,10 @@ module.exports = {
   getTierForBalance,
   applyDiscount,
   calculateDiscountedFee,
+  calculateBreakEvenFee,
   clearCache,
   getAllTiers,
   TIERS,
   ASDF_DECIMALS,
+  DEFAULT_BREAK_EVEN_FEE,
 };

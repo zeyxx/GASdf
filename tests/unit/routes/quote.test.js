@@ -45,13 +45,16 @@ jest.mock('../../../src/services/oracle', () => ({
 jest.mock('../../../src/services/holder-tiers', () => ({
   calculateDiscountedFee: jest.fn().mockResolvedValue({
     originalFee: 6000,
-    discountedFee: 6000,
-    savings: 0,
+    discountedFee: 25000, // Floored at break-even
+    breakEvenFee: 25000,
+    savings: -19000, // 6000 - 25000
     savingsPercent: 0,
+    maxDiscountPercent: 0,
     tier: 'NORMIE',
     tierEmoji: '👤',
     balance: 0,
     nextTier: { name: 'HOLDER', minHolding: 10000, needed: 10000 },
+    isAtBreakEven: true,
   }),
 }));
 

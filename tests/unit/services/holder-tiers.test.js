@@ -31,9 +31,11 @@ const {
   getTierForBalance,
   applyDiscount,
   calculateDiscountedFee,
+  calculateBreakEvenFee,
   getAllTiers,
   clearCache,
   TIERS,
+  DEFAULT_BREAK_EVEN_FEE,
 } = require('../../../src/services/holder-tiers');
 const { getConnection } = require('../../../src/utils/rpc');
 
@@ -112,57 +114,70 @@ describe('Holder Tiers Service', () => {
     });
   });
 
-  describe('applyDiscount()', () => {
-    const baseFee = 10000; // 10k lamports
+  describe('calculateBreakEvenFee()', () => {
+    it('should calculate break-even fee based on treasury ratio', () => {
+      // txCost / 0.20 = break-even
+      expect(calculateBreakEvenFee(5000)).toBe(25000);
+      expect(calculateBreakEvenFee(10000)).toBe(50000);
+      expect(calculateBreakEvenFee(1000)).toBe(5000);
+    });
 
-    it('should return base fee for 0% discount', () => {
-      expect(applyDiscount(baseFee, 0)).toBe(10000);
+    it('should have correct default break-even fee', () => {
+      expect(DEFAULT_BREAK_EVEN_FEE).toBe(25000); // 5000 / 0.20
+    });
+  });
+
+  describe('applyDiscount()', () => {
+    // Use high base fee to see discounts before hitting break-even
+    const highBaseFee = 100000; // 100k lamports
+    const lowBaseFee = 10000; // 10k lamports
+    const defaultTxCost = 5000;
+
+    it('should return base fee for 0% discount (above break-even)', () => {
+      expect(applyDiscount(highBaseFee, 0, defaultTxCost)).toBe(100000);
     });
 
     it('should apply 25% discount correctly', () => {
-      expect(applyDiscount(baseFee, 0.25)).toBe(7500);
+      // 100000 * 0.75 = 75000 > break-even (25000)
+      expect(applyDiscount(highBaseFee, 0.25, defaultTxCost)).toBe(75000);
     });
 
     it('should apply 50% discount correctly', () => {
-      expect(applyDiscount(baseFee, 0.50)).toBe(5000);
+      // 100000 * 0.50 = 50000 > break-even (25000)
+      expect(applyDiscount(highBaseFee, 0.50, defaultTxCost)).toBe(50000);
     });
 
-    it('should apply 70% discount correctly (ceil rounding)', () => {
-      // 10000 * 0.30 = 3000, ceil = 3001 due to floating point
-      const result = applyDiscount(baseFee, 0.70);
-      expect(result).toBeGreaterThanOrEqual(3000);
-      expect(result).toBeLessThanOrEqual(3002);
+    it('should floor at break-even when discount would go below', () => {
+      // 10000 * 0.05 = 500 < break-even (25000)
+      // Should floor at 25000
+      expect(applyDiscount(lowBaseFee, 0.95, defaultTxCost)).toBe(25000);
     });
 
-    it('should apply 85% discount correctly (ceil rounding)', () => {
-      // 10000 * 0.15 = 1500, ceil = 1501 due to floating point
-      const result = applyDiscount(baseFee, 0.85);
-      expect(result).toBeGreaterThanOrEqual(1500);
-      expect(result).toBeLessThanOrEqual(1502);
+    it('should floor at break-even for any base fee below break-even', () => {
+      // Base fee 10000 < break-even 25000, so always return break-even
+      expect(applyDiscount(lowBaseFee, 0, defaultTxCost)).toBe(25000);
+      expect(applyDiscount(lowBaseFee, 0.50, defaultTxCost)).toBe(25000);
     });
 
-    it('should apply 95% discount correctly (ceil rounding)', () => {
-      // 10000 * 0.05 = 500, ceil may be 501 due to floating point
-      const result = applyDiscount(baseFee, 0.95);
-      expect(result).toBeGreaterThanOrEqual(500);
-      expect(result).toBeLessThanOrEqual(502);
+    it('should use custom txCost for break-even calculation', () => {
+      // txCost 1000 → break-even 5000
+      expect(applyDiscount(10000, 0.95, 1000)).toBe(5000);
+      // txCost 10000 → break-even 50000
+      expect(applyDiscount(100000, 0.95, 10000)).toBe(50000);
     });
 
-    it('should never go below 500 lamports minimum', () => {
-      expect(applyDiscount(100, 0.95)).toBe(500);
-      expect(applyDiscount(50, 0.95)).toBe(500);
+    it('should cap discount at 95%', () => {
+      // 100% discount should be capped at 95%
+      // 100000 * 0.05 = 5000 < break-even (25000)
+      expect(applyDiscount(highBaseFee, 1.0, defaultTxCost)).toBe(25000);
     });
 
-    it('should cap at 5% minimum fee for 100%+ discount', () => {
-      expect(applyDiscount(10000, 1.0)).toBe(500);
-      expect(applyDiscount(10000, 1.5)).toBe(500);
-    });
-
-    it('should round up discounted fees', () => {
-      // 10000 * 0.74 = 2600, ceil = 2600
-      expect(applyDiscount(10000, 0.74)).toBe(2600);
-      // 10000 * 0.333 = 3330, ceil = 3330
-      expect(applyDiscount(10000, 0.667)).toBe(3330);
+    it('should allow full discount when above break-even', () => {
+      // Very high base fee: 500000 * 0.05 = 25000 ≈ break-even
+      // May be 25001 due to floating point ceil
+      const result = applyDiscount(500000, 0.95, defaultTxCost);
+      expect(result).toBeGreaterThanOrEqual(25000);
+      expect(result).toBeLessThanOrEqual(25002);
     });
   });
 
@@ -172,35 +187,41 @@ describe('Holder Tiers Service', () => {
     // Full integration testing would require actual RPC mocking
 
     it('should return fee info with tier details', async () => {
-      const result = await calculateDiscountedFee('TestWallet123', 10000);
+      const result = await calculateDiscountedFee('TestWallet123', 100000, 5000);
 
       // Should have all expected fields
       expect(result).toHaveProperty('originalFee');
       expect(result).toHaveProperty('discountedFee');
+      expect(result).toHaveProperty('breakEvenFee');
       expect(result).toHaveProperty('savings');
       expect(result).toHaveProperty('tier');
       expect(result).toHaveProperty('tierEmoji');
       expect(result).toHaveProperty('balance');
+      expect(result).toHaveProperty('isAtBreakEven');
     });
 
-    it('should return full fee when balance lookup fails', async () => {
+    it('should return break-even fee when balance lookup fails', async () => {
       // When RPC fails, should default to NORMIE (0 discount)
-      const result = await calculateDiscountedFee('NonExistentWallet', 10000);
+      // But fee is floored at break-even (25000)
+      const result = await calculateDiscountedFee('NonExistentWallet', 10000, 5000);
 
       expect(result.originalFee).toBe(10000);
-      expect(result.discountedFee).toBe(10000);
-      expect(result.savings).toBe(0);
+      expect(result.discountedFee).toBe(25000); // Floored at break-even
+      expect(result.breakEvenFee).toBe(25000);
       expect(result.tier).toBe('NORMIE');
+      expect(result.isAtBreakEven).toBe(true);
     });
 
-    it('should calculate savings correctly', async () => {
-      const result = await calculateDiscountedFee('TestWallet', 10000);
+    it('should calculate savings correctly (can be negative if floored)', async () => {
+      const result = await calculateDiscountedFee('TestWallet', 10000, 5000);
       expect(result.savings).toBe(result.originalFee - result.discountedFee);
+      // Savings is negative because fee was floored up to break-even
+      expect(result.savings).toBe(-15000); // 10000 - 25000
     });
 
     it('should include next tier info for non-whale tiers', async () => {
       // For NORMIE, next tier should be HOLDER
-      const result = await calculateDiscountedFee('TestWallet', 10000);
+      const result = await calculateDiscountedFee('TestWallet', 100000, 5000);
 
       if (result.tier !== 'WHALE') {
         expect(result.nextTier).toBeDefined();
@@ -208,6 +229,17 @@ describe('Holder Tiers Service', () => {
         expect(result.nextTier).toHaveProperty('minHolding');
         expect(result.nextTier).toHaveProperty('needed');
       }
+    });
+
+    it('should correctly indicate when at break-even floor', async () => {
+      // Low base fee should floor at break-even
+      const lowFeeResult = await calculateDiscountedFee('TestWallet', 10000, 5000);
+      expect(lowFeeResult.isAtBreakEven).toBe(true);
+
+      // High base fee should not floor
+      const highFeeResult = await calculateDiscountedFee('TestWallet', 100000, 5000);
+      expect(highFeeResult.isAtBreakEven).toBe(false);
+      expect(highFeeResult.discountedFee).toBe(100000); // NORMIE, no discount
     });
   });
 
@@ -249,10 +281,28 @@ describe('Holder Tiers Service', () => {
       }
     });
 
-    it('should ensure minimum fee is 500 lamports for any discount level', () => {
-      // Even with 100% discount on a tiny fee, min should be 500
-      expect(applyDiscount(100, 0.95)).toBe(500);
-      expect(applyDiscount(1000, 0.95)).toBe(500);
+    it('should floor at break-even fee for treasury neutrality', () => {
+      // With 5000 tx cost, break-even is 25000
+      // Any fee must be at least 25000 to ensure treasury covers tx cost
+      expect(applyDiscount(100, 0.95, 5000)).toBe(25000);
+      expect(applyDiscount(1000, 0.95, 5000)).toBe(25000);
+      expect(applyDiscount(10000, 0.95, 5000)).toBe(25000);
+    });
+
+    it('should ensure treasury always covers transaction costs', () => {
+      const txCost = 5000;
+      const breakEven = calculateBreakEvenFee(txCost);
+      const treasuryPortion = breakEven * 0.20;
+
+      // Treasury portion should exactly cover tx cost
+      expect(treasuryPortion).toBe(txCost);
+    });
+
+    it('should scale break-even with transaction complexity', () => {
+      // Simple tx: 2500 cost → 12500 min fee
+      expect(applyDiscount(5000, 0.95, 2500)).toBe(12500);
+      // Complex tx: 10000 cost → 50000 min fee
+      expect(applyDiscount(20000, 0.95, 10000)).toBe(50000);
     });
   });
 });

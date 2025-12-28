@@ -93,9 +93,11 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     }
 
     // =========================================================================
-    // HOLDER TIER: Apply $ASDF holder discount
+    // HOLDER TIER: Apply $ASDF holder discount (floored at break-even)
     // =========================================================================
-    const tierInfo = await calculateDiscountedFee(userPubkey, baseAdjustedFee);
+    // Estimate transaction cost based on compute units
+    const estimatedTxCost = config.BASE_FEE_LAMPORTS + priorityFee;
+    const tierInfo = await calculateDiscountedFee(userPubkey, baseAdjustedFee, estimatedTxCost);
     const adjustedFee = tierInfo.discountedFee;
 
     // Get fee amount in payment token
@@ -227,9 +229,12 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         tier: tierInfo.tier,
         emoji: tierInfo.tierEmoji,
         discountPercent: tierInfo.savingsPercent,
+        maxDiscountPercent: tierInfo.maxDiscountPercent,
         savings: tierInfo.savings,
         asdfBalance: tierInfo.balance,
         nextTier: tierInfo.nextTier,
+        breakEvenFee: tierInfo.breakEvenFee,
+        isAtBreakEven: tierInfo.isAtBreakEven,
       },
       expiresAt,
       ttl,
