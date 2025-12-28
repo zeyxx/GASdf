@@ -1,6 +1,6 @@
 {
   "name": "@gasdf/sdk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "GASdf SDK - Add gasless transactions to your Solana app",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -34,8 +34,20 @@
     "sdk",
     "react"
   ],
-  "author": "",
+  "author": "GASdf",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeyxx/GASdf.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/zeyxx/GASdf#readme",
+  "bugs": {
+    "url": "https://github.com/zeyxx/GASdf/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@solana/web3.js": "^1.87.0",
     "@solana/wallet-adapter-react": "^0.15.0",
