@@ -52,6 +52,7 @@ jest.mock('../../../src/services/validator', () => ({
     feePayer: 'FeePayerPubkey111111111111111111111111111111',
   }),
   validateTransactionSize: jest.fn().mockReturnValue({ valid: true, size: 500 }),
+  validateFeePayment: jest.fn().mockResolvedValue({ valid: true }),
   getTransactionBlockhash: jest.fn().mockReturnValue('blockhash123'),
   computeTransactionHash: jest.fn().mockReturnValue('txhash456'),
 }));

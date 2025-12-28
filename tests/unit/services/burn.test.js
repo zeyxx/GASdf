@@ -365,7 +365,7 @@ describe('Burn Service', () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result).toBeNull();
-      expect(logger.warn).toHaveBeenCalledWith('BURN', 'No ASDF to burn');
+      expect(logger.warn).toHaveBeenCalledWith('BURN', 'No ASDF to burn after swap');
     });
 
     it('should return null when getting balance fails', async () => {
