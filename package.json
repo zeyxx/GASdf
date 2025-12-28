@@ -1,6 +1,6 @@
 {
   "name": "gasdf",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Gasless transactions for Solana. Pay fees with any token. Fees burn $ASDF.",
   "main": "src/index.js",
   "scripts": {
