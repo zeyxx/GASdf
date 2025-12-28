@@ -114,8 +114,9 @@ router.get('/tiers/:wallet', async (req, res) => {
       tier: tierInfo.tier,
       emoji: tierInfo.emoji,
       asdfBalance: tierInfo.balance,
+      sharePercent: tierInfo.sharePercent,
+      circulating: tierInfo.circulating,
       discountPercent: tierInfo.discountPercent,
-      nextTier: tierInfo.nextTier,
     });
   } catch (error) {
     logger.error('TOKENS', 'Tier lookup failed', { wallet: req.params.wallet, error: error.message });

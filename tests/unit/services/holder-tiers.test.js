@@ -1,5 +1,5 @@
 /**
- * Holder Tiers Service Tests
+ * Holder Tiers Service Tests - Supply-Based Discount System
  */
 
 // Mock dependencies first
@@ -11,6 +11,7 @@ jest.mock('../../../src/utils/config', () => ({
 jest.mock('../../../src/utils/rpc', () => ({
   getConnection: jest.fn().mockReturnValue({
     getTokenAccountBalance: jest.fn(),
+    getTokenSupply: jest.fn(),
   }),
 }));
 
@@ -28,89 +29,111 @@ jest.mock('@solana/spl-token', () => ({
 }));
 
 const {
-  getTierForBalance,
+  calculateDiscountFromShare,
   applyDiscount,
   calculateDiscountedFee,
   calculateBreakEvenFee,
   getAllTiers,
+  getTierName,
   clearCache,
-  TIERS,
-  DEFAULT_BREAK_EVEN_FEE,
+  setCirculatingSupply,
+  ORIGINAL_SUPPLY,
 } = require('../../../src/services/holder-tiers');
 const { getConnection } = require('../../../src/utils/rpc');
 
-describe('Holder Tiers Service', () => {
+describe('Holder Tiers Service - Supply-Based Discount', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearCache();
   });
 
-  describe('TIERS', () => {
-    it('should have 6 tiers defined', () => {
-      expect(TIERS).toHaveLength(6);
+  describe('calculateDiscountFromShare()', () => {
+    // Formula: discount = min(95%, max(0, (log₁₀(share) + 5) / 3))
+
+    it('should return 0 for 0 share', () => {
+      expect(calculateDiscountFromShare(0)).toBe(0);
     });
 
-    it('should have tiers in descending order', () => {
-      for (let i = 0; i < TIERS.length - 1; i++) {
-        expect(TIERS[i].minHolding).toBeGreaterThan(TIERS[i + 1].minHolding);
-      }
+    it('should return 0 for negative share', () => {
+      expect(calculateDiscountFromShare(-0.001)).toBe(0);
     });
 
-    it('should have NORMIE as lowest tier with 0 holding', () => {
-      const normie = TIERS[TIERS.length - 1];
-      expect(normie.name).toBe('NORMIE');
-      expect(normie.minHolding).toBe(0);
-      expect(normie.discount).toBe(0);
+    it('should return 0% for 0.001% share (10⁻⁵)', () => {
+      // log₁₀(0.00001) = -5, (-5 + 5) / 3 = 0
+      const share = 0.00001; // 0.001%
+      expect(calculateDiscountFromShare(share)).toBeCloseTo(0, 5);
     });
 
-    it('should have WHALE as highest tier', () => {
-      const whale = TIERS[0];
-      expect(whale.name).toBe('WHALE');
-      expect(whale.minHolding).toBe(5_000_000);
-      expect(whale.discount).toBe(0.95);
+    it('should return ~33% for 0.01% share (10⁻⁴)', () => {
+      // log₁₀(0.0001) = -4, (-4 + 5) / 3 = 0.333...
+      const share = 0.0001; // 0.01%
+      expect(calculateDiscountFromShare(share)).toBeCloseTo(0.333, 2);
+    });
+
+    it('should return ~67% for 0.1% share (10⁻³)', () => {
+      // log₁₀(0.001) = -3, (-3 + 5) / 3 = 0.666...
+      const share = 0.001; // 0.1%
+      expect(calculateDiscountFromShare(share)).toBeCloseTo(0.667, 2);
+    });
+
+    it('should cap at 95% for 1% share (10⁻²)', () => {
+      // log₁₀(0.01) = -2, (-2 + 5) / 3 = 1.0 → capped at 0.95
+      const share = 0.01; // 1%
+      expect(calculateDiscountFromShare(share)).toBe(0.95);
+    });
+
+    it('should cap at 95% for shares above 1%', () => {
+      expect(calculateDiscountFromShare(0.1)).toBe(0.95);  // 10%
+      expect(calculateDiscountFromShare(0.5)).toBe(0.95);  // 50%
+      expect(calculateDiscountFromShare(1.0)).toBe(0.95);  // 100%
+    });
+
+    it('should handle intermediate values correctly', () => {
+      // 0.003% share = 0.00003
+      // log₁₀(0.00003) ≈ -4.52, (-4.52 + 5) / 3 ≈ 0.16
+      const share = 0.00003;
+      const discount = calculateDiscountFromShare(share);
+      expect(discount).toBeGreaterThan(0);
+      expect(discount).toBeLessThan(0.33);
     });
   });
 
-  describe('getTierForBalance()', () => {
-    it('should return NORMIE for 0 balance', () => {
-      const tier = getTierForBalance(0);
-      expect(tier.name).toBe('NORMIE');
-      expect(tier.discount).toBe(0);
+  describe('getTierName()', () => {
+    it('should return NORMIE for 0% share', () => {
+      expect(getTierName(0).name).toBe('NORMIE');
+      expect(getTierName(0).emoji).toBe('👤');
     });
 
-    it('should return HOLDER for 10k-100k balance', () => {
-      expect(getTierForBalance(10000).name).toBe('HOLDER');
-      expect(getTierForBalance(50000).name).toBe('HOLDER');
-      expect(getTierForBalance(99999).name).toBe('HOLDER');
+    it('should return HOLDER for 0.001%-0.01% share', () => {
+      expect(getTierName(0.001).name).toBe('HOLDER');
+      expect(getTierName(0.005).name).toBe('HOLDER');
+      expect(getTierName(0.009).name).toBe('HOLDER');
     });
 
-    it('should return BELIEVER for 100k-500k balance', () => {
-      expect(getTierForBalance(100000).name).toBe('BELIEVER');
-      expect(getTierForBalance(250000).name).toBe('BELIEVER');
-      expect(getTierForBalance(499999).name).toBe('BELIEVER');
+    it('should return BELIEVER for 0.01%-0.1% share', () => {
+      expect(getTierName(0.01).name).toBe('BELIEVER');
+      expect(getTierName(0.05).name).toBe('BELIEVER');
+      expect(getTierName(0.099).name).toBe('BELIEVER');
     });
 
-    it('should return DEGEN for 500k-1M balance', () => {
-      expect(getTierForBalance(500000).name).toBe('DEGEN');
-      expect(getTierForBalance(750000).name).toBe('DEGEN');
-      expect(getTierForBalance(999999).name).toBe('DEGEN');
+    it('should return OG for 0.1%-1% share', () => {
+      expect(getTierName(0.1).name).toBe('OG');
+      expect(getTierName(0.5).name).toBe('OG');
+      expect(getTierName(0.99).name).toBe('OG');
     });
 
-    it('should return OG for 1M-5M balance', () => {
-      expect(getTierForBalance(1000000).name).toBe('OG');
-      expect(getTierForBalance(3000000).name).toBe('OG');
-      expect(getTierForBalance(4999999).name).toBe('OG');
+    it('should return WHALE for 1%+ share', () => {
+      expect(getTierName(1).name).toBe('WHALE');
+      expect(getTierName(5).name).toBe('WHALE');
+      expect(getTierName(10).name).toBe('WHALE');
     });
 
-    it('should return WHALE for 5M+ balance', () => {
-      expect(getTierForBalance(5000000).name).toBe('WHALE');
-      expect(getTierForBalance(10000000).name).toBe('WHALE');
-      expect(getTierForBalance(100000000).name).toBe('WHALE');
-    });
-
-    it('should return NORMIE for balance below 10k', () => {
-      expect(getTierForBalance(5000).name).toBe('NORMIE');
-      expect(getTierForBalance(9999).name).toBe('NORMIE');
+    it('should include correct emojis', () => {
+      expect(getTierName(1).emoji).toBe('🐋');
+      expect(getTierName(0.1).emoji).toBe('👑');
+      expect(getTierName(0.01).emoji).toBe('💎');
+      expect(getTierName(0.001).emoji).toBe('🙌');
+      expect(getTierName(0).emoji).toBe('👤');
     });
   });
 
@@ -122,15 +145,15 @@ describe('Holder Tiers Service', () => {
       expect(calculateBreakEvenFee(1000)).toBe(5000);
     });
 
-    it('should have correct default break-even fee', () => {
-      expect(DEFAULT_BREAK_EVEN_FEE).toBe(25000); // 5000 / 0.20
+    it('should round up for non-integer results', () => {
+      // 5001 / 0.20 = 25005
+      expect(calculateBreakEvenFee(5001)).toBe(25005);
     });
   });
 
   describe('applyDiscount()', () => {
-    // Use high base fee to see discounts before hitting break-even
     const highBaseFee = 100000; // 100k lamports
-    const lowBaseFee = 10000; // 10k lamports
+    const lowBaseFee = 10000;   // 10k lamports
     const defaultTxCost = 5000;
 
     it('should return base fee for 0% discount (above break-even)', () => {
@@ -149,12 +172,10 @@ describe('Holder Tiers Service', () => {
 
     it('should floor at break-even when discount would go below', () => {
       // 10000 * 0.05 = 500 < break-even (25000)
-      // Should floor at 25000
       expect(applyDiscount(lowBaseFee, 0.95, defaultTxCost)).toBe(25000);
     });
 
     it('should floor at break-even for any base fee below break-even', () => {
-      // Base fee 10000 < break-even 25000, so always return break-even
       expect(applyDiscount(lowBaseFee, 0, defaultTxCost)).toBe(25000);
       expect(applyDiscount(lowBaseFee, 0.50, defaultTxCost)).toBe(25000);
     });
@@ -166,15 +187,8 @@ describe('Holder Tiers Service', () => {
       expect(applyDiscount(100000, 0.95, 10000)).toBe(50000);
     });
 
-    it('should cap discount at 95%', () => {
-      // 100% discount should be capped at 95%
-      // 100000 * 0.05 = 5000 < break-even (25000)
-      expect(applyDiscount(highBaseFee, 1.0, defaultTxCost)).toBe(25000);
-    });
-
-    it('should allow full discount when above break-even', () => {
-      // Very high base fee: 500000 * 0.05 = 25000 ≈ break-even
-      // May be 25001 due to floating point ceil
+    it('should allow full 95% discount when above break-even', () => {
+      // 500000 * 0.05 = 25000 = break-even
       const result = applyDiscount(500000, 0.95, defaultTxCost);
       expect(result).toBeGreaterThanOrEqual(25000);
       expect(result).toBeLessThanOrEqual(25002);
@@ -182,14 +196,20 @@ describe('Holder Tiers Service', () => {
   });
 
   describe('calculateDiscountedFee()', () => {
-    // Note: Due to module caching and mock timing, these tests verify
-    // the function handles errors gracefully (returns NORMIE tier)
-    // Full integration testing would require actual RPC mocking
+    beforeEach(() => {
+      // Set up mock for circulating supply
+      setCirculatingSupply(930_000_000); // 930M (7% burned)
 
-    it('should return fee info with tier details', async () => {
+      // Mock balance lookup to return 0 (NORMIE)
+      const mockConnection = getConnection();
+      mockConnection.getTokenAccountBalance.mockRejectedValue(
+        new Error('could not find account')
+      );
+    });
+
+    it('should return fee info with all required fields', async () => {
       const result = await calculateDiscountedFee('TestWallet123', 100000, 5000);
 
-      // Should have all expected fields
       expect(result).toHaveProperty('originalFee');
       expect(result).toHaveProperty('discountedFee');
       expect(result).toHaveProperty('breakEvenFee');
@@ -197,63 +217,67 @@ describe('Holder Tiers Service', () => {
       expect(result).toHaveProperty('tier');
       expect(result).toHaveProperty('tierEmoji');
       expect(result).toHaveProperty('balance');
+      expect(result).toHaveProperty('circulating');
+      expect(result).toHaveProperty('sharePercent');
       expect(result).toHaveProperty('isAtBreakEven');
     });
 
-    it('should return break-even fee when balance lookup fails', async () => {
-      // When RPC fails, should default to NORMIE (0 discount)
-      // But fee is floored at break-even (25000)
-      const result = await calculateDiscountedFee('NonExistentWallet', 10000, 5000);
+    it('should return NORMIE tier when balance lookup fails', async () => {
+      const result = await calculateDiscountedFee('NonExistentWallet', 100000, 5000);
 
-      expect(result.originalFee).toBe(10000);
-      expect(result.discountedFee).toBe(25000); // Floored at break-even
-      expect(result.breakEvenFee).toBe(25000);
       expect(result.tier).toBe('NORMIE');
+      expect(result.balance).toBe(0);
+      expect(result.sharePercent).toBe(0);
+    });
+
+    it('should apply break-even floor for low base fees', async () => {
+      const result = await calculateDiscountedFee('TestWallet', 10000, 5000);
+
+      expect(result.breakEvenFee).toBe(25000);
+      expect(result.discountedFee).toBe(25000);
       expect(result.isAtBreakEven).toBe(true);
     });
 
-    it('should calculate savings correctly (can be negative if floored)', async () => {
-      const result = await calculateDiscountedFee('TestWallet', 10000, 5000);
-      expect(result.savings).toBe(result.originalFee - result.discountedFee);
-      // Savings is negative because fee was floored up to break-even
-      expect(result.savings).toBe(-15000); // 10000 - 25000
-    });
-
-    it('should include next tier info for non-whale tiers', async () => {
-      // For NORMIE, next tier should be HOLDER
+    it('should not floor high base fees for NORMIE', async () => {
       const result = await calculateDiscountedFee('TestWallet', 100000, 5000);
 
-      if (result.tier !== 'WHALE') {
-        expect(result.nextTier).toBeDefined();
-        expect(result.nextTier).toHaveProperty('name');
-        expect(result.nextTier).toHaveProperty('minHolding');
-        expect(result.nextTier).toHaveProperty('needed');
-      }
+      expect(result.discountedFee).toBe(100000); // No discount for NORMIE
+      expect(result.isAtBreakEven).toBe(false);
     });
 
-    it('should correctly indicate when at break-even floor', async () => {
-      // Low base fee should floor at break-even
-      const lowFeeResult = await calculateDiscountedFee('TestWallet', 10000, 5000);
-      expect(lowFeeResult.isAtBreakEven).toBe(true);
+    it('should calculate savings correctly', async () => {
+      const result = await calculateDiscountedFee('TestWallet', 100000, 5000);
+      expect(result.savings).toBe(result.originalFee - result.discountedFee);
+    });
 
-      // High base fee should not floor
-      const highFeeResult = await calculateDiscountedFee('TestWallet', 100000, 5000);
-      expect(highFeeResult.isAtBreakEven).toBe(false);
-      expect(highFeeResult.discountedFee).toBe(100000); // NORMIE, no discount
+    it('should include circulating supply info', async () => {
+      const result = await calculateDiscountedFee('TestWallet', 100000, 5000);
+      expect(result.circulating).toBe(930_000_000);
     });
   });
 
   describe('getAllTiers()', () => {
-    it('should return all tiers with required fields', () => {
+    it('should return 5 tiers with required fields', () => {
       const tiers = getAllTiers();
 
-      expect(tiers).toHaveLength(6);
+      expect(tiers).toHaveLength(5);
       tiers.forEach((tier) => {
         expect(tier).toHaveProperty('name');
         expect(tier).toHaveProperty('emoji');
-        expect(tier).toHaveProperty('minHolding');
+        expect(tier).toHaveProperty('minSharePercent');
         expect(tier).toHaveProperty('discountPercent');
       });
+    });
+
+    it('should have correct tier structure', () => {
+      const tiers = getAllTiers();
+      const tierNames = tiers.map(t => t.name);
+
+      expect(tierNames).toContain('WHALE');
+      expect(tierNames).toContain('OG');
+      expect(tierNames).toContain('BELIEVER');
+      expect(tierNames).toContain('HOLDER');
+      expect(tierNames).toContain('NORMIE');
     });
 
     it('should have correct discount percentages', () => {
@@ -261,29 +285,32 @@ describe('Holder Tiers Service', () => {
 
       const whale = tiers.find((t) => t.name === 'WHALE');
       expect(whale.discountPercent).toBe(95);
+      expect(whale.minSharePercent).toBe(1);
 
       const normie = tiers.find((t) => t.name === 'NORMIE');
       expect(normie.discountPercent).toBe(0);
+      expect(normie.minSharePercent).toBe(0);
     });
   });
 
   describe('Economic Sustainability', () => {
     it('should always have minimum 5% fee contribution from whales', () => {
-      const whaleTier = TIERS.find((t) => t.name === 'WHALE');
-      const minContribution = 1 - whaleTier.discount;
-      expect(minContribution).toBeGreaterThanOrEqual(0.05);
+      // Max discount is 95%, so min contribution is 5%
+      const maxDiscount = calculateDiscountFromShare(1.0); // 100% of supply
+      expect(1 - maxDiscount).toBeGreaterThanOrEqual(0.05);
     });
 
-    it('should have progressively higher discounts for higher tiers', () => {
-      const sortedTiers = [...TIERS].sort((a, b) => a.minHolding - b.minHolding);
-      for (let i = 1; i < sortedTiers.length; i++) {
-        expect(sortedTiers[i].discount).toBeGreaterThan(sortedTiers[i - 1].discount);
+    it('should have progressively higher discounts for higher shares', () => {
+      const shares = [0.00001, 0.0001, 0.001, 0.01];
+      const discounts = shares.map(s => calculateDiscountFromShare(s));
+
+      for (let i = 1; i < discounts.length; i++) {
+        expect(discounts[i]).toBeGreaterThan(discounts[i - 1]);
       }
     });
 
     it('should floor at break-even fee for treasury neutrality', () => {
       // With 5000 tx cost, break-even is 25000
-      // Any fee must be at least 25000 to ensure treasury covers tx cost
       expect(applyDiscount(100, 0.95, 5000)).toBe(25000);
       expect(applyDiscount(1000, 0.95, 5000)).toBe(25000);
       expect(applyDiscount(10000, 0.95, 5000)).toBe(25000);
@@ -303,6 +330,48 @@ describe('Holder Tiers Service', () => {
       expect(applyDiscount(5000, 0.95, 2500)).toBe(12500);
       // Complex tx: 10000 cost → 50000 min fee
       expect(applyDiscount(20000, 0.95, 10000)).toBe(50000);
+    });
+  });
+
+  describe('Deflationary Flywheel', () => {
+    it('should increase discount as supply decreases', () => {
+      const holding = 1_000_000; // 1M tokens
+
+      // With 1B supply: 0.1% share → ~67% discount
+      const share1B = holding / 1_000_000_000;
+      const discount1B = calculateDiscountFromShare(share1B);
+
+      // With 500M supply (50% burned): 0.2% share → higher discount
+      const share500M = holding / 500_000_000;
+      const discount500M = calculateDiscountFromShare(share500M);
+
+      expect(discount500M).toBeGreaterThan(discount1B);
+    });
+
+    it('should double effective share when supply halves', () => {
+      const holding = 1_000_000; // 1M tokens
+
+      const share1B = holding / 1_000_000_000;    // 0.1%
+      const share500M = holding / 500_000_000;    // 0.2%
+
+      expect(share500M).toBeCloseTo(share1B * 2, 10);
+    });
+
+    it('should maintain same discount for same % of supply', () => {
+      // 0.1% of 1B = 1M tokens
+      // 0.1% of 500M = 500K tokens
+      // Both should have same discount
+
+      const share = 0.001; // 0.1%
+      const discount = calculateDiscountFromShare(share);
+
+      expect(discount).toBeCloseTo(0.667, 2);
+    });
+  });
+
+  describe('Constants', () => {
+    it('should have correct original supply', () => {
+      expect(ORIGINAL_SUPPLY).toBe(1_000_000_000);
     });
   });
 });
