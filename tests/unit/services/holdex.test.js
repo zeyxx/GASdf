@@ -94,6 +94,50 @@ describe('HolDex Service', () => {
     });
   });
 
+  describe('getCreditRating()', () => {
+    it('should return A1 for score >= 90', () => {
+      const rating = holdex.getCreditRating(95);
+      expect(rating.grade).toBe('A1');
+      expect(rating.label).toBe('Prime Quality');
+      expect(rating.risk).toBe('minimal');
+    });
+
+    it('should return A2 for score >= 80', () => {
+      const rating = holdex.getCreditRating(85);
+      expect(rating.grade).toBe('A2');
+      expect(rating.risk).toBe('very_low');
+    });
+
+    it('should return B1 for score >= 60', () => {
+      const rating = holdex.getCreditRating(65);
+      expect(rating.grade).toBe('B1');
+      expect(rating.risk).toBe('moderate');
+    });
+
+    it('should return D for score < 20', () => {
+      const rating = holdex.getCreditRating(10);
+      expect(rating.grade).toBe('D');
+      expect(rating.label).toBe('Default');
+      expect(rating.risk).toBe('extreme');
+    });
+
+    it('should apply trajectory bonus for improving', () => {
+      const stable = holdex.getCreditRating(87); // A2 normally
+      const improving = holdex.getCreditRating(87, 'improving'); // +5 = 92 -> A1
+      expect(stable.grade).toBe('A2');
+      expect(improving.grade).toBe('A1');
+      expect(improving.outlook).toBe('positive');
+    });
+
+    it('should apply trajectory malus for declining', () => {
+      const stable = holdex.getCreditRating(92); // A1 normally
+      const declining = holdex.getCreditRating(92, 'declining'); // -5 = 87 -> A2
+      expect(stable.grade).toBe('A1');
+      expect(declining.grade).toBe('A2');
+      expect(declining.outlook).toBe('negative');
+    });
+  });
+
   describe('getToken()', () => {
     const testMint = 'TestMint111111111111111111111111111111111111';
 

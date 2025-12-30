@@ -5,6 +5,7 @@
  * - Community verification (hasCommunityUpdate)
  * - K-score calculation with conviction analysis
  * - Metal rank tiers (Diamond/Platinum/Gold/Silver/Bronze/Rust)
+ * - Credit rating system (A1-D grades)
  *
  * Metal Ranks:
  *   💎 Diamond  = K-score 90+ (level 6)
@@ -13,6 +14,16 @@
  *   🥈 Silver   = K-score 40+ (level 3)
  *   🥉 Bronze   = K-score 20+ (level 2)
  *   🔩 Rust     = K-score <20 (level 1)
+ *
+ * Credit Rating:
+ *   A1 (90+) = Prime Quality, minimal risk
+ *   A2 (80+) = Excellent, very low risk
+ *   A3 (70+) = Good, low risk
+ *   B1 (60+) = Fair, moderate risk
+ *   B2 (50+) = Speculative, high risk
+ *   B3 (40+) = Very Speculative, very high risk
+ *   C  (20+) = Substantial Risk, severe risk
+ *   D  (<20) = Default, extreme risk
  *
  * @see https://github.com/sollama58/HolDex
  */
@@ -51,9 +62,66 @@ function getKRank(score) {
 }
 
 /**
+ * Get credit rating from K-score
+ * Matches HolDex getCreditRating() function
+ * @param {number} kScore - K-score (0-100)
+ * @param {string|null} trajectory - Score trajectory: 'improving', 'slightly_improving', 'stable', 'slightly_declining', 'declining'
+ * @returns {{grade: string, label: string, risk: string, outlook: string, trajectory: string}}
+ */
+function getCreditRating(kScore, trajectory = null) {
+  // Trajectory bonus/malus
+  let trajectoryModifier = 0;
+  let trajectoryLabel = '→ Stable';
+
+  if (trajectory === 'improving') {
+    trajectoryModifier = 5;
+    trajectoryLabel = '↗️ Improving';
+  } else if (trajectory === 'slightly_improving') {
+    trajectoryModifier = 2;
+    trajectoryLabel = '↗ Slightly Up';
+  } else if (trajectory === 'declining') {
+    trajectoryModifier = -5;
+    trajectoryLabel = '↘️ Declining';
+  } else if (trajectory === 'slightly_declining') {
+    trajectoryModifier = -2;
+    trajectoryLabel = '↘ Slightly Down';
+  }
+
+  // Adjusted score for grade calculation
+  const adjustedScore = Math.max(0, Math.min(100, kScore + trajectoryModifier));
+
+  // Grade mapping
+  let grade, label, risk;
+  if (adjustedScore >= 90) {
+    grade = 'A1'; label = 'Prime Quality'; risk = 'minimal';
+  } else if (adjustedScore >= 80) {
+    grade = 'A2'; label = 'Excellent'; risk = 'very_low';
+  } else if (adjustedScore >= 70) {
+    grade = 'A3'; label = 'Good'; risk = 'low';
+  } else if (adjustedScore >= 60) {
+    grade = 'B1'; label = 'Fair'; risk = 'moderate';
+  } else if (adjustedScore >= 50) {
+    grade = 'B2'; label = 'Speculative'; risk = 'high';
+  } else if (adjustedScore >= 40) {
+    grade = 'B3'; label = 'Very Speculative'; risk = 'very_high';
+  } else if (adjustedScore >= 20) {
+    grade = 'C'; label = 'Substantial Risk'; risk = 'severe';
+  } else {
+    grade = 'D'; label = 'Default'; risk = 'extreme';
+  }
+
+  // Outlook based on trajectory
+  let outlook = 'stable';
+  if (trajectoryModifier > 0) outlook = 'positive';
+  else if (trajectoryModifier < 0) outlook = 'negative';
+
+  return { grade, label, risk, outlook, trajectory: trajectoryLabel };
+}
+
+/**
  * Get token data from HolDex
  * @param {string} mint - Token mint address
- * @returns {Promise<{tier: string, kScore: number, kRank: object, hasCommunityUpdate: boolean, conviction?: object, cached: boolean, error?: string}>}
+ * @returns {Promise<{tier: string, kScore: number, kRank: object, creditRating: object, hasCommunityUpdate: boolean, conviction?: object, cached: boolean, error?: string}>}
  */
 async function getToken(mint) {
   // Check cache first
@@ -69,7 +137,8 @@ async function getToken(mint) {
   if (!holdexUrl) {
     logger.debug('HOLDEX', 'HOLDEX_URL not configured, skipping verification');
     const kRank = getKRank(0);
-    return { tier: 'Rust', kScore: 0, kRank, hasCommunityUpdate: false, cached: false, error: 'HOLDEX_URL not configured' };
+    const creditRating = getCreditRating(0);
+    return { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false, cached: false, error: 'HOLDEX_URL not configured' };
   }
 
   try {
@@ -87,7 +156,8 @@ async function getToken(mint) {
       // Token not found in HolDex = Rust tier
       if (response.status === 404) {
         const kRank = getKRank(0);
-        const result = { tier: 'Rust', kScore: 0, kRank, hasCommunityUpdate: false };
+        const creditRating = getCreditRating(0);
+        const result = { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false };
         cacheResult(mint, result);
         return { ...result, cached: false };
       }
@@ -96,7 +166,7 @@ async function getToken(mint) {
 
     const data = await response.json();
 
-    // Handle response structure: { token: { kScore, kRank, hasCommunityUpdate, conviction } }
+    // Handle response structure: { token: { kScore, kRank, creditRating, hasCommunityUpdate, conviction } }
     const token = data.token || data;
     const kScore = typeof token.kScore === 'number' ? token.kScore : (token.k_score ?? 0);
 
@@ -104,6 +174,9 @@ async function getToken(mint) {
     const kRank = token.kRank || getKRank(kScore);
     const tier = VALID_TIERS.has(kRank.tier) ? kRank.tier : getKRank(kScore).tier;
     const hasCommunityUpdate = token.hasCommunityUpdate === true || token.hascommunityupdate === true;
+
+    // Use creditRating from API if available, otherwise calculate locally
+    const creditRating = token.creditRating || getCreditRating(kScore);
 
     // Extract conviction data if available
     const conviction = token.conviction ? {
@@ -115,14 +188,14 @@ async function getToken(mint) {
       analyzed: token.conviction.analyzed || 0,
     } : null;
 
-    const result = { tier, kScore, kRank, hasCommunityUpdate, conviction };
+    const result = { tier, kScore, kRank, creditRating, hasCommunityUpdate, conviction };
     cacheResult(mint, result);
 
     logger.debug('HOLDEX', 'Token data fetched', {
       mint: mint.slice(0, 8),
       tier,
       kScore,
-      level: kRank.level,
+      grade: creditRating.grade,
     });
 
     return { ...result, cached: false };
@@ -134,13 +207,14 @@ async function getToken(mint) {
 
     // Cache the error to avoid hammering a failing service
     const kRank = getKRank(0);
+    const creditRating = getCreditRating(0);
     tokenCache.set(mint, {
-      data: { tier: 'Rust', kScore: 0, kRank, hasCommunityUpdate: false },
+      data: { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false },
       timestamp: Date.now(),
       isError: true,
     });
 
-    return { tier: 'Rust', kScore: 0, kRank, hasCommunityUpdate: false, cached: false, error: error.message };
+    return { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false, cached: false, error: error.message };
   }
 }
 
@@ -218,6 +292,7 @@ module.exports = {
   getToken,
   isTokenAccepted,
   getKRank,
+  getCreditRating,
   isVerifiedCommunity, // deprecated, for backward compatibility
   clearCache,
   getCacheStats,
