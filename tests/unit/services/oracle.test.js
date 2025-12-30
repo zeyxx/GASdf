@@ -1,51 +1,72 @@
 /**
- * Tests for Oracle Service
+ * Tests for Oracle Service (Legacy wrapper for HolDex)
  */
 
-const oracle = require('../../../src/services/oracle');
+// Mock holdex before requiring oracle
+jest.mock('../../../src/services/holdex', () => ({
+  getToken: jest.fn(),
+  getKRank: jest.fn((score) => {
+    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 6 };
+    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 5 };
+    if (score >= 60) return { tier: 'Gold', icon: '🥇', level: 4 };
+    if (score >= 40) return { tier: 'Silver', icon: '🥈', level: 3 };
+    if (score >= 20) return { tier: 'Bronze', icon: '🥉', level: 2 };
+    return { tier: 'Rust', icon: '🔩', level: 1 };
+  }),
+  getCacheStats: jest.fn(() => ({ totalEntries: 0, validEntries: 0, expiredEntries: 0 })),
+  clearCache: jest.fn(),
+}));
 
 // Mock config
 jest.mock('../../../src/utils/config', () => ({
-  ORACLE_URL: 'http://localhost:3001',
+  HOLDEX_URL: 'http://localhost:3001',
   IS_DEV: true,
+}));
+
+// Mock logger
+jest.mock('../../../src/utils/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
 }));
 
 // Mock fetch
 global.fetch = jest.fn();
 
-describe('Oracle Service', () => {
+const oracle = require('../../../src/services/oracle');
+const holdex = require('../../../src/services/holdex');
+
+describe('Oracle Service (Legacy)', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     global.fetch.mockReset();
-    oracle.clearCache();
   });
 
   describe('K_TIERS', () => {
-    it('should define TRUSTED tier', () => {
+    it('should define TRUSTED tier (no feeMultiplier - $ASDF philosophy)', () => {
       expect(oracle.K_TIERS.TRUSTED).toBeDefined();
-      expect(oracle.K_TIERS.TRUSTED.feeMultiplier).toBe(1.0);
       expect(oracle.K_TIERS.TRUSTED.minScore).toBe(80);
+      // No feeMultiplier - same fee for all accepted tokens
+      expect(oracle.K_TIERS.TRUSTED.feeMultiplier).toBeUndefined();
     });
 
     it('should define STANDARD tier', () => {
       expect(oracle.K_TIERS.STANDARD).toBeDefined();
-      expect(oracle.K_TIERS.STANDARD.feeMultiplier).toBe(1.25);
       expect(oracle.K_TIERS.STANDARD.minScore).toBe(50);
     });
 
     it('should define RISKY tier', () => {
       expect(oracle.K_TIERS.RISKY).toBeDefined();
-      expect(oracle.K_TIERS.RISKY.feeMultiplier).toBe(1.5);
       expect(oracle.K_TIERS.RISKY.minScore).toBe(20);
     });
 
     it('should define UNKNOWN tier', () => {
       expect(oracle.K_TIERS.UNKNOWN).toBeDefined();
-      expect(oracle.K_TIERS.UNKNOWN.feeMultiplier).toBe(2.0);
       expect(oracle.K_TIERS.UNKNOWN.minScore).toBe(0);
     });
   });
 
-  describe('TRUSTED_TOKENS', () => {
+  describe('TRUSTED_TOKENS (Diamond tier)', () => {
     it('should include SOL', () => {
       expect(oracle.TRUSTED_TOKENS.has('So11111111111111111111111111111111111111112')).toBe(true);
     });
@@ -80,8 +101,7 @@ describe('Oracle Service', () => {
       const health = oracle.getOracleHealth();
       expect(health).toBeDefined();
       expect(health.configured).toBeDefined();
-      expect(health.totalRequests).toBeDefined();
-      expect(health.totalErrors).toBeDefined();
+      expect(health.provider).toBe('HolDex');
     });
 
     it('should include URL', () => {
@@ -89,52 +109,33 @@ describe('Oracle Service', () => {
       expect(health.url).toBeDefined();
     });
 
-    it('should track error rate', () => {
-      const health = oracle.getOracleHealth();
-      expect(health.errorRate).toBeDefined();
-    });
-
     it('should include status field', () => {
       const health = oracle.getOracleHealth();
       expect(health.status).toBeDefined();
     });
 
-    it('should include consecutive errors count', () => {
+    it('should include cache size from HolDex', () => {
+      holdex.getCacheStats.mockReturnValue({ totalEntries: 5, validEntries: 3, expiredEntries: 2 });
       const health = oracle.getOracleHealth();
-      expect(typeof health.consecutiveErrors).toBe('number');
-    });
-
-    it('should include average latency', () => {
-      const health = oracle.getOracleHealth();
-      expect(typeof health.avgLatencyMs).toBe('number');
-    });
-
-    it('should include cache size', () => {
-      const health = oracle.getOracleHealth();
-      expect(typeof health.cacheSize).toBe('number');
+      expect(health.cacheSize).toBe(5);
+      expect(health.validCacheEntries).toBe(3);
     });
   });
 
   describe('clearCache()', () => {
-    it('should clear the cache', () => {
+    it('should delegate to HolDex clearCache', () => {
       oracle.clearCache();
-      const health = oracle.getOracleHealth();
-      expect(health.cacheSize).toBe(0);
+      expect(holdex.clearCache).toHaveBeenCalled();
     });
   });
 
   describe('getKScore()', () => {
-    it('should return TRUSTED for known stablecoins', async () => {
-      // USDC
+    it('should return TRUSTED for Diamond tokens (instant, no network)', async () => {
       const result = await oracle.getKScore('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
       expect(result.tier).toBe('TRUSTED');
-      expect(result.feeMultiplier).toBe(1.0);
       expect(result.score).toBe(100);
-    });
-
-    it('should return TRUSTED for USDT', async () => {
-      const result = await oracle.getKScore('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
-      expect(result.tier).toBe('TRUSTED');
+      // Should NOT call holdex for Diamond tokens
+      expect(holdex.getToken).not.toHaveBeenCalled();
     });
 
     it('should return TRUSTED for SOL', async () => {
@@ -152,37 +153,81 @@ describe('Oracle Service', () => {
       expect(result.tier).toBe('TRUSTED');
     });
 
-    it('should return cached result on second call', async () => {
-      const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-
-      await oracle.getKScore(mint);
-      const result2 = await oracle.getKScore(mint);
-
-      // Cached results should be fast and have same tier
-      expect(result2.tier).toBe('TRUSTED');
-    });
-
-    it('should handle oracle response for unknown token', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          mint: 'unknown123',
-          score: 60,
-          holders: 100,
-        }),
+    it('should delegate to HolDex for non-Diamond tokens', async () => {
+      holdex.getToken.mockResolvedValue({
+        tier: 'Gold',
+        kScore: 65,
+        hasCommunityUpdate: true,
+        cached: false,
       });
 
-      const result = await oracle.getKScore('unknown123');
-      expect(result).toBeDefined();
+      const result = await oracle.getKScore('unknown_token_123');
+
+      expect(holdex.getToken).toHaveBeenCalledWith('unknown_token_123');
+      expect(result.tier).toBe('STANDARD'); // Gold maps to STANDARD
+      expect(result.holdexTier).toBe('Gold');
     });
 
-    it('should fallback on oracle error', async () => {
-      global.fetch.mockRejectedValue(new Error('Network error'));
+    it('should map Platinum tier to TRUSTED', async () => {
+      holdex.getToken.mockResolvedValue({
+        tier: 'Platinum',
+        kScore: 85,
+        hasCommunityUpdate: true,
+        cached: false,
+      });
 
-      const result = await oracle.getKScore('error_token');
-      // On error, it should return a valid result with a feeMultiplier
-      expect(result).toBeDefined();
-      expect(result.feeMultiplier).toBeDefined();
+      const result = await oracle.getKScore('platinum_token');
+      expect(result.tier).toBe('TRUSTED');
+      expect(result.holdexTier).toBe('Platinum');
+    });
+
+    it('should map Silver tier to RISKY', async () => {
+      holdex.getToken.mockResolvedValue({
+        tier: 'Silver',
+        kScore: 35,
+        hasCommunityUpdate: true,
+        cached: false,
+      });
+
+      const result = await oracle.getKScore('silver_token');
+      expect(result.tier).toBe('RISKY');
+      expect(result.holdexTier).toBe('Silver');
+    });
+
+    it('should map Bronze tier to UNKNOWN', async () => {
+      holdex.getToken.mockResolvedValue({
+        tier: 'Bronze',
+        kScore: 25,
+        kRank: { tier: 'Bronze', icon: '🥉', level: 2 },
+        hasCommunityUpdate: false,
+        cached: false,
+      });
+
+      const result = await oracle.getKScore('bronze_token');
+      expect(result.tier).toBe('UNKNOWN');
+      expect(result.holdexTier).toBe('Bronze');
+    });
+
+    it('should map Rust tier to UNKNOWN', async () => {
+      holdex.getToken.mockResolvedValue({
+        tier: 'Rust',
+        kScore: 5,
+        kRank: { tier: 'Rust', icon: '🔩', level: 1 },
+        hasCommunityUpdate: false,
+        cached: false,
+      });
+
+      const result = await oracle.getKScore('rust_token');
+      expect(result.tier).toBe('UNKNOWN');
+      expect(result.holdexTier).toBe('Rust');
+      expect(result.kRank.level).toBe(1);
+    });
+
+    it('should include kRank in result', async () => {
+      const result = await oracle.getKScore('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      expect(result.kRank).toBeDefined();
+      expect(result.kRank.tier).toBe('Diamond');
+      expect(result.kRank.level).toBe(6);
     });
 
     it('should include score in result', async () => {
@@ -190,55 +235,18 @@ describe('Oracle Service', () => {
       expect(result.score).toBeDefined();
       expect(typeof result.score).toBe('number');
     });
-
-    it('should include feeMultiplier in result', async () => {
-      const result = await oracle.getKScore('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-      expect(result.feeMultiplier).toBeDefined();
-      expect(typeof result.feeMultiplier).toBe('number');
-    });
-  });
-
-  describe('calculateFeeWithKScore()', () => {
-    it('should calculate fee with multiplier', () => {
-      const baseFee = 10000;
-      const kScore = { feeMultiplier: 1.5 };
-      const result = oracle.calculateFeeWithKScore(baseFee, kScore);
-
-      expect(result).toBe(15000);
-    });
-
-    it('should not change fee for 1.0 multiplier', () => {
-      const baseFee = 10000;
-      const kScore = { feeMultiplier: 1.0 };
-      const result = oracle.calculateFeeWithKScore(baseFee, kScore);
-
-      expect(result).toBe(baseFee);
-    });
-
-    it('should apply 2.0 multiplier correctly', () => {
-      const baseFee = 10000;
-      const kScore = { feeMultiplier: 2.0 };
-      const result = oracle.calculateFeeWithKScore(baseFee, kScore);
-
-      expect(result).toBe(20000);
-    });
-
-    it('should ceil fractional results', () => {
-      const baseFee = 10000;
-      const kScore = { feeMultiplier: 1.25 };
-      const result = oracle.calculateFeeWithKScore(baseFee, kScore);
-
-      expect(result).toBe(12500);
-    });
   });
 
   describe('pingOracle()', () => {
-    it('should return success on successful ping', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-      });
+    it('should ping HolDex health endpoint', async () => {
+      global.fetch.mockResolvedValue({ ok: true });
 
       const result = await oracle.pingOracle();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3001/health',
+        expect.any(Object)
+      );
       expect(result.success).toBe(true);
       expect(result.latencyMs).toBeDefined();
     });
@@ -262,9 +270,7 @@ describe('Oracle Service', () => {
     });
 
     it('should include latency in response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-      });
+      global.fetch.mockResolvedValue({ ok: true });
 
       const result = await oracle.pingOracle();
       expect(typeof result.latencyMs).toBe('number');

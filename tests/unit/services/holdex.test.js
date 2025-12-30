@@ -1,5 +1,5 @@
 /**
- * Tests for HolDex Integration
+ * Tests for HolDex Integration - Token Verification & K-score Oracle
  */
 
 jest.mock('../../../src/utils/config', () => ({
@@ -37,120 +37,310 @@ describe('HolDex Service', () => {
     jest.restoreAllMocks();
   });
 
-  describe('isVerifiedCommunity()', () => {
+  describe('ACCEPTED_TIERS', () => {
+    it('should include Diamond, Platinum, and Gold', () => {
+      expect(holdex.ACCEPTED_TIERS.has('Diamond')).toBe(true);
+      expect(holdex.ACCEPTED_TIERS.has('Platinum')).toBe(true);
+      expect(holdex.ACCEPTED_TIERS.has('Gold')).toBe(true);
+    });
+
+    it('should NOT include Silver, Bronze, and Rust', () => {
+      expect(holdex.ACCEPTED_TIERS.has('Silver')).toBe(false);
+      expect(holdex.ACCEPTED_TIERS.has('Bronze')).toBe(false);
+      expect(holdex.ACCEPTED_TIERS.has('Rust')).toBe(false);
+    });
+  });
+
+  describe('VALID_TIERS', () => {
+    it('should include all tier names including Rust', () => {
+      expect(holdex.VALID_TIERS.has('Diamond')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Platinum')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Gold')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Silver')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Bronze')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Rust')).toBe(true);
+    });
+  });
+
+  describe('getKRank()', () => {
+    it('should return Diamond for score >= 90', () => {
+      expect(holdex.getKRank(90)).toEqual({ tier: 'Diamond', icon: '💎', level: 6 });
+      expect(holdex.getKRank(100)).toEqual({ tier: 'Diamond', icon: '💎', level: 6 });
+    });
+
+    it('should return Platinum for score >= 80', () => {
+      expect(holdex.getKRank(80)).toEqual({ tier: 'Platinum', icon: '💠', level: 5 });
+      expect(holdex.getKRank(89)).toEqual({ tier: 'Platinum', icon: '💠', level: 5 });
+    });
+
+    it('should return Gold for score >= 60', () => {
+      expect(holdex.getKRank(60)).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
+      expect(holdex.getKRank(79)).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
+    });
+
+    it('should return Silver for score >= 40', () => {
+      expect(holdex.getKRank(40)).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
+      expect(holdex.getKRank(59)).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
+    });
+
+    it('should return Bronze for score >= 20', () => {
+      expect(holdex.getKRank(20)).toEqual({ tier: 'Bronze', icon: '🥉', level: 2 });
+      expect(holdex.getKRank(39)).toEqual({ tier: 'Bronze', icon: '🥉', level: 2 });
+    });
+
+    it('should return Rust for score < 20', () => {
+      expect(holdex.getKRank(0)).toEqual({ tier: 'Rust', icon: '🔩', level: 1 });
+      expect(holdex.getKRank(19)).toEqual({ tier: 'Rust', icon: '🔩', level: 1 });
+    });
+  });
+
+  describe('getToken()', () => {
     const testMint = 'TestMint111111111111111111111111111111111111';
 
-    it('should return verified=true and kScore for verified community', async () => {
+    it('should return tier, kScore, and kRank from API', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true, kScore: 70 }),
+        json: () => Promise.resolve({ kScore: 65, hasCommunityUpdate: true }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Gold');
+      expect(result.kScore).toBe(65);
+      expect(result.kRank).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
+      expect(result.hasCommunityUpdate).toBe(true);
+      expect(result.cached).toBe(false);
+    });
+
+    it('should handle nested token response with kRank', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          token: {
+            kScore: 85,
+            kRank: { tier: 'Platinum', icon: '💠', level: 5 },
+            hasCommunityUpdate: true
+          }
+        }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Platinum');
+      expect(result.kScore).toBe(85);
+      expect(result.kRank.level).toBe(5);
+    });
+
+    it('should handle conviction data from API', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          token: {
+            kScore: 75,
+            conviction: {
+              score: 80,
+              accumulators: 150,
+              holders: 200,
+              reducers: 30,
+              extractors: 20,
+              analyzed: 400
+            }
+          }
+        }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.conviction).toBeDefined();
+      expect(result.conviction.score).toBe(80);
+      expect(result.conviction.accumulators).toBe(150);
+      expect(result.conviction.extractors).toBe(20);
+    });
+
+    it('should calculate kRank locally for invalid API tier', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ kScore: 50 }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Silver');
+      expect(result.kRank).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
+    });
+
+    it('should return Rust for 404 (token not found)', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Rust');
+      expect(result.kScore).toBe(0);
+      expect(result.kRank).toEqual({ tier: 'Rust', icon: '🔩', level: 1 });
+      expect(result.hasCommunityUpdate).toBe(false);
+    });
+
+    it('should cache results', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 70 }),
+      });
+
+      // First call
+      await holdex.getToken(testMint);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      // Second call should use cache
+      const result = await holdex.getToken(testMint);
+      expect(result.cached).toBe(true);
+      expect(result.tier).toBe('Gold');
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return Rust with error when HOLDEX_URL not configured', async () => {
+      const originalUrl = config.HOLDEX_URL;
+      config.HOLDEX_URL = undefined;
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Rust');
+      expect(result.kRank.level).toBe(1);
+      expect(result.error).toContain('not configured');
+
+      config.HOLDEX_URL = originalUrl;
+    });
+
+    it('should handle fetch errors gracefully', async () => {
+      global.fetch.mockRejectedValue(new Error('Network error'));
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.tier).toBe('Rust');
+      expect(result.kRank).toEqual({ tier: 'Rust', icon: '🔩', level: 1 });
+      expect(result.error).toBe('Network error');
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
+  describe('isTokenAccepted() with Rust tier', () => {
+    const testMint = 'TestMint111111111111111111111111111111111111';
+
+    it('should reject Rust tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ kScore: 10 }),
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(false);
+      expect(result.tier).toBe('Rust');
+    });
+  });
+
+  describe('isTokenAccepted()', () => {
+    const testMint = 'TestMint111111111111111111111111111111111111';
+
+    it('should accept Gold tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 65, hasCommunityUpdate: true }),
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(true);
+      expect(result.tier).toBe('Gold');
+    });
+
+    it('should accept Platinum tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Platinum', kScore: 85 }),
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(true);
+      expect(result.tier).toBe('Platinum');
+    });
+
+    it('should accept Diamond tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Diamond', kScore: 100 }),
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(true);
+      expect(result.tier).toBe('Diamond');
+    });
+
+    it('should reject Silver tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ kScore: 45 }), // 40-59 = Silver
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(false);
+      expect(result.tier).toBe('Silver');
+    });
+
+    it('should reject Bronze tier tokens', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ kScore: 25 }), // 20-39 = Bronze
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(false);
+      expect(result.tier).toBe('Bronze');
+    });
+  });
+
+  describe('isVerifiedCommunity() (legacy)', () => {
+    const testMint = 'TestMint111111111111111111111111111111111111';
+
+    it('should return verified=true for accepted tiers with hasCommunityUpdate', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 70, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
       expect(result.verified).toBe(true);
       expect(result.kScore).toBe(70);
-      expect(result.cached).toBe(false);
     });
 
-    it('should return verified=false and kScore for unverified community', async () => {
+    it('should return verified=false for rejected tiers', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: false, kScore: 30 }),
+        json: () => Promise.resolve({ tier: 'Silver', kScore: 30, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
       expect(result.verified).toBe(false);
       expect(result.kScore).toBe(30);
-      expect(result.cached).toBe(false);
     });
 
-    it('should return verified=false and kScore=0 for 404 (token not found)', async () => {
+    it('should return verified=false when hasCommunityUpdate is false', async () => {
       global.fetch.mockResolvedValue({
-        ok: false,
-        status: 404,
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 70, hasCommunityUpdate: false }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
       expect(result.verified).toBe(false);
-      expect(result.kScore).toBe(0);
-      expect(result.cached).toBe(false);
-    });
-
-    it('should cache results including kScore', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true, kScore: 75 }),
-      });
-
-      // First call
-      await holdex.isVerifiedCommunity(testMint);
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-
-      // Second call should use cache
-      const result = await holdex.isVerifiedCommunity(testMint);
-      expect(result.cached).toBe(true);
-      expect(result.kScore).toBe(75);
-      expect(global.fetch).toHaveBeenCalledTimes(1); // No additional call
-    });
-
-    it('should return error and kScore=0 when HOLDEX_URL not configured', async () => {
-      // Temporarily remove HOLDEX_URL
-      const originalUrl = config.HOLDEX_URL;
-      config.HOLDEX_URL = undefined;
-
-      const result = await holdex.isVerifiedCommunity(testMint);
-
-      expect(result.verified).toBe(false);
-      expect(result.kScore).toBe(0);
-      expect(result.error).toContain('not configured');
-
-      // Restore
-      config.HOLDEX_URL = originalUrl;
-    });
-
-    it('should handle fetch errors gracefully with kScore=0', async () => {
-      global.fetch.mockRejectedValue(new Error('Network error'));
-
-      const result = await holdex.isVerifiedCommunity(testMint);
-
-      expect(result.verified).toBe(false);
-      expect(result.kScore).toBe(0);
-      expect(result.error).toBe('Network error');
-      expect(logger.warn).toHaveBeenCalled();
-    });
-
-    it('should call correct API endpoint', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true }),
-      });
-
-      await holdex.isVerifiedCommunity(testMint);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        `https://holdex.test/token/${testMint}`,
-        expect.objectContaining({
-          headers: { 'Accept': 'application/json' },
-        })
-      );
-    });
-
-    it('should log debug on successful verification with kScore', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true, kScore: 80 }),
-      });
-
-      await holdex.isVerifiedCommunity(testMint);
-
-      expect(logger.debug).toHaveBeenCalledWith(
-        'HOLDEX',
-        'Verification result',
-        expect.objectContaining({ verified: true, kScore: 80 })
-      );
     });
   });
 
@@ -158,20 +348,20 @@ describe('HolDex Service', () => {
     it('should clear the cache', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 70 }),
       });
 
       const testMint = 'CacheMint11111111111111111111111111111111111';
 
       // Populate cache
-      await holdex.isVerifiedCommunity(testMint);
+      await holdex.getToken(testMint);
       expect(global.fetch).toHaveBeenCalledTimes(1);
 
       // Clear cache
       holdex.clearCache();
 
       // Should fetch again
-      await holdex.isVerifiedCommunity(testMint);
+      await holdex.getToken(testMint);
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
@@ -185,11 +375,11 @@ describe('HolDex Service', () => {
     it('should return cache statistics', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 70 }),
       });
 
-      await holdex.isVerifiedCommunity('Mint1111111111111111111111111111111111111111');
-      await holdex.isVerifiedCommunity('Mint2222222222222222222222222222222222222222');
+      await holdex.getToken('Mint1111111111111111111111111111111111111111');
+      await holdex.getToken('Mint2222222222222222222222222222222222222222');
 
       const stats = holdex.getCacheStats();
 
