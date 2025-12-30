@@ -5,12 +5,14 @@
  * Uses HolDex as the single source of truth for tier-based acceptance:
  *
  * Metal Ranks (K-score based):
- *   💎 Diamond  (90+)  → Hardcoded trusted tokens (SOL, USDC, etc.) → Accepted
- *   💠 Platinum (80+)  → High conviction, strong holders → Accepted
- *   🥇 Gold     (60+)  → Good conviction → Accepted
- *   🥈 Silver   (40+)  → Medium conviction → Rejected
- *   🥉 Bronze   (20+)  → Low conviction → Rejected
- *   🔩 Rust     (<20)  → Unknown/untrusted → Rejected
+ *   💎 Diamond  (90-99, 100=native) → Hardcoded trusted tokens (SOL, USDC, etc.) → Accepted
+ *   💠 Platinum (80-89)  → High conviction, strong holders → Accepted
+ *   🥇 Gold     (70-79)  → Good conviction → Accepted (minimum tier)
+ *   🥈 Silver   (60-69)  → Medium conviction → Rejected
+ *   🥉 Bronze   (50-59)  → Low conviction → Rejected
+ *   🟤 Copper   (40-49)  → Very low conviction → Rejected
+ *   ⚫ Iron     (20-39)  → Substantial risk → Rejected
+ *   🔩 Rust     (0-19)   → Unknown/untrusted → Rejected
  *
  * This protects the treasury from:
  *   - Rug pulls (worthless tokens)

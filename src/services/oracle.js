@@ -5,12 +5,14 @@
  * Kept for backward compatibility with existing health checks and monitoring.
  *
  * Tier mapping (HolDex Metal Ranks → Legacy):
- *   Diamond (90+)  → TRUSTED (100)
- *   Platinum (80+) → TRUSTED (85)
- *   Gold (60+)     → STANDARD (65)
- *   Silver (40+)   → RISKY (35)
- *   Bronze (20+)   → UNKNOWN (15)
- *   Rust (<20)     → UNKNOWN (5)
+ *   Diamond (90-99, 100=native) → TRUSTED (100)
+ *   Platinum (80-89)  → TRUSTED (85)
+ *   Gold (70-79)      → STANDARD (75)
+ *   Silver (60-69)    → RISKY (65)
+ *   Bronze (50-59)    → RISKY (55)
+ *   Copper (40-49)    → UNKNOWN (45)
+ *   Iron (20-39)      → UNKNOWN (30)
+ *   Rust (0-19)       → UNKNOWN (10)
  *
  * @deprecated Use holdex.js directly for new code
  */
@@ -23,10 +25,12 @@ const holdex = require('./holdex');
 const TIER_TO_LEGACY = {
   Diamond: { tier: 'TRUSTED', score: 100 },
   Platinum: { tier: 'TRUSTED', score: 85 },
-  Gold: { tier: 'STANDARD', score: 65 },
-  Silver: { tier: 'RISKY', score: 35 },
-  Bronze: { tier: 'UNKNOWN', score: 15 },
-  Rust: { tier: 'UNKNOWN', score: 5 },
+  Gold: { tier: 'STANDARD', score: 75 },
+  Silver: { tier: 'RISKY', score: 65 },
+  Bronze: { tier: 'RISKY', score: 55 },
+  Copper: { tier: 'UNKNOWN', score: 45 },
+  Iron: { tier: 'UNKNOWN', score: 30 },
+  Rust: { tier: 'UNKNOWN', score: 10 },
 };
 
 // Legacy K_TIERS (no fee multipliers - $ASDF philosophy)

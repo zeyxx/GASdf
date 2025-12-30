@@ -6,11 +6,13 @@
 jest.mock('../../../src/services/holdex', () => ({
   getToken: jest.fn(),
   getKRank: jest.fn((score) => {
-    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 6 };
-    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 5 };
-    if (score >= 60) return { tier: 'Gold', icon: '🥇', level: 4 };
-    if (score >= 40) return { tier: 'Silver', icon: '🥈', level: 3 };
-    if (score >= 20) return { tier: 'Bronze', icon: '🥉', level: 2 };
+    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 };
+    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 7 };
+    if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 };
+    if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 };
+    if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 };
+    if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 };
+    if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 };
     return { tier: 'Rust', icon: '🔩', level: 1 };
   }),
   getCacheStats: jest.fn(() => ({ totalEntries: 0, validEntries: 0, expiredEntries: 0 })),
@@ -156,7 +158,7 @@ describe('Oracle Service (Legacy)', () => {
     it('should delegate to HolDex for non-Diamond tokens', async () => {
       holdex.getToken.mockResolvedValue({
         tier: 'Gold',
-        kScore: 65,
+        kScore: 75,
         hasCommunityUpdate: true,
         cached: false,
       });
@@ -184,7 +186,7 @@ describe('Oracle Service (Legacy)', () => {
     it('should map Silver tier to RISKY', async () => {
       holdex.getToken.mockResolvedValue({
         tier: 'Silver',
-        kScore: 35,
+        kScore: 65,
         hasCommunityUpdate: true,
         cached: false,
       });
@@ -194,17 +196,17 @@ describe('Oracle Service (Legacy)', () => {
       expect(result.holdexTier).toBe('Silver');
     });
 
-    it('should map Bronze tier to UNKNOWN', async () => {
+    it('should map Bronze tier to RISKY', async () => {
       holdex.getToken.mockResolvedValue({
         tier: 'Bronze',
-        kScore: 25,
-        kRank: { tier: 'Bronze', icon: '🥉', level: 2 },
+        kScore: 55,
+        kRank: { tier: 'Bronze', icon: '🥉', level: 4 },
         hasCommunityUpdate: false,
         cached: false,
       });
 
       const result = await oracle.getKScore('bronze_token');
-      expect(result.tier).toBe('UNKNOWN');
+      expect(result.tier).toBe('RISKY');
       expect(result.holdexTier).toBe('Bronze');
     });
 
@@ -227,7 +229,7 @@ describe('Oracle Service (Legacy)', () => {
       const result = await oracle.getKScore('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
       expect(result.kRank).toBeDefined();
       expect(result.kRank.tier).toBe('Diamond');
-      expect(result.kRank.level).toBe(6);
+      expect(result.kRank.level).toBe(8);
     });
 
     it('should include score in result', async () => {

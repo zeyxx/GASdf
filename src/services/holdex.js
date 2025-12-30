@@ -4,16 +4,20 @@
  * HolDex is the $ASDF ecosystem's single source of truth for:
  * - Community verification (hasCommunityUpdate)
  * - K-score calculation with conviction analysis
- * - Metal rank tiers (Diamond/Platinum/Gold/Silver/Bronze/Rust)
+ * - Metal rank tiers
  * - Credit rating system (A1-D grades)
  *
+ * K-score: 100 = native tokens (SOL), 0-99 for everything else
+ *
  * Metal Ranks:
- *   💎 Diamond  = K-score 90+ (level 6)
- *   💠 Platinum = K-score 80+ (level 5)
- *   🥇 Gold     = K-score 60+ (level 4)
- *   🥈 Silver   = K-score 40+ (level 3)
- *   🥉 Bronze   = K-score 20+ (level 2)
- *   🔩 Rust     = K-score <20 (level 1)
+ *   💎 Diamond  = K-score 90-99 (level 8), 100 reserved for native tokens (SOL)
+ *   💠 Platinum = K-score 80-89  (level 7)
+ *   🥇 Gold     = K-score 70-79  (level 6) - Minimum for acceptance
+ *   🥈 Silver   = K-score 60-69  (level 5)
+ *   🥉 Bronze   = K-score 50-59  (level 4)
+ *   🟤 Copper   = K-score 40-49  (level 3)
+ *   ⚫ Iron     = K-score 20-39  (level 2)
+ *   🔩 Rust     = K-score 0-19   (level 1)
  *
  * Credit Rating:
  *   A1 (90+) = Prime Quality, minimal risk
@@ -24,6 +28,8 @@
  *   B3 (40+) = Very Speculative, very high risk
  *   C  (20+) = Substantial Risk, severe risk
  *   D  (<20) = Default, extreme risk
+ *
+ * Acceptance: Gold+ (K-score >= 70)
  *
  * @see https://github.com/sollama58/HolDex
  */
@@ -39,12 +45,12 @@ const ERROR_CACHE_TTL = 30 * 1000; // 30 seconds for errors (retry sooner)
 // API configuration
 const HOLDEX_TIMEOUT = 5000; // 5 seconds
 
-// Accepted tiers for gasless transactions
-// Diamond/Platinum/Gold = trusted, Silver/Bronze/Rust = rejected
+// Accepted tiers for gasless transactions (K-score >= 70)
+// Diamond/Platinum/Gold = accepted, Silver and below = rejected
 const ACCEPTED_TIERS = new Set(['Diamond', 'Platinum', 'Gold']);
 
-// All valid tier names (including new Rust tier)
-const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Rust']);
+// All valid tier names
+const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Rust']);
 
 /**
  * Get metal rank info from K-score
@@ -53,12 +59,14 @@ const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 
  * @returns {{tier: string, icon: string, level: number}}
  */
 function getKRank(score) {
-  if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 6 };
-  if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 5 };
-  if (score >= 60) return { tier: 'Gold', icon: '🥇', level: 4 };
-  if (score >= 40) return { tier: 'Silver', icon: '🥈', level: 3 };
-  if (score >= 20) return { tier: 'Bronze', icon: '🥉', level: 2 };
-  return { tier: 'Rust', icon: '🔩', level: 1 };
+  if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 };  // A1 [90-99], 100 = native
+  if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 7 }; // A2 [80-89]
+  if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 };     // A3 [70-79]
+  if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 };   // B1 [60-69]
+  if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 };   // B2 [50-59]
+  if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 };   // B3 [40-49]
+  if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 };     // C  [20-39]
+  return { tier: 'Rust', icon: '🔩', level: 1 };                      // D  [0-19]
 }
 
 /**

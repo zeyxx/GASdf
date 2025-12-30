@@ -52,40 +52,52 @@ describe('HolDex Service', () => {
   });
 
   describe('VALID_TIERS', () => {
-    it('should include all tier names including Rust', () => {
+    it('should include all tier names', () => {
       expect(holdex.VALID_TIERS.has('Diamond')).toBe(true);
       expect(holdex.VALID_TIERS.has('Platinum')).toBe(true);
       expect(holdex.VALID_TIERS.has('Gold')).toBe(true);
       expect(holdex.VALID_TIERS.has('Silver')).toBe(true);
       expect(holdex.VALID_TIERS.has('Bronze')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Copper')).toBe(true);
+      expect(holdex.VALID_TIERS.has('Iron')).toBe(true);
       expect(holdex.VALID_TIERS.has('Rust')).toBe(true);
     });
   });
 
   describe('getKRank()', () => {
     it('should return Diamond for score >= 90', () => {
-      expect(holdex.getKRank(90)).toEqual({ tier: 'Diamond', icon: '💎', level: 6 });
-      expect(holdex.getKRank(100)).toEqual({ tier: 'Diamond', icon: '💎', level: 6 });
+      expect(holdex.getKRank(90)).toEqual({ tier: 'Diamond', icon: '💎', level: 8 });
+      expect(holdex.getKRank(100)).toEqual({ tier: 'Diamond', icon: '💎', level: 8 });
     });
 
-    it('should return Platinum for score >= 80', () => {
-      expect(holdex.getKRank(80)).toEqual({ tier: 'Platinum', icon: '💠', level: 5 });
-      expect(holdex.getKRank(89)).toEqual({ tier: 'Platinum', icon: '💠', level: 5 });
+    it('should return Platinum for score 80-89', () => {
+      expect(holdex.getKRank(80)).toEqual({ tier: 'Platinum', icon: '💠', level: 7 });
+      expect(holdex.getKRank(89)).toEqual({ tier: 'Platinum', icon: '💠', level: 7 });
     });
 
-    it('should return Gold for score >= 60', () => {
-      expect(holdex.getKRank(60)).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
-      expect(holdex.getKRank(79)).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
+    it('should return Gold for score 70-79', () => {
+      expect(holdex.getKRank(70)).toEqual({ tier: 'Gold', icon: '🥇', level: 6 });
+      expect(holdex.getKRank(79)).toEqual({ tier: 'Gold', icon: '🥇', level: 6 });
     });
 
-    it('should return Silver for score >= 40', () => {
-      expect(holdex.getKRank(40)).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
-      expect(holdex.getKRank(59)).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
+    it('should return Silver for score 60-69', () => {
+      expect(holdex.getKRank(60)).toEqual({ tier: 'Silver', icon: '🥈', level: 5 });
+      expect(holdex.getKRank(69)).toEqual({ tier: 'Silver', icon: '🥈', level: 5 });
     });
 
-    it('should return Bronze for score >= 20', () => {
-      expect(holdex.getKRank(20)).toEqual({ tier: 'Bronze', icon: '🥉', level: 2 });
-      expect(holdex.getKRank(39)).toEqual({ tier: 'Bronze', icon: '🥉', level: 2 });
+    it('should return Bronze for score 50-59', () => {
+      expect(holdex.getKRank(50)).toEqual({ tier: 'Bronze', icon: '🥉', level: 4 });
+      expect(holdex.getKRank(59)).toEqual({ tier: 'Bronze', icon: '🥉', level: 4 });
+    });
+
+    it('should return Copper for score 40-49', () => {
+      expect(holdex.getKRank(40)).toEqual({ tier: 'Copper', icon: '🟤', level: 3 });
+      expect(holdex.getKRank(49)).toEqual({ tier: 'Copper', icon: '🟤', level: 3 });
+    });
+
+    it('should return Iron for score 20-39', () => {
+      expect(holdex.getKRank(20)).toEqual({ tier: 'Iron', icon: '⚫', level: 2 });
+      expect(holdex.getKRank(39)).toEqual({ tier: 'Iron', icon: '⚫', level: 2 });
     });
 
     it('should return Rust for score < 20', () => {
@@ -144,14 +156,14 @@ describe('HolDex Service', () => {
     it('should return tier, kScore, and kRank from API', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ kScore: 65, hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ kScore: 75, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.getToken(testMint);
 
       expect(result.tier).toBe('Gold');
-      expect(result.kScore).toBe(65);
-      expect(result.kRank).toEqual({ tier: 'Gold', icon: '🥇', level: 4 });
+      expect(result.kScore).toBe(75);
+      expect(result.kRank).toEqual({ tier: 'Gold', icon: '🥇', level: 6 });
       expect(result.hasCommunityUpdate).toBe(true);
       expect(result.cached).toBe(false);
     });
@@ -204,13 +216,13 @@ describe('HolDex Service', () => {
     it('should calculate kRank locally for invalid API tier', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ kScore: 50 }),
+        json: () => Promise.resolve({ kScore: 55 }),
       });
 
       const result = await holdex.getToken(testMint);
 
-      expect(result.tier).toBe('Silver');
-      expect(result.kRank).toEqual({ tier: 'Silver', icon: '🥈', level: 3 });
+      expect(result.tier).toBe('Bronze');
+      expect(result.kRank).toEqual({ tier: 'Bronze', icon: '🥉', level: 4 });
     });
 
     it('should return Rust for 404 (token not found)', async () => {
@@ -291,7 +303,7 @@ describe('HolDex Service', () => {
     it('should accept Gold tier tokens', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ tier: 'Gold', kScore: 65, hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 75, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.isTokenAccepted(testMint);
@@ -327,7 +339,7 @@ describe('HolDex Service', () => {
     it('should reject Silver tier tokens', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ kScore: 45 }), // 40-59 = Silver
+        json: () => Promise.resolve({ kScore: 65 }), // 60-69 = Silver
       });
 
       const result = await holdex.isTokenAccepted(testMint);
@@ -339,7 +351,7 @@ describe('HolDex Service', () => {
     it('should reject Bronze tier tokens', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ kScore: 25 }), // 20-39 = Bronze
+        json: () => Promise.resolve({ kScore: 55 }), // 50-59 = Bronze
       });
 
       const result = await holdex.isTokenAccepted(testMint);
@@ -355,31 +367,31 @@ describe('HolDex Service', () => {
     it('should return verified=true for accepted tiers with hasCommunityUpdate', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ tier: 'Gold', kScore: 70, hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 75, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
       expect(result.verified).toBe(true);
-      expect(result.kScore).toBe(70);
+      expect(result.kScore).toBe(75);
     });
 
     it('should return verified=false for rejected tiers', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ tier: 'Silver', kScore: 30, hasCommunityUpdate: true }),
+        json: () => Promise.resolve({ tier: 'Silver', kScore: 65, hasCommunityUpdate: true }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
       expect(result.verified).toBe(false);
-      expect(result.kScore).toBe(30);
+      expect(result.kScore).toBe(65);
     });
 
     it('should return verified=false when hasCommunityUpdate is false', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ tier: 'Gold', kScore: 70, hasCommunityUpdate: false }),
+        json: () => Promise.resolve({ tier: 'Gold', kScore: 75, hasCommunityUpdate: false }),
       });
 
       const result = await holdex.isVerifiedCommunity(testMint);

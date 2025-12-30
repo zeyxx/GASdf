@@ -3,8 +3,8 @@
  *
  * Tier-based token acceptance (Metal Ranks):
  * - Diamond (90+): Hardcoded tokens (SOL, USDC, etc.) → Always accepted locally
- * - Platinum/Gold (60+): HolDex verified → Accepted
- * - Silver/Bronze/Rust (<60): HolDex rejected → Rejected
+ * - Platinum (80+) / Gold (70+): HolDex verified → Accepted
+ * - Silver/Bronze/Copper/Iron/Rust (<70): HolDex rejected → Rejected
  */
 
 jest.mock('../../../src/utils/config', () => ({
@@ -21,17 +21,23 @@ jest.mock('../../../src/utils/logger', () => ({
 jest.mock('../../../src/services/holdex', () => ({
   isTokenAccepted: jest.fn(),
   getKRank: jest.fn((score) => {
-    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 6 };
-    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 5 };
-    if (score >= 60) return { tier: 'Gold', icon: '🥇', level: 4 };
-    if (score >= 40) return { tier: 'Silver', icon: '🥈', level: 3 };
-    if (score >= 20) return { tier: 'Bronze', icon: '🥉', level: 2 };
+    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 };
+    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 7 };
+    if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 };
+    if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 };
+    if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 };
+    if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 };
+    if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 };
     return { tier: 'Rust', icon: '🔩', level: 1 };
   }),
   getCreditRating: jest.fn((score) => {
     if (score >= 90) return { grade: 'A1', label: 'Prime Quality', risk: 'minimal', outlook: 'stable', trajectory: '→ Stable' };
     if (score >= 80) return { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 70) return { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable', trajectory: '→ Stable' };
     if (score >= 60) return { grade: 'B1', label: 'Fair', risk: 'moderate', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 50) return { grade: 'B2', label: 'Speculative', risk: 'high', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 40) return { grade: 'B3', label: 'Very Speculative', risk: 'very_high', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 20) return { grade: 'C', label: 'Substantial Risk', risk: 'severe', outlook: 'stable', trajectory: '→ Stable' };
     return { grade: 'D', label: 'Default', risk: 'extreme', outlook: 'stable', trajectory: '→ Stable' };
   }),
 }));
@@ -59,7 +65,7 @@ describe('Token Gate Service', () => {
         expect(result.reason).toBe('diamond');
         expect(result.tier).toBe('Diamond');
         expect(result.kScore).toBe(100);
-        expect(result.kRank.level).toBe(6);
+        expect(result.kRank.level).toBe(8);
         expect(result.creditRating.grade).toBe('A1');
         expect(holdex.isTokenAccepted).not.toHaveBeenCalled();
       });
@@ -113,7 +119,7 @@ describe('Token Gate Service', () => {
           accepted: true,
           tier: 'Platinum',
           kScore: 85,
-          kRank: { tier: 'Platinum', icon: '💠', level: 5 },
+          kRank: { tier: 'Platinum', icon: '💠', level: 7 },
           creditRating: { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable' },
           cached: false,
         });
@@ -132,9 +138,9 @@ describe('Token Gate Service', () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: true,
           tier: 'Gold',
-          kScore: 65,
-          kRank: { tier: 'Gold', icon: '🥇', level: 4 },
-          creditRating: { grade: 'B1', label: 'Fair', risk: 'moderate', outlook: 'stable' },
+          kScore: 75,
+          kRank: { tier: 'Gold', icon: '🥇', level: 6 },
+          creditRating: { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable' },
           cached: false,
         });
 
@@ -143,15 +149,15 @@ describe('Token Gate Service', () => {
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('tier_accepted');
         expect(result.tier).toBe('Gold');
-        expect(result.kScore).toBe(65);
-        expect(result.creditRating.grade).toBe('B1');
+        expect(result.kScore).toBe(75);
+        expect(result.creditRating.grade).toBe('A3');
       });
 
       it('should reject Silver tier tokens', async () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: false,
           tier: 'Silver',
-          kScore: 35,
+          kScore: 65,
           cached: false,
         });
 
@@ -160,14 +166,14 @@ describe('Token Gate Service', () => {
         expect(result.accepted).toBe(false);
         expect(result.reason).toBe('tier_rejected');
         expect(result.tier).toBe('Silver');
-        expect(result.kScore).toBe(35);
+        expect(result.kScore).toBe(65);
       });
 
       it('should reject Bronze tier tokens', async () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: false,
           tier: 'Bronze',
-          kScore: 25,
+          kScore: 55,
           cached: false,
         });
 
@@ -213,7 +219,7 @@ describe('Token Gate Service', () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: false,
           tier: 'Silver',
-          kScore: 40,
+          kScore: 65,
           cached: false,
         });
 
@@ -224,7 +230,7 @@ describe('Token Gate Service', () => {
           'Token rejected',
           expect.objectContaining({
             tier: 'Silver',
-            kScore: 40,
+            kScore: 65,
           })
         );
       });
