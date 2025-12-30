@@ -20,6 +20,20 @@ jest.mock('../../../src/utils/logger', () => ({
 
 jest.mock('../../../src/services/holdex', () => ({
   isTokenAccepted: jest.fn(),
+  getKRank: jest.fn((score) => {
+    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 6 };
+    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 5 };
+    if (score >= 60) return { tier: 'Gold', icon: '🥇', level: 4 };
+    if (score >= 40) return { tier: 'Silver', icon: '🥈', level: 3 };
+    if (score >= 20) return { tier: 'Bronze', icon: '🥉', level: 2 };
+    return { tier: 'Rust', icon: '🔩', level: 1 };
+  }),
+  getCreditRating: jest.fn((score) => {
+    if (score >= 90) return { grade: 'A1', label: 'Prime Quality', risk: 'minimal', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 80) return { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 60) return { grade: 'B1', label: 'Fair', risk: 'moderate', outlook: 'stable', trajectory: '→ Stable' };
+    return { grade: 'D', label: 'Default', risk: 'extreme', outlook: 'stable', trajectory: '→ Stable' };
+  }),
 }));
 
 describe('Token Gate Service', () => {
@@ -38,12 +52,15 @@ describe('Token Gate Service', () => {
 
   describe('isTokenAccepted()', () => {
     describe('DIAMOND_TOKENS (local, no network)', () => {
-      it('should accept SOL with Diamond tier', async () => {
+      it('should accept SOL with Diamond tier and credit rating', async () => {
         const result = await tokenGate.isTokenAccepted('So11111111111111111111111111111111111111112');
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
         expect(result.tier).toBe('Diamond');
+        expect(result.kScore).toBe(100);
+        expect(result.kRank.level).toBe(6);
+        expect(result.creditRating.grade).toBe('A1');
         expect(holdex.isTokenAccepted).not.toHaveBeenCalled();
       });
 
@@ -91,11 +108,13 @@ describe('Token Gate Service', () => {
     describe('HolDex tier-based acceptance', () => {
       const unknownMint = 'UnknownMint1111111111111111111111111111111';
 
-      it('should accept Platinum tier tokens', async () => {
+      it('should accept Platinum tier tokens with credit rating', async () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: true,
           tier: 'Platinum',
           kScore: 85,
+          kRank: { tier: 'Platinum', icon: '💠', level: 5 },
+          creditRating: { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable' },
           cached: false,
         });
 
@@ -105,14 +124,17 @@ describe('Token Gate Service', () => {
         expect(result.reason).toBe('tier_accepted');
         expect(result.tier).toBe('Platinum');
         expect(result.kScore).toBe(85);
+        expect(result.creditRating.grade).toBe('A2');
         expect(holdex.isTokenAccepted).toHaveBeenCalledWith(unknownMint);
       });
 
-      it('should accept Gold tier tokens', async () => {
+      it('should accept Gold tier tokens with credit rating', async () => {
         holdex.isTokenAccepted.mockResolvedValue({
           accepted: true,
           tier: 'Gold',
           kScore: 65,
+          kRank: { tier: 'Gold', icon: '🥇', level: 4 },
+          creditRating: { grade: 'B1', label: 'Fair', risk: 'moderate', outlook: 'stable' },
           cached: false,
         });
 
@@ -122,6 +144,7 @@ describe('Token Gate Service', () => {
         expect(result.reason).toBe('tier_accepted');
         expect(result.tier).toBe('Gold');
         expect(result.kScore).toBe(65);
+        expect(result.creditRating.grade).toBe('B1');
       });
 
       it('should reject Silver tier tokens', async () => {

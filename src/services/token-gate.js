@@ -54,16 +54,22 @@ function getDiamondTokens() {
  * Check if a token is accepted for payment
  *
  * @param {string} mint - Token mint address
- * @returns {Promise<{accepted: boolean, reason: string, tier: string, kScore?: number}>}
+ * @returns {Promise<{accepted: boolean, reason: string, tier: string, kScore?: number, kRank?: object, creditRating?: object}>}
  */
 async function isTokenAccepted(mint) {
   // 1. Check DIAMOND_TOKENS locally (instant, no network call)
   const diamondTokens = getDiamondTokens();
   if (diamondTokens.has(mint)) {
+    // Diamond tokens get perfect scores
+    const kRank = holdex.getKRank(100);
+    const creditRating = holdex.getCreditRating(100);
     return {
       accepted: true,
       reason: 'diamond',
       tier: 'Diamond',
+      kScore: 100,
+      kRank,
+      creditRating,
     };
   }
 
@@ -75,6 +81,7 @@ async function isTokenAccepted(mint) {
       mint: mint.slice(0, 8),
       tier: tokenData.tier,
       kScore: tokenData.kScore,
+      creditRating: tokenData.creditRating?.grade,
       error: tokenData.error,
     });
     return {
@@ -82,6 +89,8 @@ async function isTokenAccepted(mint) {
       reason: tokenData.error ? 'verification_failed' : 'tier_rejected',
       tier: tokenData.tier,
       kScore: tokenData.kScore,
+      kRank: tokenData.kRank,
+      creditRating: tokenData.creditRating,
     };
   }
 
@@ -90,6 +99,7 @@ async function isTokenAccepted(mint) {
     mint: mint.slice(0, 8),
     tier: tokenData.tier,
     kScore: tokenData.kScore,
+    creditRating: tokenData.creditRating?.grade,
   });
 
   return {
@@ -97,6 +107,8 @@ async function isTokenAccepted(mint) {
     reason: 'tier_accepted',
     tier: tokenData.tier,
     kScore: tokenData.kScore,
+    kRank: tokenData.kRank,
+    creditRating: tokenData.creditRating,
   };
 }
 

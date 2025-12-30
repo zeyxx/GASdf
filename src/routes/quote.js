@@ -232,7 +232,11 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
         decimals: feeInToken.decimals || 6,
-        accepted: tokenCheck.reason, // 'trusted' or 'holdex_verified'
+        accepted: tokenCheck.reason, // 'diamond' or 'tier_accepted'
+        tier: tokenCheck.tier,
+        kScore: tokenCheck.kScore,
+        kRank: tokenCheck.kRank,
+        creditRating: tokenCheck.creditRating,
       },
       holderTier: {
         tier: tierInfo.tier,
