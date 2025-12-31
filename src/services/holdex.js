@@ -43,19 +43,32 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const ERROR_CACHE_TTL = 30 * 1000; // 30 seconds for errors (retry sooner)
 
 // =============================================================================
-// DUAL-BURN FLYWHEEL: Ecosystem burn bonus based on token's own burn rate
+// DUAL-BURN FLYWHEEL: Pure Golden Ratio (φ) Based Economics
 // =============================================================================
-// Tokens that burn their own supply get a bonus: we burn a portion of fees directly
-// (instead of swapping to ASDF) to support ecosystem-wide burning.
+// All ratios derive from the Golden Ratio φ = 1.618033988749...
 //
-// Formula: ecosystemBurnPct = min(MAX_ECOSYSTEM_BURN, burnedPercent * BURN_BONUS_RATE)
-// Example: Token burned 20% of supply → we burn 10% of fees directly
+// The Golden Ratio appears throughout nature (spirals, shells, galaxies),
+// art (Parthenon, Da Vinci), and markets (Fibonacci retracements).
 //
-// This creates a virtuous flywheel:
+// Fee Split (Pure Golden):
+//   Treasury:      1/φ³ = 23.6%
+//   Ecosystem max: 1/φ² = 38.2%
+//   ASDF min:      1/φ² = 38.2%
+//   Total:                100.0% ✓
+//
+// Formula: ecosystemBurn = (1/φ²) × (1 - φ^(-burnPct/30))
+//
+// This creates a virtuous flywheel with mathematically elegant proportions:
 // Token burns → Higher bonus → More direct burns → Incentive to burn more
 // =============================================================================
-const MAX_ECOSYSTEM_BURN_PCT = 0.40; // Max 40% of fees burned directly
-const BURN_BONUS_RATE = 0.5; // 0.5x multiplier on token's burn percentage
+const PHI = 1.618033988749; // Golden Ratio (φ)
+const PHI_SQUARED = PHI * PHI; // φ² = 2.618...
+const PHI_CUBED = PHI * PHI * PHI; // φ³ = 4.236...
+
+// Pure Golden ratios
+const MAX_ECOSYSTEM_BURN_PCT = 1 / PHI_SQUARED; // 1/φ² ≈ 38.2%
+const TREASURY_RATIO = 1 / PHI_CUBED; // 1/φ³ ≈ 23.6%
+const BURN_CURVE_STEEPNESS = 30; // Controls how fast bonus grows
 
 // Default initial supply for pump.fun tokens (1 billion with 6 decimals)
 const PUMP_FUN_INITIAL_SUPPLY = 1_000_000_000_000_000;
@@ -160,30 +173,43 @@ function calculateBurnedPercent(currentSupply, initialSupply = PUMP_FUN_INITIAL_
 
 /**
  * Calculate ecosystem burn bonus based on token's own burn rate
- * Tokens that burn more get more of their fees burned directly (instead of swapped to ASDF)
+ * Uses Pure Golden Ratio formula for mathematically elegant proportions
+ *
+ * Formula: ecosystemBurn = (1/φ²) × (1 - φ^(-burnPct/30))
+ *
+ * This creates an asymptotic curve that:
+ * - Rewards early burns more (diminishing returns)
+ * - Never truly reaches max (always room to improve)
+ * - Uses φ throughout for mathematical harmony
  *
  * @param {number} burnedPercent - Token's burned percentage (0-100)
- * @returns {{ecosystemBurnPct: number, asdfBurnPct: number, explanation: string}}
+ * @returns {{ecosystemBurnPct: number, asdfBurnPct: number, treasuryPct: number, explanation: string}}
  */
 function calculateEcosystemBurnBonus(burnedPercent) {
+  // Treasury is always 1/φ³ ≈ 23.6%
+  const treasuryPct = TREASURY_RATIO;
+  const burnablePct = 1 - treasuryPct; // ≈ 76.4% available for burns
+
   if (!burnedPercent || burnedPercent <= 0) {
     return {
       ecosystemBurnPct: 0,
-      asdfBurnPct: 0.80, // Full 80% goes to ASDF burn
-      treasuryPct: 0.20,
+      asdfBurnPct: burnablePct, // Full burnable portion goes to ASDF
+      treasuryPct,
       explanation: 'No ecosystem burn bonus (token has not burned supply)',
     };
   }
 
-  // Formula: ecosystemBurnPct = min(40%, burnedPercent * 0.5)
-  const ecosystemBurn = Math.min(MAX_ECOSYSTEM_BURN_PCT, (burnedPercent / 100) * BURN_BONUS_RATE);
-  const asdfBurn = 0.80 - ecosystemBurn; // Remaining goes to ASDF burn
+  // Pure Golden Formula: ecosystemBurn = (1/φ²) × (1 - φ^(-b/30))
+  // This creates a smooth asymptotic curve approaching 1/φ² ≈ 38.2%
+  const goldenMultiplier = 1 - Math.pow(PHI, -burnedPercent / BURN_CURVE_STEEPNESS);
+  const ecosystemBurn = MAX_ECOSYSTEM_BURN_PCT * goldenMultiplier;
+  const asdfBurn = burnablePct - ecosystemBurn;
 
   return {
     ecosystemBurnPct: ecosystemBurn,
     asdfBurnPct: asdfBurn,
-    treasuryPct: 0.20, // Treasury always gets 20%
-    explanation: `${(ecosystemBurn * 100).toFixed(1)}% ecosystem burn bonus (token burned ${burnedPercent.toFixed(1)}% of supply)`,
+    treasuryPct,
+    explanation: `${(ecosystemBurn * 100).toFixed(1)}% ecosystem burn (φ-curve, token burned ${burnedPercent.toFixed(1)}% of supply)`,
   };
 }
 
@@ -400,10 +426,15 @@ module.exports = {
   getCacheStats,
   ACCEPTED_TIERS,
   VALID_TIERS,
-  // Dual-burn flywheel
+  // Pure Golden Dual-burn flywheel
   calculateBurnedPercent,
   calculateEcosystemBurnBonus,
-  MAX_ECOSYSTEM_BURN_PCT,
-  BURN_BONUS_RATE,
+  // Golden Ratio constants
+  PHI,
+  PHI_SQUARED,
+  PHI_CUBED,
+  MAX_ECOSYSTEM_BURN_PCT, // 1/φ² ≈ 38.2%
+  TREASURY_RATIO, // 1/φ³ ≈ 23.6%
+  BURN_CURVE_STEEPNESS,
   PUMP_FUN_INITIAL_SUPPLY,
 };

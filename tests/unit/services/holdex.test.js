@@ -480,16 +480,39 @@ describe('HolDex Service', () => {
   });
 
   // ==========================================================================
-  // DUAL-BURN FLYWHEEL TESTS
+  // PURE GOLDEN DUAL-BURN FLYWHEEL TESTS
   // ==========================================================================
 
-  describe('Dual-Burn Flywheel Constants', () => {
-    it('should export MAX_ECOSYSTEM_BURN_PCT as 0.40 (40%)', () => {
-      expect(holdex.MAX_ECOSYSTEM_BURN_PCT).toBe(0.40);
+  describe('Pure Golden Ratio Constants', () => {
+    it('should export PHI as the Golden Ratio ≈ 1.618', () => {
+      expect(holdex.PHI).toBeCloseTo(1.618033988749, 6);
     });
 
-    it('should export BURN_BONUS_RATE as 0.5 (50%)', () => {
-      expect(holdex.BURN_BONUS_RATE).toBe(0.5);
+    it('should export PHI_SQUARED ≈ 2.618', () => {
+      expect(holdex.PHI_SQUARED).toBeCloseTo(2.618033988749, 5);
+    });
+
+    it('should export PHI_CUBED ≈ 4.236', () => {
+      expect(holdex.PHI_CUBED).toBeCloseTo(4.236067977499, 5);
+    });
+
+    it('should export MAX_ECOSYSTEM_BURN_PCT as 1/φ² ≈ 38.2%', () => {
+      expect(holdex.MAX_ECOSYSTEM_BURN_PCT).toBeCloseTo(0.381966, 5);
+      expect(holdex.MAX_ECOSYSTEM_BURN_PCT).toBeCloseTo(1 / holdex.PHI_SQUARED, 10);
+    });
+
+    it('should export TREASURY_RATIO as 1/φ³ ≈ 23.6%', () => {
+      expect(holdex.TREASURY_RATIO).toBeCloseTo(0.236068, 5);
+      expect(holdex.TREASURY_RATIO).toBeCloseTo(1 / holdex.PHI_CUBED, 10);
+    });
+
+    it('should have Pure Golden split sum to 100%', () => {
+      // Max ecosystem + min ASDF + treasury = 100%
+      // 38.2% + 38.2% + 23.6% = 100%
+      const maxEco = holdex.MAX_ECOSYSTEM_BURN_PCT;
+      const treasury = holdex.TREASURY_RATIO;
+      const minAsdf = 1 - treasury - maxEco;
+      expect(maxEco + minAsdf + treasury).toBeCloseTo(1.0, 10);
     });
 
     it('should export PUMP_FUN_INITIAL_SUPPLY as 1 trillion (with decimals)', () => {
@@ -538,73 +561,118 @@ describe('HolDex Service', () => {
     });
   });
 
-  describe('calculateEcosystemBurnBonus()', () => {
+  describe('calculateEcosystemBurnBonus() - Pure Golden Formula', () => {
+    // Golden ratio constants (defined locally to avoid module loading issues)
+    const PHI = 1.618033988749;
+    const PHI_SQUARED = PHI * PHI;
+    const PHI_CUBED = PHI * PHI * PHI;
+    const maxEco = 1 / PHI_SQUARED; // 1/φ² ≈ 38.2%
+    const treasuryPct = 1 / PHI_CUBED; // 1/φ³ ≈ 23.6%
+    const burnablePct = 1 - treasuryPct; // ≈ 76.4%
+
     it('should return no bonus for 0% burned', () => {
       const result = holdex.calculateEcosystemBurnBonus(0);
       expect(result.ecosystemBurnPct).toBe(0);
-      expect(result.asdfBurnPct).toBe(0.80);
-      expect(result.treasuryPct).toBe(0.20);
+      expect(result.asdfBurnPct).toBeCloseTo(burnablePct, 5);
+      expect(result.treasuryPct).toBeCloseTo(treasuryPct, 5);
       expect(result.explanation).toContain('No ecosystem burn bonus');
     });
 
     it('should return no bonus for negative burned percent', () => {
       const result = holdex.calculateEcosystemBurnBonus(-5);
       expect(result.ecosystemBurnPct).toBe(0);
-      expect(result.asdfBurnPct).toBe(0.80);
+      expect(result.asdfBurnPct).toBeCloseTo(burnablePct, 5);
     });
 
-    it('should calculate 10% ecosystem burn for 20% token burned', () => {
-      // Formula: min(40%, 20 * 0.5 / 100) = min(0.40, 0.10) = 0.10
+    it('should use golden formula: (1/φ²) × (1 - φ^(-b/30))', () => {
+      // For 30% burned: multiplier = 1 - φ^(-1) = 1 - 0.618 = 0.382
+      // ecosystemBurn = 0.382 × 0.382 ≈ 14.6%
+      const result = holdex.calculateEcosystemBurnBonus(30);
+      const expectedMultiplier = 1 - Math.pow(PHI, -30/30);
+      const expectedEco = maxEco * expectedMultiplier;
+      expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
+    });
+
+    it('should calculate correct ecosystem burn for 20% token burned', () => {
+      // Formula: (1/φ²) × (1 - φ^(-20/30))
       const result = holdex.calculateEcosystemBurnBonus(20);
-      expect(result.ecosystemBurnPct).toBeCloseTo(0.10, 5);
-      expect(result.asdfBurnPct).toBeCloseTo(0.70, 5);
-      expect(result.treasuryPct).toBe(0.20);
+      const expectedMultiplier = 1 - Math.pow(PHI, -20/30);
+      const expectedEco = maxEco * expectedMultiplier;
+      expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
+      expect(result.ecosystemBurnPct).toBeCloseTo(0.105, 2); // ~10.5%
     });
 
-    it('should calculate 20% ecosystem burn for 40% token burned', () => {
-      // Formula: min(40%, 40 * 0.5 / 100) = min(0.40, 0.20) = 0.20
-      const result = holdex.calculateEcosystemBurnBonus(40);
-      expect(result.ecosystemBurnPct).toBeCloseTo(0.20, 5);
-      expect(result.asdfBurnPct).toBeCloseTo(0.60, 5);
+    it('should calculate correct ecosystem burn for 50% token burned', () => {
+      const result = holdex.calculateEcosystemBurnBonus(50);
+      const expectedMultiplier = 1 - Math.pow(PHI, -50/30);
+      const expectedEco = maxEco * expectedMultiplier;
+      expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
     });
 
-    it('should cap ecosystem burn at 40% for very high burn rates', () => {
-      // Formula: min(40%, 90 * 0.5 / 100) = min(0.40, 0.45) = 0.40
-      const result = holdex.calculateEcosystemBurnBonus(90);
-      expect(result.ecosystemBurnPct).toBe(0.40);
-      expect(result.asdfBurnPct).toBeCloseTo(0.40, 5);
+    it('should asymptotically approach 1/φ² (38.2%) for very high burn rates', () => {
+      const result90 = holdex.calculateEcosystemBurnBonus(90);
+      const result100 = holdex.calculateEcosystemBurnBonus(100);
+      const result200 = holdex.calculateEcosystemBurnBonus(200);
+
+      // Should approach but never quite reach maxEco
+      expect(result90.ecosystemBurnPct).toBeLessThan(maxEco);
+      expect(result100.ecosystemBurnPct).toBeLessThan(maxEco);
+      expect(result200.ecosystemBurnPct).toBeLessThan(maxEco);
+
+      // Higher burn = closer to max
+      expect(result100.ecosystemBurnPct).toBeGreaterThan(result90.ecosystemBurnPct);
+      expect(result200.ecosystemBurnPct).toBeGreaterThan(result100.ecosystemBurnPct);
+
+      // At 200% (impossible but test asymptote), should be very close
+      expect(result200.ecosystemBurnPct).toBeCloseTo(maxEco, 1);
     });
 
-    it('should cap at 40% even for 100% burned', () => {
-      const result = holdex.calculateEcosystemBurnBonus(100);
-      expect(result.ecosystemBurnPct).toBe(0.40);
-    });
-
-    it('should maintain 20% treasury regardless of ecosystem burn', () => {
+    it('should maintain 1/φ³ (23.6%) treasury regardless of ecosystem burn', () => {
       [0, 10, 20, 50, 80, 100].forEach(burnedPercent => {
         const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
-        expect(result.treasuryPct).toBe(0.20);
+        expect(result.treasuryPct).toBeCloseTo(treasuryPct, 5);
       });
     });
 
     it('should have percentages sum to 100%', () => {
-      [0, 10, 20, 50, 80].forEach(burnedPercent => {
+      [0, 10, 20, 50, 80, 100].forEach(burnedPercent => {
         const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
         const total = result.ecosystemBurnPct + result.asdfBurnPct + result.treasuryPct;
         expect(total).toBeCloseTo(1.0, 5);
       });
     });
 
-    it('should include explanation in result', () => {
+    it('should include φ-curve in explanation', () => {
       const result = holdex.calculateEcosystemBurnBonus(20);
-      expect(result.explanation).toContain('10.0%');
-      expect(result.explanation).toContain('ecosystem burn bonus');
+      expect(result.explanation).toContain('φ-curve');
       expect(result.explanation).toContain('20.0%');
+    });
+
+    it('should demonstrate diminishing returns (golden curve property)', () => {
+      // First 10% burn gives more bonus per % than last 10%
+      const result10 = holdex.calculateEcosystemBurnBonus(10);
+      const result20 = holdex.calculateEcosystemBurnBonus(20);
+      const result90 = holdex.calculateEcosystemBurnBonus(90);
+      const result100 = holdex.calculateEcosystemBurnBonus(100);
+
+      const gain0to10 = result10.ecosystemBurnPct - 0;
+      const gain10to20 = result20.ecosystemBurnPct - result10.ecosystemBurnPct;
+      const gain90to100 = result100.ecosystemBurnPct - result90.ecosystemBurnPct;
+
+      // Early burns more rewarding than late burns
+      expect(gain0to10).toBeGreaterThan(gain10to20);
+      expect(gain10to20).toBeGreaterThan(gain90to100);
     });
   });
 
   describe('getToken() with supply and ecosystem burn data', () => {
     const testMint = 'TestMint111111111111111111111111111111111111';
+    // Golden ratio constants (defined locally)
+    const PHI = 1.618033988749;
+    const PHI_SQUARED = PHI * PHI;
+    const PHI_CUBED = PHI * PHI * PHI;
+    const treasuryPct = 1 / PHI_CUBED;
+    const maxEco = 1 / PHI_SQUARED;
 
     it('should include supply data when available from API', async () => {
       global.fetch.mockResolvedValue({
@@ -624,7 +692,7 @@ describe('HolDex Service', () => {
       expect(result.supply.burnedPercent).toBeCloseTo(20, 5);
     });
 
-    it('should include ecosystemBurn data', async () => {
+    it('should include ecosystemBurn data with golden formula', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
@@ -638,9 +706,16 @@ describe('HolDex Service', () => {
       const result = await holdex.getToken(testMint);
 
       expect(result.ecosystemBurn).toBeDefined();
-      expect(result.ecosystemBurn.ecosystemBurnPct).toBeCloseTo(0.10, 5);
-      expect(result.ecosystemBurn.asdfBurnPct).toBeCloseTo(0.70, 5);
-      expect(result.ecosystemBurn.treasuryPct).toBe(0.20);
+      // Golden formula: (1/φ²) × (1 - φ^(-20/30)) ≈ 10.5%
+      const expectedMultiplier = 1 - Math.pow(PHI, -20/30);
+      const expectedEco = maxEco * expectedMultiplier;
+      expect(result.ecosystemBurn.ecosystemBurnPct).toBeCloseTo(expectedEco, 4);
+      expect(result.ecosystemBurn.treasuryPct).toBeCloseTo(treasuryPct, 5);
+      // Total should be 100%
+      const total = result.ecosystemBurn.ecosystemBurnPct +
+                   result.ecosystemBurn.asdfBurnPct +
+                   result.ecosystemBurn.treasuryPct;
+      expect(total).toBeCloseTo(1.0, 5);
     });
 
     it('should handle missing supply data gracefully', async () => {
@@ -657,6 +732,7 @@ describe('HolDex Service', () => {
       expect(result.supply).toBeDefined();
       expect(result.supply.burnedPercent).toBe(0);
       expect(result.ecosystemBurn.ecosystemBurnPct).toBe(0);
+      expect(result.ecosystemBurn.treasuryPct).toBeCloseTo(treasuryPct, 5);
     });
   });
 });

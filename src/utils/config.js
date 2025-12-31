@@ -4,6 +4,14 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 // =============================================================================
+// Golden Ratio (φ) - Used for Pure Golden fee split
+// =============================================================================
+const PHI = 1.618033988749; // Golden Ratio
+const PHI_CUBED = PHI * PHI * PHI; // φ³ = 4.236...
+const GOLDEN_TREASURY_RATIO = 1 / PHI_CUBED; // 1/φ³ ≈ 23.6%
+const GOLDEN_BURN_RATIO = 1 - GOLDEN_TREASURY_RATIO; // ≈ 76.4%
+
+// =============================================================================
 // Environment Detection
 // =============================================================================
 const ENV = process.env.NODE_ENV || 'development';
@@ -102,9 +110,10 @@ const config = {
   //
   // ==========================================================================
 
-  // Treasury model (80/20 split) - defines break-even math
-  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || 0.80,
-  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || 0.20,
+  // Treasury model (Pure Golden split: 76.4% burn / 23.6% treasury)
+  // Based on Golden Ratio: Treasury = 1/φ³, Burn = 1 - 1/φ³
+  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || GOLDEN_BURN_RATIO,
+  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || GOLDEN_TREASURY_RATIO,
 
   // Network cost (Solana base fee) - the fundamental input
   NETWORK_FEE_LAMPORTS: parseInt(process.env.NETWORK_FEE_LAMPORTS) || 5000,
@@ -113,7 +122,7 @@ const config = {
   FEE_MARKUP: parseFloat(process.env.FEE_MARKUP) || 2.0,
 
   // Derived: BASE_FEE = NETWORK_FEE × (1/TREASURY_RATIO) × MARKUP
-  // = 5000 × 5 × 2 = 50000 lamports
+  // = 5000 × (1/0.236) × 2 ≈ 5000 × 4.24 × 2 ≈ 42400 lamports
   BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 50000,
 
   // Legacy multiplier (kept at 1.0, margin is in BASE_FEE now)
