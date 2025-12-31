@@ -15,6 +15,7 @@ const submitRouter = require('./routes/submit');
 const tokensRouter = require('./routes/tokens');
 const statsRouter = require('./routes/stats');
 const healthRouter = require('./routes/health');
+const adminRouter = require('./routes/admin');
 
 const app = express();
 
@@ -162,6 +163,9 @@ app.use('/v1/submit', submitRouter);
 app.use('/v1/tokens', tokensRouter);
 app.use('/v1/stats', statsRouter);
 app.use('/v1/health', healthRouter);
+
+// Admin routes (protected by API key)
+app.use('/admin', adminRouter);
 
 // API Routes - legacy (backwards compatibility)
 // Deprecation middleware
