@@ -4,7 +4,7 @@
 
 All fees are converted to **$ASDF** and burned.
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/zeyxx/GASdf/releases)
+[![Version](https://img.shields.io/badge/version-1.5.4-blue.svg)](https://github.com/zeyxx/GASdf/releases)
 [![Tests](https://img.shields.io/badge/tests-741%20passing-brightgreen.svg)](#testing)
 [![Security](https://img.shields.io/badge/security-12%2F12%20layers-brightgreen.svg)](#security)
 
@@ -131,16 +131,20 @@ Service health with RPC pool status.
 
 Public status page (Upptime-compatible).
 
-## K-Score Pricing
+## K-Score Token Gating
 
-Tokens are scored for trustworthiness, affecting fee multiplier:
+Tokens are scored by [HolDex](https://holdex.io) for trustworthiness. Only tokens with K-score >= 50 are accepted:
 
-| Tier     | Score | Fee Multiplier | Examples |
-|----------|-------|----------------|----------|
-| TRUSTED  | 80+   | 1.0x          | USDC, SOL |
-| STANDARD | 50-79 | 1.25x         | Major tokens |
-| RISKY    | 20-49 | 1.5x          | Low liquidity |
-| UNKNOWN  | 0-19  | 2.0x          | New tokens |
+| Tier | K-Score | Icon | Credit Rating | Examples |
+|------|---------|------|---------------|----------|
+| Diamond | 90-100 | :gem: | A1 (Prime) | SOL, USDC, USDT, $ASDF |
+| Platinum | 80-89 | :sparkles: | A2 (High Grade) | Major DeFi tokens |
+| Gold | 70-79 | :1st_place_medal: | A3 (Good) | Verified memecoins |
+| Silver | 60-69 | :2nd_place_medal: | B1 (Adequate) | Emerging tokens |
+| Bronze | 50-59 | :3rd_place_medal: | B2 (Speculative) | New verified tokens |
+| Rejected | < 50 | :x: | - | Unverified tokens |
+
+All accepted tokens pay the same base fee (~$0.01). Token gating replaces fee multipliers for risk management.
 
 ## Security
 

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2025-12-31
+
+### Fixed
+
+- **Jupiter API Migration**: Updated from deprecated `quote-api.jup.ag/v6` to `lite-api.jup.ag/swap/v1`
+  - Old v6 endpoint was deprecated in September 2025
+  - Using lite-api (no API key required) until January 31, 2026
+  - TODO: Migrate to `api.jup.ag` with API key before deprecation
+
+- **Fee Payer Thresholds**: Lowered balance thresholds to prevent service disruption
+  - Critical threshold: 0.1 SOL → 0.01 SOL
+  - Warning threshold: 0.2 SOL → 0.05 SOL
+  - Allows service to continue operating with lower fee payer balance
+
+### Changed
+
+- Fee payer status now shows "warning" instead of "critical" at low balances
+- Service remains operational with ~0.04 SOL (enough for ~8000 transactions)
+
 ## [1.2.5] - 2025-12-28
 
 ### Added
