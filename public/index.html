@@ -957,6 +957,66 @@
       }
     }
 
+    // Fetch $ASDF token data from HolDex for dual-burn flywheel
+    async function fetchAsdfData() {
+      try {
+        const res = await fetch('https://asdev-backend.onrender.com/api/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          const token = data.token;
+
+          // Update price ticker
+          const priceUsd = token.priceUsd || token.priceusd || 0;
+          document.getElementById('asdfPrice').textContent = '$' + priceUsd.toFixed(6);
+
+          // Calculate burned percent
+          const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
+          const currentSupply = parseInt(token.supply) || INITIAL_SUPPLY;
+          const burnedPercent = ((INITIAL_SUPPLY - currentSupply) / INITIAL_SUPPLY) * 100;
+          const burnedAmount = (INITIAL_SUPPLY - currentSupply) / 1e6; // In tokens
+
+          // Update burn progress bar
+          document.getElementById('burnProgress').style.width = Math.min(burnedPercent, 100) + '%';
+          document.getElementById('burnedAmount').textContent = burnedAmount.toLocaleString('en-US', { maximumFractionDigits: 0 });
+          document.getElementById('burnPercent').textContent = burnedPercent.toFixed(2) + '%';
+
+          // Update golden split visualization with real data
+          updateSplitVisualization(burnedPercent);
+
+          // Update burned USD value
+          const burnedUsd = burnedAmount * priceUsd;
+          document.getElementById('burnedUsd').textContent = '$' + burnedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+          console.log('ASDF Data:', { burnedPercent: burnedPercent.toFixed(2) + '%', price: priceUsd });
+        }
+      } catch (err) {
+        console.error('Failed to fetch ASDF data:', err);
+      }
+    }
+
+    // Fetch SOL price from a public API
+    async function fetchSolPrice() {
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const data = await res.json();
+        if (data.solana?.usd) {
+          document.getElementById('solPrice').textContent = '$' + data.solana.usd.toFixed(2);
+        }
+      } catch (err) {
+        // Fallback - try Jupiter
+        try {
+          const res = await fetch('https://price.jup.ag/v4/price?ids=SOL');
+          const data = await res.json();
+          if (data.data?.SOL?.price) {
+            document.getElementById('solPrice').textContent = '$' + data.data.SOL.price.toFixed(2);
+          }
+        } catch {
+          console.error('Failed to fetch SOL price');
+        }
+      }
+    }
+
     // Fetch health
     async function fetchHealth() {
       try {
@@ -1065,28 +1125,20 @@
       if (e.key === 'Enter') lookupWallet();
     });
 
-    // Animate split on load
-    function animateSplit() {
-      let current = 0;
-      const target = 50; // Simulate 50% burned token
-      const interval = setInterval(() => {
-        current += 2;
-        updateSplitVisualization(current);
-        if (current >= target) clearInterval(interval);
-      }, 50);
-    }
-
     // Initial load
     fetchStats();
     fetchHealth();
     fetchLeaderboard();
+    fetchAsdfData();
+    fetchSolPrice();
     loadSavedWallet();
-    setTimeout(animateSplit, 500);
 
     // Refresh intervals
     setInterval(fetchStats, 30000);
     setInterval(fetchHealth, 30000);
     setInterval(fetchLeaderboard, 60000);
+    setInterval(fetchAsdfData, 60000);
+    setInterval(fetchSolPrice, 120000);
   </script>
 </body>
 </html>
