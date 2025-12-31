@@ -3,7 +3,7 @@ const { jupiterBreaker } = require('../utils/circuit-breaker');
 const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
 const { fetchWithTimeout, JUPITER_TIMEOUT } = require('../utils/fetch-timeout');
 
-const JUPITER_API = 'https://quote-api.jup.ag/v6';
+const JUPITER_API = 'https://api.jup.ag/swap/v1';
 
 // Common token info (avoid extra API calls)
 const TOKEN_INFO = {
