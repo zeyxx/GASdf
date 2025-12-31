@@ -329,17 +329,45 @@ async function getToken(mint) {
     } : null);
 
     // ==========================================================================
-    // DUAL-BURN FLYWHEEL: Calculate ecosystem burn bonus from supply data
+    // DUAL-BURN FLYWHEEL: Use HolDex burn data (source of truth) or calculate
     // ==========================================================================
     const currentSupply = parseInt(token.supply) || 0;
-    const burnedPercent = calculateBurnedPercent(currentSupply);
+
+    // Prefer HolDex pre-calculated burn data (tracks actual on-chain burns)
+    let burnedPercent = 0;
+    let burnedAmount = 0;
+    let initialSupply = PUMP_FUN_INITIAL_SUPPLY;
+    let burnSource = 'none';
+
+    if (typeof token.burnedPercent === 'number' && token.burnedPercent > 0) {
+      // HolDex provides burn data - use it (most accurate)
+      burnedPercent = token.burnedPercent;
+      burnedAmount = token.burnedAmount || 0;
+      initialSupply = parseFloat(token.initialSupply) * Math.pow(10, token.decimals || 6) || PUMP_FUN_INITIAL_SUPPLY;
+      burnSource = 'holdex';
+    } else if (token.burned_percent && token.burned_percent > 0) {
+      // Alternative field names
+      burnedPercent = token.burned_percent;
+      burnedAmount = token.burned_amount || 0;
+      initialSupply = parseFloat(token.initial_supply) * Math.pow(10, token.decimals || 6) || PUMP_FUN_INITIAL_SUPPLY;
+      burnSource = 'holdex';
+    } else if (currentSupply > 0 && currentSupply < PUMP_FUN_INITIAL_SUPPLY) {
+      // Fallback: Calculate from pump.fun standard 1B initial supply
+      burnedPercent = calculateBurnedPercent(currentSupply);
+      burnedAmount = PUMP_FUN_INITIAL_SUPPLY - currentSupply;
+      burnSource = 'calculated';
+    }
+
     const ecosystemBurn = calculateEcosystemBurnBonus(burnedPercent);
 
     const supplyData = {
       current: currentSupply,
-      initial: PUMP_FUN_INITIAL_SUPPLY,
+      initial: initialSupply,
       burnedPercent,
-      burnedAmount: PUMP_FUN_INITIAL_SUPPLY - currentSupply,
+      burnedAmount,
+      source: burnSource, // 'holdex', 'calculated', or 'none'
+      isPumpFun: token.isPumpFun || token.is_pump_fun || false,
+      bondingCurveComplete: token.bondingCurveComplete || token.bonding_curve_complete || false,
     };
 
     const result = {
@@ -361,6 +389,7 @@ async function getToken(mint) {
       kScore,
       grade: creditRating.grade,
       burnedPercent: burnedPercent.toFixed(2) + '%',
+      burnSource,
       ecosystemBurnBonus: (ecosystemBurn.ecosystemBurnPct * 100).toFixed(1) + '%',
     });
 
