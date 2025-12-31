@@ -15,6 +15,7 @@ const rpc = require('../utils/rpc');
 const { getHealthyPayer } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
+const holdex = require('./holdex');
 const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
 
 // Lazy-load ASDF mint to avoid startup errors in dev
@@ -278,26 +279,64 @@ async function executeBurnWithLock(tokenBalances) {
 
 /**
  * Process a single token type for burning
+ *
+ * DUAL-BURN FLYWHEEL:
+ * - Tokens that have burned their own supply get an "ecosystem burn bonus"
+ * - Instead of swapping 100% to ASDF, we burn a portion of the token directly
+ * - This supports ecosystem-wide burning and incentivizes all tokens to burn
+ *
+ * Split calculation:
+ * - ecosystemBurnPct% → Burn token directly (ecosystem support)
+ * - (80% - ecosystemBurnPct)% → Swap to ASDF → Burn
+ * - 20% → Swap to SOL (treasury)
  */
 async function processTokenBurn(token) {
   const { mint, balance, symbol, decimals, valueUsd } = token;
   const isAsdf = mint === config.ASDF_MINT;
 
-  // Calculate 80/20 split
-  const { burnAmount, treasuryAmount } = calculateTreasurySplit(balance, config.BURN_RATIO);
+  // ==========================================================================
+  // DUAL-BURN FLYWHEEL: Get ecosystem burn bonus for HolDex tokens
+  // ==========================================================================
+  let ecosystemBurnBonus = { ecosystemBurnPct: 0, asdfBurnPct: 0.80, treasuryPct: 0.20 };
+  let tokenBurnedPercent = 0;
 
-  logger.info('BURN', `Processing ${symbol}`, {
+  if (!isAsdf) {
+    try {
+      const tokenData = await holdex.getToken(mint);
+      if (tokenData.ecosystemBurn) {
+        ecosystemBurnBonus = tokenData.ecosystemBurn;
+        tokenBurnedPercent = tokenData.supply?.burnedPercent || 0;
+      }
+    } catch (error) {
+      logger.debug('BURN', 'Could not get ecosystem burn data, using default split', {
+        mint: mint.slice(0, 8),
+        error: error.message,
+      });
+    }
+  }
+
+  // Calculate amounts based on ecosystem burn bonus
+  const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
+  const asdfBurnAmount = Math.floor(balance * ecosystemBurnBonus.asdfBurnPct);
+  const treasuryAmount = balance - ecosystemBurnAmount - asdfBurnAmount; // Remainder to treasury
+
+  logger.info('BURN', `Processing ${symbol} with dual-burn flywheel`, {
     mint: mint.slice(0, 8),
     totalBalance: balance,
     valueUsd: valueUsd?.toFixed(2) || 'unknown',
-    burnPortion: burnAmount,
-    treasuryPortion: treasuryAmount,
+    tokenBurnedPercent: tokenBurnedPercent.toFixed(2) + '%',
+    ecosystemBurnPct: (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%',
+    ecosystemBurnAmount,
+    asdfBurnAmount,
+    treasuryAmount,
     isAsdf,
   });
 
   let asdfBurned = 0;
+  let ecosystemBurned = 0;
   let solToTreasury = 0;
   let burnSignature = null;
+  let ecosystemBurnSignature = null;
   let swapSignatures = [];
 
   const feePayer = getHealthyPayer();
@@ -310,19 +349,22 @@ async function processTokenBurn(token) {
     // $ASDF TOKEN: Burn 80% directly, swap 20% → SOL for treasury
     // ==========================================================================
 
+    const { burnAmount: directBurnAmount, treasuryAmount: asdfTreasuryAmount } =
+      calculateTreasurySplit(balance, config.BURN_RATIO);
+
     // 1. Burn 80% directly
-    if (burnAmount > 0) {
-      burnSignature = await burnAsdfFromTreasury(burnAmount);
-      asdfBurned = burnAmount;
+    if (directBurnAmount > 0) {
+      burnSignature = await burnAsdfFromTreasury(directBurnAmount);
+      asdfBurned = directBurnAmount;
       logger.info('BURN', 'Direct ASDF burn', {
-        amount: burnAmount,
+        amount: directBurnAmount,
         signature: burnSignature,
       });
     }
 
     // 2. Swap 20% → SOL for treasury operations
-    if (treasuryAmount > 0) {
-      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
+    if (asdfTreasuryAmount > 0) {
+      const treasurySwap = await swapTokenToSol(mint, asdfTreasuryAmount, feePayer);
       if (treasurySwap.success) {
         solToTreasury = parseInt(treasurySwap.solReceived);
         swapSignatures.push(treasurySwap.signature);
@@ -331,7 +373,7 @@ async function processTokenBurn(token) {
         await redis.recordTreasuryEvent({
           type: 'fee_conversion',
           tokenMint: mint,
-          tokenAmount: treasuryAmount,
+          tokenAmount: asdfTreasuryAmount,
           solAmount: solToTreasury,
           source: 'asdf_treasury_portion',
         });
@@ -340,12 +382,37 @@ async function processTokenBurn(token) {
 
   } else {
     // ==========================================================================
-    // OTHER TOKENS: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
+    // OTHER TOKENS: Dual-burn flywheel
+    // - ecosystemBurnPct% → Burn token directly (ecosystem support)
+    // - asdfBurnPct% → Swap to ASDF → Burn
+    // - treasuryPct% → Swap to SOL (treasury)
     // ==========================================================================
 
-    // 1. Swap 80% → ASDF and burn
-    if (burnAmount > 0) {
-      const burnSwap = await swapTokenToAsdf(mint, burnAmount, feePayer);
+    // 1. ECOSYSTEM BURN: Burn token directly (supports ecosystem-wide burning)
+    if (ecosystemBurnAmount > 0) {
+      try {
+        ecosystemBurnSignature = await burnTokenFromTreasury(mint, ecosystemBurnAmount, feePayer);
+        ecosystemBurned = ecosystemBurnAmount;
+        logger.info('BURN', 'Ecosystem direct burn', {
+          symbol,
+          amount: ecosystemBurnAmount,
+          signature: ecosystemBurnSignature,
+          tokenBurnedPercent: tokenBurnedPercent.toFixed(2) + '%',
+        });
+      } catch (error) {
+        logger.warn('BURN', 'Ecosystem burn failed, will swap to ASDF instead', {
+          mint: mint.slice(0, 8),
+          error: error.message,
+        });
+        // Fall back: add to ASDF burn amount
+        // asdfBurnAmount += ecosystemBurnAmount; // Can't modify const, handled below
+      }
+    }
+
+    // 2. ASDF BURN: Swap portion → ASDF and burn
+    const effectiveAsdfBurnAmount = ecosystemBurned > 0 ? asdfBurnAmount : asdfBurnAmount + ecosystemBurnAmount;
+    if (effectiveAsdfBurnAmount > 0) {
+      const burnSwap = await swapTokenToAsdf(mint, effectiveAsdfBurnAmount, feePayer);
       if (burnSwap.success) {
         const asdfToBurn = parseInt(burnSwap.asdfReceived);
         swapSignatures.push(burnSwap.signature);
@@ -354,8 +421,8 @@ async function processTokenBurn(token) {
         burnSignature = await burnAsdf(asdfToBurn);
         asdfBurned = asdfToBurn;
 
-        logger.info('BURN', 'Swap and burn completed', {
-          tokenIn: burnAmount,
+        logger.info('BURN', 'Swap to ASDF and burn completed', {
+          tokenIn: effectiveAsdfBurnAmount,
           asdfBurned: asdfToBurn,
           swapSignature: burnSwap.signature,
           burnSignature,
@@ -363,7 +430,7 @@ async function processTokenBurn(token) {
       }
     }
 
-    // 2. Swap 20% → SOL for treasury operations
+    // 3. TREASURY: Swap portion → SOL for treasury operations
     if (treasuryAmount > 0) {
       const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
       if (treasurySwap.success) {
@@ -389,18 +456,25 @@ async function processTokenBurn(token) {
   }
 
   // Update burn stats
-  if (asdfBurned > 0) {
-    await redis.incrBurnTotal(asdfBurned);
+  if (asdfBurned > 0 || ecosystemBurned > 0) {
+    if (asdfBurned > 0) {
+      await redis.incrBurnTotal(asdfBurned);
+    }
 
-    // Record burn proof for transparency
+    // Record burn proof for transparency (includes ecosystem burn data)
     await redis.recordBurnProof({
       burnSignature,
+      ecosystemBurnSignature,
       swapSignatures,
       amountBurned: asdfBurned,
+      ecosystemBurned,
+      ecosystemBurnBonus: ecosystemBurnBonus.ecosystemBurnPct,
       sourceToken: mint,
-      sourceAmount: burnAmount,
+      sourceSymbol: symbol,
+      sourceAmount: balance,
+      tokenBurnedPercent,
       treasuryAmount: solToTreasury,
-      method: isAsdf ? 'direct' : 'swap',
+      method: isAsdf ? 'direct' : (ecosystemBurned > 0 ? 'dual_burn' : 'swap'),
       network: config.NETWORK,
     });
   }
@@ -409,9 +483,16 @@ async function processTokenBurn(token) {
     mint,
     symbol,
     asdfBurned,
+    ecosystemBurned,
     solToTreasury,
     burnSignature,
+    ecosystemBurnSignature,
     swapSignatures,
+    dualBurn: {
+      tokenBurnedPercent,
+      ecosystemBurnPct: ecosystemBurnBonus.ecosystemBurnPct,
+      explanation: ecosystemBurnBonus.explanation,
+    },
   };
 }
 
@@ -585,6 +666,77 @@ async function burnAsdfFromTreasury(amount) {
   return signature;
 }
 
+/**
+ * Burn any SPL token directly from treasury token account
+ * Used for ecosystem burn bonus in dual-burn flywheel
+ *
+ * @param {string} mint - Token mint address
+ * @param {number} amount - Amount to burn (raw, with decimals)
+ * @param {Keypair} feePayer - Fee payer keypair (must be treasury owner)
+ * @returns {Promise<string>} - Transaction signature
+ */
+async function burnTokenFromTreasury(mint, amount, feePayer) {
+  const treasury = getTreasuryAddress();
+  const tokenMint = new PublicKey(mint);
+
+  // Get treasury's token account for this mint
+  const treasuryAta = await getAssociatedTokenAddress(
+    tokenMint,
+    treasury
+  );
+
+  // Verify the token account exists and has sufficient balance
+  try {
+    const account = await getAccount(rpc.getConnection(), treasuryAta);
+    if (BigInt(account.amount) < BigInt(amount)) {
+      throw new Error(`Insufficient balance: ${account.amount} < ${amount}`);
+    }
+  } catch (error) {
+    if (error.message.includes('could not find account')) {
+      throw new Error(`Token account not found for mint ${mint.slice(0, 8)}`);
+    }
+    throw error;
+  }
+
+  // Check if fee payer is the treasury (can burn directly)
+  const feePayerIsTreasury = feePayer.publicKey.equals(treasury);
+
+  if (!feePayerIsTreasury) {
+    // Treasury and fee payer are different - cannot burn without treasury signing
+    throw new Error('Fee payer is not treasury owner, cannot burn directly');
+  }
+
+  // Create burn instruction (treasury is fee payer, so we have authority)
+  const burnIx = createBurnInstruction(
+    treasuryAta,
+    tokenMint,
+    treasury,
+    amount
+  );
+
+  // Build and send transaction
+  const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+
+  const transaction = new Transaction({
+    feePayer: feePayer.publicKey,
+    blockhash,
+    lastValidBlockHeight,
+  }).add(burnIx);
+
+  transaction.sign(feePayer);
+
+  const signature = await rpc.sendTransaction(transaction);
+  await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+  logger.info('BURN', 'Token burned from treasury (ecosystem burn)', {
+    mint: mint.slice(0, 8),
+    amount,
+    signature,
+  });
+
+  return signature;
+}
+
 // Schedule periodic burn checks
 function startBurnWorker(intervalMs = 60000) {
   // Initial check after 10 seconds
@@ -611,6 +763,7 @@ function startBurnWorker(intervalMs = 60000) {
 module.exports = {
   checkAndExecuteBurn,
   burnAsdf,
+  burnTokenFromTreasury,
   startBurnWorker,
   getTreasuryTokenBalances,
 };

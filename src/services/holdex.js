@@ -42,6 +42,24 @@ const tokenCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const ERROR_CACHE_TTL = 30 * 1000; // 30 seconds for errors (retry sooner)
 
+// =============================================================================
+// DUAL-BURN FLYWHEEL: Ecosystem burn bonus based on token's own burn rate
+// =============================================================================
+// Tokens that burn their own supply get a bonus: we burn a portion of fees directly
+// (instead of swapping to ASDF) to support ecosystem-wide burning.
+//
+// Formula: ecosystemBurnPct = min(MAX_ECOSYSTEM_BURN, burnedPercent * BURN_BONUS_RATE)
+// Example: Token burned 20% of supply → we burn 10% of fees directly
+//
+// This creates a virtuous flywheel:
+// Token burns → Higher bonus → More direct burns → Incentive to burn more
+// =============================================================================
+const MAX_ECOSYSTEM_BURN_PCT = 0.40; // Max 40% of fees burned directly
+const BURN_BONUS_RATE = 0.5; // 0.5x multiplier on token's burn percentage
+
+// Default initial supply for pump.fun tokens (1 billion with 6 decimals)
+const PUMP_FUN_INITIAL_SUPPLY = 1_000_000_000_000_000;
+
 // API configuration
 const HOLDEX_TIMEOUT = 5000; // 5 seconds
 
@@ -127,6 +145,49 @@ function getCreditRating(kScore, trajectory = null) {
 }
 
 /**
+ * Calculate burned percentage from supply data
+ * @param {number} currentSupply - Current circulating supply (raw, with decimals)
+ * @param {number} initialSupply - Initial supply (raw, with decimals), defaults to pump.fun standard
+ * @returns {number} - Burned percentage (0-100)
+ */
+function calculateBurnedPercent(currentSupply, initialSupply = PUMP_FUN_INITIAL_SUPPLY) {
+  if (!currentSupply || currentSupply <= 0 || initialSupply <= 0) return 0;
+  if (currentSupply >= initialSupply) return 0; // No burns
+
+  const burned = initialSupply - currentSupply;
+  return (burned / initialSupply) * 100;
+}
+
+/**
+ * Calculate ecosystem burn bonus based on token's own burn rate
+ * Tokens that burn more get more of their fees burned directly (instead of swapped to ASDF)
+ *
+ * @param {number} burnedPercent - Token's burned percentage (0-100)
+ * @returns {{ecosystemBurnPct: number, asdfBurnPct: number, explanation: string}}
+ */
+function calculateEcosystemBurnBonus(burnedPercent) {
+  if (!burnedPercent || burnedPercent <= 0) {
+    return {
+      ecosystemBurnPct: 0,
+      asdfBurnPct: 0.80, // Full 80% goes to ASDF burn
+      treasuryPct: 0.20,
+      explanation: 'No ecosystem burn bonus (token has not burned supply)',
+    };
+  }
+
+  // Formula: ecosystemBurnPct = min(40%, burnedPercent * 0.5)
+  const ecosystemBurn = Math.min(MAX_ECOSYSTEM_BURN_PCT, (burnedPercent / 100) * BURN_BONUS_RATE);
+  const asdfBurn = 0.80 - ecosystemBurn; // Remaining goes to ASDF burn
+
+  return {
+    ecosystemBurnPct: ecosystemBurn,
+    asdfBurnPct: asdfBurn,
+    treasuryPct: 0.20, // Treasury always gets 20%
+    explanation: `${(ecosystemBurn * 100).toFixed(1)}% ecosystem burn bonus (token burned ${burnedPercent.toFixed(1)}% of supply)`,
+  };
+}
+
+/**
  * Get token data from HolDex
  * @param {string} mint - Token mint address
  * @returns {Promise<{tier: string, kScore: number, kRank: object, creditRating: object, hasCommunityUpdate: boolean, conviction?: object, cached: boolean, error?: string}>}
@@ -194,9 +255,40 @@ async function getToken(mint) {
       reducers: token.conviction.reducers || 0,
       extractors: token.conviction.extractors || 0,
       analyzed: token.conviction.analyzed || 0,
-    } : null;
+    } : (token.conviction_score ? {
+      score: token.conviction_score,
+      accumulators: token.conviction_accumulators || 0,
+      holders: token.conviction_holders || 0,
+      reducers: token.conviction_reducers || 0,
+      extractors: token.conviction_extractors || 0,
+      analyzed: token.conviction_analyzed || 0,
+    } : null);
 
-    const result = { tier, kScore, kRank, creditRating, hasCommunityUpdate, conviction };
+    // ==========================================================================
+    // DUAL-BURN FLYWHEEL: Calculate ecosystem burn bonus from supply data
+    // ==========================================================================
+    const currentSupply = parseInt(token.supply) || 0;
+    const burnedPercent = calculateBurnedPercent(currentSupply);
+    const ecosystemBurn = calculateEcosystemBurnBonus(burnedPercent);
+
+    const supplyData = {
+      current: currentSupply,
+      initial: PUMP_FUN_INITIAL_SUPPLY,
+      burnedPercent,
+      burnedAmount: PUMP_FUN_INITIAL_SUPPLY - currentSupply,
+    };
+
+    const result = {
+      tier,
+      kScore,
+      kRank,
+      creditRating,
+      hasCommunityUpdate,
+      conviction,
+      // Dual-burn flywheel data
+      supply: supplyData,
+      ecosystemBurn,
+    };
     cacheResult(mint, result);
 
     logger.debug('HOLDEX', 'Token data fetched', {
@@ -204,6 +296,8 @@ async function getToken(mint) {
       tier,
       kScore,
       grade: creditRating.grade,
+      burnedPercent: burnedPercent.toFixed(2) + '%',
+      ecosystemBurnBonus: (ecosystemBurn.ecosystemBurnPct * 100).toFixed(1) + '%',
     });
 
     return { ...result, cached: false };
@@ -306,4 +400,10 @@ module.exports = {
   getCacheStats,
   ACCEPTED_TIERS,
   VALID_TIERS,
+  // Dual-burn flywheel
+  calculateBurnedPercent,
+  calculateEcosystemBurnBonus,
+  MAX_ECOSYSTEM_BURN_PCT,
+  BURN_BONUS_RATE,
+  PUMP_FUN_INITIAL_SUPPLY,
 };

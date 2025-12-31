@@ -478,4 +478,185 @@ describe('HolDex Service', () => {
       expect(stats.expiredEntries).toBe(0);
     });
   });
+
+  // ==========================================================================
+  // DUAL-BURN FLYWHEEL TESTS
+  // ==========================================================================
+
+  describe('Dual-Burn Flywheel Constants', () => {
+    it('should export MAX_ECOSYSTEM_BURN_PCT as 0.40 (40%)', () => {
+      expect(holdex.MAX_ECOSYSTEM_BURN_PCT).toBe(0.40);
+    });
+
+    it('should export BURN_BONUS_RATE as 0.5 (50%)', () => {
+      expect(holdex.BURN_BONUS_RATE).toBe(0.5);
+    });
+
+    it('should export PUMP_FUN_INITIAL_SUPPLY as 1 trillion (with decimals)', () => {
+      expect(holdex.PUMP_FUN_INITIAL_SUPPLY).toBe(1_000_000_000_000_000);
+    });
+  });
+
+  describe('calculateBurnedPercent()', () => {
+    it('should return 0 when currentSupply is 0', () => {
+      expect(holdex.calculateBurnedPercent(0)).toBe(0);
+    });
+
+    it('should return 0 when currentSupply is negative', () => {
+      expect(holdex.calculateBurnedPercent(-1)).toBe(0);
+    });
+
+    it('should return 0 when currentSupply >= initialSupply (no burns)', () => {
+      expect(holdex.calculateBurnedPercent(1_000_000_000_000_000)).toBe(0);
+      expect(holdex.calculateBurnedPercent(1_100_000_000_000_000)).toBe(0);
+    });
+
+    it('should calculate 10% burned correctly', () => {
+      // 90% remaining = 10% burned
+      const currentSupply = 900_000_000_000_000; // 90% of initial
+      const result = holdex.calculateBurnedPercent(currentSupply);
+      expect(result).toBeCloseTo(10, 5);
+    });
+
+    it('should calculate 50% burned correctly', () => {
+      const currentSupply = 500_000_000_000_000; // 50% of initial
+      const result = holdex.calculateBurnedPercent(currentSupply);
+      expect(result).toBeCloseTo(50, 5);
+    });
+
+    it('should calculate 80% burned correctly', () => {
+      const currentSupply = 200_000_000_000_000; // 20% remaining = 80% burned
+      const result = holdex.calculateBurnedPercent(currentSupply);
+      expect(result).toBeCloseTo(80, 5);
+    });
+
+    it('should use custom initial supply when provided', () => {
+      const initialSupply = 100_000_000; // Custom 100M
+      const currentSupply = 75_000_000; // 75% remaining = 25% burned
+      const result = holdex.calculateBurnedPercent(currentSupply, initialSupply);
+      expect(result).toBeCloseTo(25, 5);
+    });
+  });
+
+  describe('calculateEcosystemBurnBonus()', () => {
+    it('should return no bonus for 0% burned', () => {
+      const result = holdex.calculateEcosystemBurnBonus(0);
+      expect(result.ecosystemBurnPct).toBe(0);
+      expect(result.asdfBurnPct).toBe(0.80);
+      expect(result.treasuryPct).toBe(0.20);
+      expect(result.explanation).toContain('No ecosystem burn bonus');
+    });
+
+    it('should return no bonus for negative burned percent', () => {
+      const result = holdex.calculateEcosystemBurnBonus(-5);
+      expect(result.ecosystemBurnPct).toBe(0);
+      expect(result.asdfBurnPct).toBe(0.80);
+    });
+
+    it('should calculate 10% ecosystem burn for 20% token burned', () => {
+      // Formula: min(40%, 20 * 0.5 / 100) = min(0.40, 0.10) = 0.10
+      const result = holdex.calculateEcosystemBurnBonus(20);
+      expect(result.ecosystemBurnPct).toBeCloseTo(0.10, 5);
+      expect(result.asdfBurnPct).toBeCloseTo(0.70, 5);
+      expect(result.treasuryPct).toBe(0.20);
+    });
+
+    it('should calculate 20% ecosystem burn for 40% token burned', () => {
+      // Formula: min(40%, 40 * 0.5 / 100) = min(0.40, 0.20) = 0.20
+      const result = holdex.calculateEcosystemBurnBonus(40);
+      expect(result.ecosystemBurnPct).toBeCloseTo(0.20, 5);
+      expect(result.asdfBurnPct).toBeCloseTo(0.60, 5);
+    });
+
+    it('should cap ecosystem burn at 40% for very high burn rates', () => {
+      // Formula: min(40%, 90 * 0.5 / 100) = min(0.40, 0.45) = 0.40
+      const result = holdex.calculateEcosystemBurnBonus(90);
+      expect(result.ecosystemBurnPct).toBe(0.40);
+      expect(result.asdfBurnPct).toBeCloseTo(0.40, 5);
+    });
+
+    it('should cap at 40% even for 100% burned', () => {
+      const result = holdex.calculateEcosystemBurnBonus(100);
+      expect(result.ecosystemBurnPct).toBe(0.40);
+    });
+
+    it('should maintain 20% treasury regardless of ecosystem burn', () => {
+      [0, 10, 20, 50, 80, 100].forEach(burnedPercent => {
+        const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
+        expect(result.treasuryPct).toBe(0.20);
+      });
+    });
+
+    it('should have percentages sum to 100%', () => {
+      [0, 10, 20, 50, 80].forEach(burnedPercent => {
+        const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
+        const total = result.ecosystemBurnPct + result.asdfBurnPct + result.treasuryPct;
+        expect(total).toBeCloseTo(1.0, 5);
+      });
+    });
+
+    it('should include explanation in result', () => {
+      const result = holdex.calculateEcosystemBurnBonus(20);
+      expect(result.explanation).toContain('10.0%');
+      expect(result.explanation).toContain('ecosystem burn bonus');
+      expect(result.explanation).toContain('20.0%');
+    });
+  });
+
+  describe('getToken() with supply and ecosystem burn data', () => {
+    const testMint = 'TestMint111111111111111111111111111111111111';
+
+    it('should include supply data when available from API', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          token: {
+            kScore: 75,
+            supply: '800000000000000', // 80% remaining = 20% burned
+          }
+        }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.supply).toBeDefined();
+      expect(result.supply.current).toBe(800000000000000);
+      expect(result.supply.burnedPercent).toBeCloseTo(20, 5);
+    });
+
+    it('should include ecosystemBurn data', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          token: {
+            kScore: 75,
+            supply: '800000000000000', // 20% burned
+          }
+        }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.ecosystemBurn).toBeDefined();
+      expect(result.ecosystemBurn.ecosystemBurnPct).toBeCloseTo(0.10, 5);
+      expect(result.ecosystemBurn.asdfBurnPct).toBeCloseTo(0.70, 5);
+      expect(result.ecosystemBurn.treasuryPct).toBe(0.20);
+    });
+
+    it('should handle missing supply data gracefully', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          kScore: 75,
+          // No supply field
+        }),
+      });
+
+      const result = await holdex.getToken(testMint);
+
+      expect(result.supply).toBeDefined();
+      expect(result.supply.burnedPercent).toBe(0);
+      expect(result.ecosystemBurn.ecosystemBurnPct).toBe(0);
+    });
+  });
 });
