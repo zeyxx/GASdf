@@ -3,8 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GASdf - Gasless Solana Transactions</title>
+  <title>GASdf - Pure Golden Economics</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      /* Golden Ratio */
+      --phi: 1.618033988749;
+
+      /* Pure Golden Percentages */
+      --treasury-pct: 23.6;
+      --burn-pct: 76.4;
+      --max-eco-pct: 38.2;
+
+      /* Colors - Fire/Golden Theme */
+      --bg-dark: #0a0505;
+      --bg-card: #120808;
+      --bg-card-hover: #1a0c0c;
+      --border-subtle: #2a1515;
+      --border-golden: #b8860b33;
+
+      /* Golden palette */
+      --gold-primary: #ffd700;
+      --gold-secondary: #daa520;
+      --gold-muted: #b8860b;
+
+      /* Fire palette */
+      --fire-red: #ff4444;
+      --fire-orange: #ff6b35;
+      --fire-yellow: #ffaa00;
+
+      /* Ecosystem */
+      --eco-green: #00ff88;
+      --eco-cyan: #00d4ff;
+
+      /* Text */
+      --text-primary: #f0e6d3;
+      --text-secondary: #a09080;
+      --text-muted: #605040;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -12,233 +49,461 @@
     }
 
     body {
-      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
-      background: #0a0a0a;
-      color: #e0e0e0;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text-primary);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
+      overflow-x: hidden;
+    }
+
+    /* Golden Spiral Background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 200vmax;
+      height: 200vmax;
+      transform: translate(-50%, -50%);
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(255, 215, 0, 0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(255, 68, 68, 0.02) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
     }
 
     .container {
-      max-width: 800px;
-      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
     }
 
+    /* Header */
     header {
       text-align: center;
       margin-bottom: 3rem;
+      position: relative;
     }
 
-    h1 {
-      font-size: 3rem;
+    .logo {
+      font-size: 4rem;
       font-weight: 700;
-      background: linear-gradient(135deg, #00ff88, #00d4ff);
+      background: linear-gradient(135deg, var(--gold-primary), var(--fire-orange), var(--fire-red));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 0.5rem;
+      letter-spacing: -0.05em;
+      position: relative;
+      display: inline-block;
+    }
+
+    .logo::after {
+      content: 'φ';
+      position: absolute;
+      top: -0.5rem;
+      right: -1.5rem;
+      font-size: 1.5rem;
+      color: var(--gold-primary);
+      opacity: 0.8;
     }
 
     .tagline {
-      color: #888;
-      font-size: 1.1rem;
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-top: 0.5rem;
     }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 3rem;
-    }
-
-    .stat-card {
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 12px;
-      padding: 1.5rem;
-      text-align: center;
-    }
-
-    .stat-label {
-      color: #666;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 0.5rem;
-    }
-
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 600;
-      color: #00ff88;
-    }
-
-    .stat-value.burn {
-      color: #ff6b6b;
-    }
-
-    .stat-value.treasury {
-      color: #ffd700;
-    }
-
-    .model-badge {
+    .version-badge {
       display: inline-block;
-      background: linear-gradient(135deg, #ff6b6b, #ffd700);
+      background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
       color: #000;
       font-size: 0.7rem;
       font-weight: 700;
-      padding: 0.2rem 0.5rem;
+      padding: 0.2rem 0.6rem;
       border-radius: 4px;
       margin-left: 0.5rem;
     }
 
+    /* Navigation */
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--gold-primary);
+      background: var(--border-subtle);
+    }
+
+    nav a.active {
+      color: var(--gold-primary);
+      border-bottom: 2px solid var(--gold-primary);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 500px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-golden);
+      transform: translateY(-2px);
+    }
+
+    .stat-card.golden {
+      border-color: var(--gold-muted);
+      background: linear-gradient(135deg, var(--bg-card), rgba(184, 134, 11, 0.05));
+    }
+
+    .stat-card.burn {
+      border-color: rgba(255, 68, 68, 0.3);
+      background: linear-gradient(135deg, var(--bg-card), rgba(255, 68, 68, 0.05));
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--eco-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
+    }
+
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stat-value.gold { color: var(--gold-primary); }
+    .stat-value.fire { color: var(--fire-orange); }
+    .stat-value.green { color: var(--eco-green); }
+
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Pure Golden Section */
+    .golden-section {
+      background: var(--bg-card);
+      border: 1px solid var(--gold-muted);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .golden-section::before {
+      content: 'φ';
+      position: absolute;
+      top: -20px;
+      right: 20px;
+      font-size: 8rem;
+      color: var(--gold-primary);
+      opacity: 0.03;
+      font-weight: 700;
+    }
+
+    .golden-section h2 {
+      color: var(--gold-primary);
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .golden-section h2::before {
+      content: '◆';
+      font-size: 0.8rem;
+    }
+
+    /* Golden Split Bar */
+    .golden-split {
+      margin: 1.5rem 0;
+    }
+
     .split-bar {
       display: flex;
-      height: 8px;
-      border-radius: 4px;
+      height: 12px;
+      border-radius: 6px;
       overflow: hidden;
-      margin-top: 1rem;
+      background: var(--bg-dark);
     }
 
-    .split-burn {
-      background: #ff6b6b;
-      flex: 80;
+    .split-segment {
+      transition: all 0.5s ease;
+      position: relative;
     }
 
-    .split-treasury {
-      background: #ffd700;
-      flex: 20;
+    .split-segment.ecosystem {
+      background: linear-gradient(90deg, var(--eco-green), var(--eco-cyan));
+    }
+
+    .split-segment.asdf {
+      background: linear-gradient(90deg, var(--fire-orange), var(--fire-red));
+    }
+
+    .split-segment.treasury {
+      background: linear-gradient(90deg, var(--gold-secondary), var(--gold-primary));
     }
 
     .split-legend {
       display: flex;
       justify-content: space-between;
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
       font-size: 0.75rem;
-      color: #888;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
 
-    .info-section {
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 2rem;
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
     }
 
-    .info-section h2 {
-      font-size: 1.3rem;
-      margin-bottom: 1rem;
-      color: #fff;
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
     }
 
-    .endpoint {
-      background: #0a0a0a;
-      border: 1px solid #333;
+    .legend-dot.ecosystem { background: var(--eco-green); }
+    .legend-dot.asdf { background: var(--fire-orange); }
+    .legend-dot.treasury { background: var(--gold-primary); }
+
+    /* Formula Display */
+    .formula-box {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1rem;
+      padding: 1rem 1.5rem;
+      margin: 1rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      overflow-x: auto;
+    }
+
+    .formula {
+      color: var(--text-secondary);
       font-size: 0.9rem;
     }
 
-    .endpoint-method {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      font-weight: 600;
-      margin-right: 0.5rem;
-    }
+    .formula .phi { color: var(--gold-primary); font-weight: 600; }
+    .formula .eco { color: var(--eco-green); }
+    .formula .num { color: var(--fire-orange); }
 
-    .endpoint-method.post {
-      background: #2d5a27;
-      color: #7ec96a;
-    }
-
-    .endpoint-method.get {
-      background: #1e4a6e;
-      color: #5eb3e4;
-    }
-
-    .endpoint-path {
-      color: #fff;
-    }
-
-    .endpoint-desc {
-      color: #888;
-      margin-top: 0.5rem;
-    }
-
-    .flow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin: 1.5rem 0;
-    }
-
-    .flow-step {
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-size: 0.85rem;
-    }
-
-    .flow-arrow {
-      color: #00ff88;
-    }
-
-    footer {
-      text-align: center;
-      color: #444;
-      font-size: 0.85rem;
-      margin-top: auto;
-      padding-top: 2rem;
-    }
-
-    footer a {
-      color: #00ff88;
-      text-decoration: none;
-    }
-
-    .live-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      background: #00ff88;
-      border-radius: 50%;
-      margin-right: 0.5rem;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .loading {
-      color: #666;
-    }
-
-    /* Burn Tracker Section */
-    .burn-tracker {
-      background: linear-gradient(135deg, #1a0a0a, #111);
-      border: 1px solid #ff6b6b33;
-      border-radius: 12px;
+    /* Dual-Burn Flywheel */
+    .flywheel-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
       padding: 2rem;
       margin-bottom: 2rem;
     }
 
-    .burn-tracker h2 {
-      color: #ff6b6b;
+    .flywheel-section h2 {
+      color: var(--fire-orange);
+      font-size: 1.2rem;
       margin-bottom: 1rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+
+    .flywheel-visual {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flywheel-step {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      text-align: center;
+      min-width: 140px;
+    }
+
+    .flywheel-step .icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .flywheel-step .label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .flywheel-arrow {
+      color: var(--gold-primary);
+      font-size: 1.5rem;
+    }
+
+    /* Token Burn Table */
+    .burn-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    .burn-table th {
+      color: var(--text-muted);
+      font-weight: 500;
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+    }
+
+    .burn-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .burn-table tr:hover td {
+      background: var(--bg-card-hover);
+    }
+
+    .burn-table .eco-pct { color: var(--eco-green); }
+    .burn-table .asdf-pct { color: var(--fire-orange); }
+    .burn-table .treasury-pct { color: var(--gold-primary); }
+
+    /* Burn Progress */
+    .burn-progress {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .burn-progress h2 {
+      color: var(--fire-red);
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .progress-bar-container {
+      background: var(--bg-dark);
+      border-radius: 8px;
+      height: 24px;
+      position: relative;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--fire-red), var(--fire-orange), var(--fire-yellow));
+      border-radius: 8px;
+      transition: width 1s ease;
+      position: relative;
+    }
+
+    .progress-bar-fill::after {
+      content: '🔥';
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.2rem;
+      animation: flicker 0.5s infinite alternate;
+    }
+
+    @keyframes flicker {
+      from { opacity: 1; transform: translateY(-50%) scale(1); }
+      to { opacity: 0.8; transform: translateY(-50%) scale(1.1); }
+    }
+
+    .progress-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    /* Wallet Tracker */
+    .wallet-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .wallet-section h2 {
+      color: var(--text-primary);
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
     }
 
     .wallet-input-group {
@@ -249,103 +514,105 @@
 
     .wallet-input {
       flex: 1;
-      background: #0a0a0a;
-      border: 1px solid #333;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
       border-radius: 8px;
       padding: 0.75rem 1rem;
-      color: #fff;
+      color: var(--text-primary);
       font-family: inherit;
       font-size: 0.9rem;
     }
 
     .wallet-input:focus {
       outline: none;
-      border-color: #ff6b6b;
+      border-color: var(--gold-primary);
     }
 
     .wallet-input::placeholder {
-      color: #555;
+      color: var(--text-muted);
     }
 
-    .lookup-btn {
-      background: linear-gradient(135deg, #ff6b6b, #ff8888);
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
       border: none;
       border-radius: 8px;
       padding: 0.75rem 1.5rem;
       color: #000;
       font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: transform 0.1s;
+      transition: all 0.2s;
     }
 
-    .lookup-btn:hover {
+    .btn-primary:hover {
       transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
     }
 
-    .lookup-btn:disabled {
+    .btn-primary:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .wallet-stats {
-      display: none;
-      background: #0a0a0a;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 1.5rem;
+    /* API Section */
+    .api-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
     }
 
-    .wallet-stats.visible {
-      display: block;
-    }
-
-    .wallet-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
+    .api-section h2 {
+      color: var(--text-primary);
+      font-size: 1.2rem;
       margin-bottom: 1rem;
     }
 
-    .wallet-stat {
-      text-align: center;
-    }
-
-    .wallet-stat-label {
-      color: #666;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .wallet-stat-value {
-      font-size: 1.4rem;
-      font-weight: 600;
-      color: #ff6b6b;
-    }
-
-    .wallet-stat-value.rank {
-      color: #ffd700;
-    }
-
-    .impact-message {
-      text-align: center;
-      color: #888;
-      font-size: 0.9rem;
-      padding-top: 1rem;
-      border-top: 1px solid #222;
-    }
-
-    /* Leaderboard */
-    .leaderboard {
-      margin-top: 1.5rem;
-    }
-
-    .leaderboard h3 {
-      color: #fff;
-      font-size: 1rem;
+    .endpoint {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem;
       margin-bottom: 0.75rem;
     }
 
+    .endpoint-method {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .endpoint-method.post { background: #1e4a2e; color: #4ade80; }
+    .endpoint-method.get { background: #1e3a5f; color: #60a5fa; }
+
+    .endpoint-path { color: var(--text-primary); }
+    .endpoint-desc { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 2rem;
+      border-top: 1px solid var(--border-subtle);
+      margin-top: 2rem;
+    }
+
+    footer a {
+      color: var(--gold-primary);
+      text-decoration: none;
+    }
+
+    .phi-symbol {
+      color: var(--gold-primary);
+      font-weight: 700;
+    }
+
+    /* Leaderboard */
     .leaderboard-list {
       max-height: 300px;
       overflow-y: auto;
@@ -354,211 +621,396 @@
     .leaderboard-entry {
       display: flex;
       align-items: center;
-      padding: 0.5rem;
+      padding: 0.5rem 0.75rem;
       border-radius: 4px;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      gap: 1rem;
     }
 
     .leaderboard-entry:nth-child(odd) {
-      background: #0a0a0a;
+      background: var(--bg-dark);
     }
 
     .leaderboard-rank {
       width: 2rem;
-      color: #666;
+      color: var(--text-muted);
       font-weight: 600;
     }
 
-    .leaderboard-rank.top3 {
-      color: #ffd700;
-    }
+    .leaderboard-rank.top3 { color: var(--gold-primary); }
 
     .leaderboard-wallet {
       flex: 1;
-      color: #888;
-      font-family: monospace;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
     }
 
-    .leaderboard-burned {
-      color: #ff6b6b;
-      font-weight: 500;
+    .leaderboard-burned { color: var(--fire-orange); }
+    .leaderboard-percent { color: var(--text-muted); font-size: 0.75rem; }
+
+    /* Prices */
+    .price-ticker {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
     }
 
-    .leaderboard-percent {
-      width: 4rem;
-      text-align: right;
-      color: #666;
-      font-size: 0.8rem;
+    .price-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .price-value {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .price-change.up { color: var(--eco-green); }
+    .price-change.down { color: var(--fire-red); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container { padding: 1rem; }
+      .logo { font-size: 2.5rem; }
+      .golden-section, .flywheel-section, .burn-progress, .wallet-section, .api-section {
+        padding: 1.5rem;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>GASdf</h1>
-      <p class="tagline">Gasless transactions for Solana. Pay fees with any token.</p>
+      <div class="logo">GASdf</div>
+      <p class="tagline">
+        Pure Golden Economics <span class="version-badge" id="version">v1.6.0</span>
+      </p>
     </header>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label"><span class="live-dot"></span>Total Burned</div>
-        <div class="stat-value burn" id="burned">Loading...</div>
+    <nav>
+      <a href="#stats" class="active">Dashboard</a>
+      <a href="https://alonisthe.dev/burns" target="_blank">Burns</a>
+      <a href="https://alonisthe.dev/ecosystem" target="_blank">Ecosystem</a>
+      <a href="https://dexscreener.com/solana/asdf" target="_blank">Chart</a>
+    </nav>
+
+    <!-- Price Ticker -->
+    <div class="price-ticker">
+      <div class="price-item">
+        <span>SOL</span>
+        <span class="price-value" id="solPrice">$--</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Treasury<span class="model-badge">80/20</span></div>
-        <div class="stat-value treasury" id="treasury">Loading...</div>
+      <div class="price-item">
+        <span>ASDF</span>
+        <span class="price-value" id="asdfPrice">$--</span>
+      </div>
+      <div class="price-item">
+        <span>Network</span>
+        <span class="price-value" id="network">--</span>
+      </div>
+    </div>
+
+    <!-- Main Stats -->
+    <div class="stats-grid" id="stats">
+      <div class="stat-card burn">
+        <div class="stat-label"><span class="live-dot"></span>Total Burned</div>
+        <div class="stat-value fire" id="totalBurned">--</div>
+        <div class="stat-sub" id="burnedUsd">--</div>
+      </div>
+      <div class="stat-card golden">
+        <div class="stat-label">Treasury (1/φ³)</div>
+        <div class="stat-value gold" id="treasury">--</div>
+        <div class="stat-sub">23.6% of fees</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Transactions</div>
-        <div class="stat-value" id="txCount">Loading...</div>
+        <div class="stat-value" id="txCount">--</div>
+        <div class="stat-sub" id="txRate">--</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Status</div>
-        <div class="stat-value" id="status">...</div>
+        <div class="stat-value green" id="status">--</div>
+        <div class="stat-sub" id="uptime">--</div>
       </div>
     </div>
 
-    <!-- Burn Tracker -->
-    <div class="burn-tracker">
-      <h2>Your Burn Contribution</h2>
+    <!-- Pure Golden Economics -->
+    <div class="golden-section">
+      <h2>Pure Golden Economics (φ)</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        All ratios derive from the Golden Ratio φ = 1.618033988749...
+      </p>
+
+      <div class="formula-box">
+        <div class="formula">
+          ecosystemBurn = (<span class="num">1</span>/<span class="phi">φ²</span>) × (<span class="num">1</span> - <span class="phi">φ</span>^(-b/<span class="num">30</span>))
+        </div>
+      </div>
+
+      <div class="golden-split">
+        <div class="split-bar">
+          <div class="split-segment ecosystem" id="ecoSegment" style="width: 0%;"></div>
+          <div class="split-segment asdf" id="asdfSegment" style="width: 76.4%;"></div>
+          <div class="split-segment treasury" style="width: 23.6%;"></div>
+        </div>
+        <div class="split-legend">
+          <div class="legend-item">
+            <div class="legend-dot ecosystem"></div>
+            <span>Ecosystem <span id="ecoLegend">0%</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot asdf"></div>
+            <span>ASDF Burn <span id="asdfLegend">76.4%</span></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot treasury"></div>
+            <span>Treasury 1/φ³ = 23.6%</span>
+          </div>
+        </div>
+      </div>
+
+      <table class="burn-table">
+        <thead>
+          <tr>
+            <th>Token Burn</th>
+            <th>Ecosystem</th>
+            <th>ASDF</th>
+            <th>Treasury</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>0%</td><td class="eco-pct">0.0%</td><td class="asdf-pct">76.4%</td><td class="treasury-pct">23.6%</td></tr>
+          <tr><td>20%</td><td class="eco-pct">10.5%</td><td class="asdf-pct">65.9%</td><td class="treasury-pct">23.6%</td></tr>
+          <tr><td>50%</td><td class="eco-pct">21.1%</td><td class="asdf-pct">55.3%</td><td class="treasury-pct">23.6%</td></tr>
+          <tr><td>80%</td><td class="eco-pct">27.6%</td><td class="asdf-pct">48.8%</td><td class="treasury-pct">23.6%</td></tr>
+          <tr><td>100%</td><td class="eco-pct">30.5%</td><td class="asdf-pct">45.9%</td><td class="treasury-pct">23.6%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Dual-Burn Flywheel -->
+    <div class="flywheel-section">
+      <h2>🔥 Dual-Burn Flywheel</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        Tokens that burn their supply earn ecosystem burn bonuses
+      </p>
+
+      <div class="flywheel-visual">
+        <div class="flywheel-step">
+          <div class="icon">🔥</div>
+          <div class="label">Token Burns</div>
+        </div>
+        <div class="flywheel-arrow">→</div>
+        <div class="flywheel-step">
+          <div class="icon">📈</div>
+          <div class="label">Higher Bonus</div>
+        </div>
+        <div class="flywheel-arrow">→</div>
+        <div class="flywheel-step">
+          <div class="icon">💎</div>
+          <div class="label">Direct Burns</div>
+        </div>
+        <div class="flywheel-arrow">→</div>
+        <div class="flywheel-step">
+          <div class="icon">🌀</div>
+          <div class="label">Incentive</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Burn Progress -->
+    <div class="burn-progress">
+      <h2>🔥 Burn Progress</h2>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="burnProgress" style="width: 0%;"></div>
+      </div>
+      <div class="progress-stats">
+        <span><span id="burnedAmount">0</span> ASDF burned</span>
+        <span id="burnPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- Wallet Tracker -->
+    <div class="wallet-section">
+      <h2>Your Contribution</h2>
       <div class="wallet-input-group">
         <input type="text" class="wallet-input" id="walletInput" placeholder="Enter your Solana wallet address...">
-        <button class="lookup-btn" id="lookupBtn" onclick="lookupWallet()">Track</button>
+        <button class="btn-primary" id="lookupBtn" onclick="lookupWallet()">Track</button>
       </div>
-      <div class="wallet-stats" id="walletStats">
-        <div class="wallet-stats-grid">
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">Your Burn</div>
-            <div class="wallet-stat-value" id="walletBurned">0 $ASDF</div>
+
+      <div id="walletStats" style="display: none;">
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
+          <div class="stat-card">
+            <div class="stat-label">Your Burn</div>
+            <div class="stat-value fire" id="walletBurned">0</div>
           </div>
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">Transactions</div>
-            <div class="wallet-stat-value" id="walletTxCount">0</div>
+          <div class="stat-card">
+            <div class="stat-label">Transactions</div>
+            <div class="stat-value" id="walletTxCount">0</div>
           </div>
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">Rank</div>
-            <div class="wallet-stat-value rank" id="walletRank">-</div>
+          <div class="stat-card">
+            <div class="stat-label">Rank</div>
+            <div class="stat-value gold" id="walletRank">-</div>
           </div>
-          <div class="wallet-stat">
-            <div class="wallet-stat-label">Contribution</div>
-            <div class="wallet-stat-value" id="walletPercent">0%</div>
+          <div class="stat-card">
+            <div class="stat-label">Contribution</div>
+            <div class="stat-value" id="walletPercent">0%</div>
           </div>
         </div>
-        <div class="impact-message" id="impactMessage">Start transacting to contribute to the burn</div>
       </div>
-      <div class="leaderboard">
-        <h3>Top Contributors</h3>
-        <div class="leaderboard-list" id="leaderboardList">
-          <div style="color: #666; text-align: center; padding: 1rem;">Loading...</div>
-        </div>
+
+      <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 1.5rem 0 1rem;">Top Contributors</h3>
+      <div class="leaderboard-list" id="leaderboardList">
+        <div style="color: var(--text-muted); text-align: center; padding: 1rem;">Loading...</div>
       </div>
     </div>
 
-    <!-- 80/20 Model Visualization -->
-    <div class="info-section">
-      <h2>Economic Model</h2>
-      <p style="color: #888; margin-bottom: 1rem;">Sustainable tokenomics: 80% burn, 20% operations</p>
-      <div class="split-bar">
-        <div class="split-burn"></div>
-        <div class="split-treasury"></div>
-      </div>
-      <div class="split-legend">
-        <span>80% Burn $ASDF</span>
-        <span>20% Treasury</span>
-      </div>
-    </div>
-
-    <div class="info-section">
-      <h2>How It Works</h2>
-      <div class="flow">
-        <div class="flow-step">1. Get Quote</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">2. Sign TX</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">3. Submit</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">4. Fees → $ASDF Burn</div>
-      </div>
-    </div>
-
-    <div class="info-section">
+    <!-- API Endpoints -->
+    <div class="api-section">
       <h2>API Endpoints</h2>
 
       <div class="endpoint">
         <span class="endpoint-method post">POST</span>
-        <span class="endpoint-path">/quote</span>
+        <span class="endpoint-path">/v1/quote</span>
         <div class="endpoint-desc">Get a fee quote for your transaction</div>
       </div>
 
       <div class="endpoint">
         <span class="endpoint-method post">POST</span>
-        <span class="endpoint-path">/submit</span>
+        <span class="endpoint-path">/v1/submit</span>
         <div class="endpoint-desc">Submit your signed transaction for gasless execution</div>
       </div>
 
       <div class="endpoint">
         <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/tokens</span>
-        <div class="endpoint-desc">List supported payment tokens</div>
+        <span class="endpoint-path">/v1/tokens</span>
+        <div class="endpoint-desc">List supported payment tokens with K-scores</div>
       </div>
 
       <div class="endpoint">
         <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/stats</span>
-        <div class="endpoint-desc">Get burn statistics</div>
+        <span class="endpoint-path">/v1/stats</span>
+        <div class="endpoint-desc">Get burn statistics and treasury data</div>
       </div>
 
       <div class="endpoint">
         <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/health</span>
-        <div class="endpoint-desc">Health check endpoint</div>
+        <span class="endpoint-path">/v1/health</span>
+        <div class="endpoint-desc">Health check with version and component status</div>
       </div>
     </div>
   </div>
 
   <footer>
-    <p>Powered by $ASDFASDFA</p>
+    <p>
+      Powered by <span class="phi-symbol">φ</span> Golden Ratio Economics
+      · <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
+      · Part of the <a href="https://alonisthe.dev" target="_blank">$ASDF Ecosystem</a>
+    </p>
   </footer>
 
   <script>
+    // Golden Ratio constants
+    const PHI = 1.618033988749;
+    const PHI_SQUARED = PHI * PHI;
+    const PHI_CUBED = PHI * PHI * PHI;
+    const TREASURY_RATIO = 1 / PHI_CUBED;
+    const MAX_ECO = 1 / PHI_SQUARED;
+
+    // Calculate ecosystem burn bonus (φ-curve)
+    function calculateEcosystemBonus(burnedPercent) {
+      if (burnedPercent <= 0) return { eco: 0, asdf: 1 - TREASURY_RATIO, treasury: TREASURY_RATIO };
+      const multiplier = 1 - Math.pow(PHI, -burnedPercent / 30);
+      const eco = MAX_ECO * multiplier;
+      const asdf = (1 - TREASURY_RATIO) - eco;
+      return { eco, asdf, treasury: TREASURY_RATIO };
+    }
+
+    // Update split visualization
+    function updateSplitVisualization(burnedPercent = 0) {
+      const split = calculateEcosystemBonus(burnedPercent);
+      document.getElementById('ecoSegment').style.width = (split.eco * 100) + '%';
+      document.getElementById('asdfSegment').style.width = (split.asdf * 100) + '%';
+      document.getElementById('ecoLegend').textContent = (split.eco * 100).toFixed(1) + '%';
+      document.getElementById('asdfLegend').textContent = (split.asdf * 100).toFixed(1) + '%';
+    }
+
+    // Fetch stats
     async function fetchStats() {
       try {
-        const res = await fetch('/stats');
+        const res = await fetch('/v1/stats');
         const data = await res.json();
 
-        document.getElementById('burned').textContent = data.burnedFormatted;
-        document.getElementById('txCount').textContent = data.totalTransactions.toLocaleString();
+        document.getElementById('totalBurned').textContent = data.burnedFormatted || '0 $ASDF';
+        document.getElementById('txCount').textContent = (data.totalTransactions || 0).toLocaleString();
 
-        // Treasury stats (80/20 model)
         if (data.treasury) {
-          document.getElementById('treasury').textContent = data.treasury.balanceFormatted;
+          document.getElementById('treasury').textContent = data.treasury.onChain?.solFormatted || '0 SOL';
         }
       } catch (err) {
-        document.getElementById('burned').textContent = '0 $ASDF';
-        document.getElementById('txCount').textContent = '0';
-        document.getElementById('treasury').textContent = '0 SOL';
+        console.error('Failed to fetch stats:', err);
       }
     }
 
+    // Fetch health
     async function fetchHealth() {
       try {
-        const res = await fetch('/health');
+        const res = await fetch('/v1/health');
         const data = await res.json();
 
         const statusEl = document.getElementById('status');
+        const versionEl = document.getElementById('version');
+        const networkEl = document.getElementById('network');
+        const uptimeEl = document.getElementById('uptime');
+
+        versionEl.textContent = 'v' + (data.version || '1.6.0');
+        networkEl.textContent = data.network || 'mainnet';
+        uptimeEl.textContent = data.uptime ? Math.floor(data.uptime / 60) + 'm' : '--';
+
         if (data.status === 'ok' || data.status === 'healthy') {
           statusEl.textContent = 'Online';
-          statusEl.style.color = '#00ff88';
-        } else if (data.status === 'unhealthy') {
+          statusEl.style.color = 'var(--eco-green)';
+        } else if (data.status === 'degraded') {
           statusEl.textContent = 'Degraded';
-          statusEl.style.color = '#ffaa00';
+          statusEl.style.color = 'var(--fire-yellow)';
         } else {
-          statusEl.textContent = 'Unknown';
-          statusEl.style.color = '#888';
+          statusEl.textContent = 'Offline';
+          statusEl.style.color = 'var(--fire-red)';
         }
       } catch (err) {
         document.getElementById('status').textContent = 'Offline';
-        document.getElementById('status').style.color = '#ff6b6b';
+        document.getElementById('status').style.color = 'var(--fire-red)';
+      }
+    }
+
+    // Fetch leaderboard
+    async function fetchLeaderboard() {
+      try {
+        const res = await fetch('/v1/stats/leaderboard?limit=10');
+        const data = await res.json();
+
+        const listEl = document.getElementById('leaderboardList');
+
+        if (data.leaderboard && data.leaderboard.length > 0) {
+          listEl.innerHTML = data.leaderboard.map(entry => `
+            <div class="leaderboard-entry">
+              <span class="leaderboard-rank ${entry.rank <= 3 ? 'top3' : ''}">#${entry.rank}</span>
+              <span class="leaderboard-wallet">${entry.walletShort}</span>
+              <span class="leaderboard-burned">${entry.burnedFormatted}</span>
+              <span class="leaderboard-percent">${entry.contributionPercent}%</span>
+            </div>
+          `).join('');
+        } else {
+          listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No contributors yet. Be the first!</div>';
+        }
+      } catch (err) {
+        document.getElementById('leaderboardList').innerHTML =
+          '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">Failed to load</div>';
       }
     }
 
@@ -578,21 +1030,18 @@
       btn.textContent = 'Loading...';
 
       try {
-        const res = await fetch(`/stats/wallet/${wallet}`);
+        const res = await fetch(`/v1/stats/wallet/${wallet}`);
         const data = await res.json();
 
         if (res.ok) {
           document.getElementById('walletBurned').textContent = data.burnedFormatted;
-          document.getElementById('walletTxCount').textContent = data.txCount.toLocaleString();
+          document.getElementById('walletTxCount').textContent = data.txCount?.toLocaleString() || '0';
           document.getElementById('walletRank').textContent = data.rank ? `#${data.rank}` : '-';
-          document.getElementById('walletPercent').textContent = `${data.contributionPercent}%`;
-          document.getElementById('impactMessage').textContent = data.impact.message;
-          statsDiv.classList.add('visible');
-
-          // Save to localStorage for persistence
+          document.getElementById('walletPercent').textContent = `${data.contributionPercent || 0}%`;
+          statsDiv.style.display = 'block';
           localStorage.setItem('gasdf_wallet', wallet);
         } else {
-          alert(data.error || 'Failed to lookup wallet');
+          alert(data.error || 'Wallet not found');
         }
       } catch (err) {
         alert('Failed to lookup wallet');
@@ -602,52 +1051,39 @@
       }
     }
 
-    // Fetch leaderboard
-    async function fetchLeaderboard() {
-      try {
-        const res = await fetch('/stats/leaderboard?limit=10');
-        const data = await res.json();
-
-        const listEl = document.getElementById('leaderboardList');
-
-        if (data.leaderboard && data.leaderboard.length > 0) {
-          listEl.innerHTML = data.leaderboard.map(entry => `
-            <div class="leaderboard-entry">
-              <span class="leaderboard-rank ${entry.rank <= 3 ? 'top3' : ''}">${entry.rank}</span>
-              <span class="leaderboard-wallet">${entry.walletShort}</span>
-              <span class="leaderboard-burned">${entry.burnedFormatted}</span>
-              <span class="leaderboard-percent">${entry.contributionPercent}%</span>
-            </div>
-          `).join('');
-        } else {
-          listEl.innerHTML = '<div style="color: #666; text-align: center; padding: 1rem;">No contributors yet. Be the first!</div>';
-        }
-      } catch (err) {
-        document.getElementById('leaderboardList').innerHTML = '<div style="color: #666; text-align: center; padding: 1rem;">Failed to load leaderboard</div>';
-      }
-    }
-
-    // Load saved wallet on page load
+    // Load saved wallet
     function loadSavedWallet() {
-      const savedWallet = localStorage.getItem('gasdf_wallet');
-      if (savedWallet) {
-        document.getElementById('walletInput').value = savedWallet;
+      const saved = localStorage.getItem('gasdf_wallet');
+      if (saved) {
+        document.getElementById('walletInput').value = saved;
         lookupWallet();
       }
     }
 
-    // Allow Enter key to trigger lookup
+    // Enter key listener
     document.getElementById('walletInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') lookupWallet();
     });
 
-    // Initial fetch
+    // Animate split on load
+    function animateSplit() {
+      let current = 0;
+      const target = 50; // Simulate 50% burned token
+      const interval = setInterval(() => {
+        current += 2;
+        updateSplitVisualization(current);
+        if (current >= target) clearInterval(interval);
+      }, 50);
+    }
+
+    // Initial load
     fetchStats();
     fetchHealth();
     fetchLeaderboard();
     loadSavedWallet();
+    setTimeout(animateSplit, 500);
 
-    // Refresh every 30 seconds
+    // Refresh intervals
     setInterval(fetchStats, 30000);
     setInterval(fetchHealth, 30000);
     setInterval(fetchLeaderboard, 60000);
