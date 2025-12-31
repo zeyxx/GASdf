@@ -7,10 +7,10 @@
  * Metal Ranks (K-score based):
  *   💎 Diamond  (90-99, 100=native) → Hardcoded trusted tokens (SOL, USDC, etc.) → Accepted
  *   💠 Platinum (80-89)  → High conviction, strong holders → Accepted
- *   🥇 Gold     (70-79)  → Good conviction → Accepted (minimum tier)
- *   🥈 Silver   (60-69)  → Medium conviction → Rejected
- *   🥉 Bronze   (50-59)  → Low conviction → Rejected
- *   🟤 Copper   (40-49)  → Very low conviction → Rejected
+ *   🥇 Gold     (70-79)  → Good conviction → Accepted
+ *   🥈 Silver   (60-69)  → Medium conviction → Accepted
+ *   🥉 Bronze   (50-59)  → Speculative → Accepted (minimum tier)
+ *   🟤 Copper   (40-49)  → Very speculative → Rejected
  *   ⚫ Iron     (20-39)  → Substantial risk → Rejected
  *   🔩 Rust     (0-19)   → Unknown/untrusted → Rejected
  *
@@ -21,7 +21,7 @@
  *   - Dust accumulation
  *
  * Security model: Binary accept/reject based on tier.
- * A token is either safe enough (Diamond/Platinum/Gold), or it's not.
+ * A token is either safe enough (Diamond/Platinum/Gold/Silver/Bronze), or it's not.
  */
 
 const config = require('../utils/config');

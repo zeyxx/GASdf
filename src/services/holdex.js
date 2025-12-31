@@ -12,7 +12,7 @@
  * Metal Ranks:
  *   💎 Diamond  = K-score 90-99 (level 8), 100 reserved for native tokens (SOL)
  *   💠 Platinum = K-score 80-89  (level 7)
- *   🥇 Gold     = K-score 70-79  (level 6) - Minimum for acceptance
+ *   🥇 Gold     = K-score 70-79  (level 6)
  *   🥈 Silver   = K-score 60-69  (level 5)
  *   🥉 Bronze   = K-score 50-59  (level 4)
  *   🟤 Copper   = K-score 40-49  (level 3)
@@ -29,7 +29,7 @@
  *   C  (20+) = Substantial Risk, severe risk
  *   D  (<20) = Default, extreme risk
  *
- * Acceptance: Gold+ (K-score >= 70)
+ * Acceptance: Bronze+ (K-score >= 50)
  *
  * @see https://github.com/sollama58/HolDex
  */
@@ -45,9 +45,9 @@ const ERROR_CACHE_TTL = 30 * 1000; // 30 seconds for errors (retry sooner)
 // API configuration
 const HOLDEX_TIMEOUT = 5000; // 5 seconds
 
-// Accepted tiers for gasless transactions (K-score >= 70)
-// Diamond/Platinum/Gold = accepted, Silver and below = rejected
-const ACCEPTED_TIERS = new Set(['Diamond', 'Platinum', 'Gold']);
+// Accepted tiers for gasless transactions (K-score >= 50)
+// Diamond/Platinum/Gold/Silver/Bronze = accepted, Copper and below = rejected
+const ACCEPTED_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze']);
 
 // All valid tier names
 const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Rust']);
