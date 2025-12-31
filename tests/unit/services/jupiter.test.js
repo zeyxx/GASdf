@@ -76,7 +76,7 @@ describe('Jupiter Service', () => {
 
       expect(result).toEqual(mockQuote);
       expect(fetchWithTimeout).toHaveBeenCalledWith(
-        expect.stringContaining('quote-api.jup.ag/v6/quote'),
+        expect.stringContaining('lite-api.jup.ag/swap/v1/quote'),
         {},
         15000
       );

@@ -38,15 +38,17 @@ describe('HolDex Service', () => {
   });
 
   describe('ACCEPTED_TIERS', () => {
-    it('should include Diamond, Platinum, and Gold', () => {
+    it('should include Diamond, Platinum, Gold, Silver, and Bronze (K-score >= 50)', () => {
       expect(holdex.ACCEPTED_TIERS.has('Diamond')).toBe(true);
       expect(holdex.ACCEPTED_TIERS.has('Platinum')).toBe(true);
       expect(holdex.ACCEPTED_TIERS.has('Gold')).toBe(true);
+      expect(holdex.ACCEPTED_TIERS.has('Silver')).toBe(true);
+      expect(holdex.ACCEPTED_TIERS.has('Bronze')).toBe(true);
     });
 
-    it('should NOT include Silver, Bronze, and Rust', () => {
-      expect(holdex.ACCEPTED_TIERS.has('Silver')).toBe(false);
-      expect(holdex.ACCEPTED_TIERS.has('Bronze')).toBe(false);
+    it('should NOT include Copper, Iron, and Rust (K-score < 50)', () => {
+      expect(holdex.ACCEPTED_TIERS.has('Copper')).toBe(false);
+      expect(holdex.ACCEPTED_TIERS.has('Iron')).toBe(false);
       expect(holdex.ACCEPTED_TIERS.has('Rust')).toBe(false);
     });
   });
@@ -336,7 +338,7 @@ describe('HolDex Service', () => {
       expect(result.tier).toBe('Diamond');
     });
 
-    it('should reject Silver tier tokens', async () => {
+    it('should accept Silver tier tokens (K-score >= 50)', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ kScore: 65 }), // 60-69 = Silver
@@ -344,11 +346,11 @@ describe('HolDex Service', () => {
 
       const result = await holdex.isTokenAccepted(testMint);
 
-      expect(result.accepted).toBe(false);
+      expect(result.accepted).toBe(true);
       expect(result.tier).toBe('Silver');
     });
 
-    it('should reject Bronze tier tokens', async () => {
+    it('should accept Bronze tier tokens (K-score >= 50)', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ kScore: 55 }), // 50-59 = Bronze
@@ -356,8 +358,20 @@ describe('HolDex Service', () => {
 
       const result = await holdex.isTokenAccepted(testMint);
 
-      expect(result.accepted).toBe(false);
+      expect(result.accepted).toBe(true);
       expect(result.tier).toBe('Bronze');
+    });
+
+    it('should reject Copper tier tokens (K-score < 50)', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ kScore: 45 }), // 40-49 = Copper
+      });
+
+      const result = await holdex.isTokenAccepted(testMint);
+
+      expect(result.accepted).toBe(false);
+      expect(result.tier).toBe('Copper');
     });
   });
 
@@ -376,7 +390,19 @@ describe('HolDex Service', () => {
       expect(result.kScore).toBe(75);
     });
 
-    it('should return verified=false for rejected tiers', async () => {
+    it('should return verified=false for rejected tiers (K-score < 50)', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ tier: 'Copper', kScore: 45, hasCommunityUpdate: true }),
+      });
+
+      const result = await holdex.isVerifiedCommunity(testMint);
+
+      expect(result.verified).toBe(false);
+      expect(result.kScore).toBe(45);
+    });
+
+    it('should return verified=true for Silver tier (now accepted)', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ tier: 'Silver', kScore: 65, hasCommunityUpdate: true }),
@@ -384,7 +410,7 @@ describe('HolDex Service', () => {
 
       const result = await holdex.isVerifiedCommunity(testMint);
 
-      expect(result.verified).toBe(false);
+      expect(result.verified).toBe(true);
       expect(result.kScore).toBe(65);
     });
 
