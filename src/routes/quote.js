@@ -237,6 +237,14 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         kScore: tokenCheck.kScore,
         kRank: tokenCheck.kRank,
         creditRating: tokenCheck.creditRating,
+        // Dual-burn flywheel (Pure Golden φ-based economics)
+        dualBurn: tokenCheck.ecosystemBurn ? {
+          burnedPercent: tokenCheck.supply?.burnedPercent || 0,
+          ecosystemBurnPct: tokenCheck.ecosystemBurn.ecosystemBurnPct,
+          asdfBurnPct: tokenCheck.ecosystemBurn.asdfBurnPct,
+          treasuryPct: tokenCheck.ecosystemBurn.treasuryPct,
+          explanation: tokenCheck.ecosystemBurn.explanation,
+        } : null,
       },
       holderTier: {
         tier: tierInfo.tier,

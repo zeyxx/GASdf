@@ -198,7 +198,7 @@ describe('Quote Route', () => {
         .send(validRequest)
         .expect(200);
 
-      expect(response.body.paymentToken).toEqual({
+      expect(response.body.paymentToken).toMatchObject({
         mint: validRequest.paymentToken,
         symbol: 'USDC',
         decimals: 6,

@@ -102,6 +102,7 @@ async function isTokenAccepted(mint) {
     tier: tokenData.tier,
     kScore: tokenData.kScore,
     creditRating: tokenData.creditRating?.grade,
+    burnedPct: tokenData.supply?.burnedPercent?.toFixed(2),
   });
 
   return {
@@ -111,6 +112,9 @@ async function isTokenAccepted(mint) {
     kScore: tokenData.kScore,
     kRank: tokenData.kRank,
     creditRating: tokenData.creditRating,
+    // Dual-burn flywheel data
+    supply: tokenData.supply,
+    ecosystemBurn: tokenData.ecosystemBurn,
   };
 }
 
