@@ -333,14 +333,31 @@ async function getToken(mint) {
     // ==========================================================================
     const currentSupply = parseInt(token.supply) || 0;
 
-    // Prefer HolDex pre-calculated burn data (tracks actual on-chain burns)
+    // Calculate burn data - pump.fun tokens always use 1B initial supply
     let burnedPercent = 0;
     let burnedAmount = 0;
     let initialSupply = PUMP_FUN_INITIAL_SUPPLY;
     let burnSource = 'none';
 
-    if (typeof token.burnedPercent === 'number' && token.burnedPercent > 0) {
-      // HolDex provides burn data - use it (most accurate)
+    const isPumpFun = token.isPumpFun || token.is_pump_fun || mint.endsWith('pump');
+    const isMayhemMode = token.isMayhemMode || token.is_mayhem_mode || false;
+
+    if (isPumpFun && !isMayhemMode) {
+      // Standard pump.fun tokens: ALWAYS use 1B initial supply
+      initialSupply = PUMP_FUN_INITIAL_SUPPLY;
+      burnedPercent = calculateBurnedPercent(currentSupply);
+      burnedAmount = PUMP_FUN_INITIAL_SUPPLY - currentSupply;
+      burnSource = 'pump_fun_1b';
+    } else if (isMayhemMode && token.initialSupply) {
+      // Mayhem Mode tokens: Use HolDex initialSupply (variable supply)
+      initialSupply = parseFloat(token.initialSupply) * Math.pow(10, token.decimals || 6);
+      if (currentSupply < initialSupply) {
+        burnedAmount = initialSupply - currentSupply;
+        burnedPercent = (burnedAmount / initialSupply) * 100;
+      }
+      burnSource = 'mayhem_mode';
+    } else if (typeof token.burnedPercent === 'number' && token.burnedPercent > 0) {
+      // Non-pump.fun: Use HolDex data if available
       burnedPercent = token.burnedPercent;
       burnedAmount = token.burnedAmount || 0;
       initialSupply = parseFloat(token.initialSupply) * Math.pow(10, token.decimals || 6) || PUMP_FUN_INITIAL_SUPPLY;
@@ -365,8 +382,9 @@ async function getToken(mint) {
       initial: initialSupply,
       burnedPercent,
       burnedAmount,
-      source: burnSource, // 'holdex', 'calculated', or 'none'
-      isPumpFun: token.isPumpFun || token.is_pump_fun || false,
+      source: burnSource, // 'pump_fun_1b', 'mayhem_mode', 'holdex', 'calculated', 'none'
+      isPumpFun,
+      isMayhemMode,
       bondingCurveComplete: token.bondingCurveComplete || token.bonding_curve_complete || false,
     };
 
