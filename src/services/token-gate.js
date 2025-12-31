@@ -56,7 +56,7 @@ function getDiamondTokens() {
  * Check if a token is accepted for payment
  *
  * @param {string} mint - Token mint address
- * @returns {Promise<{accepted: boolean, reason: string, tier: string, kScore?: number, kRank?: object, creditRating?: object}>}
+ * @returns {Promise<{accepted: boolean, reason: string, tier: string, kScore?: number, kRank?: object, creditRating?: object, supply?: object, ecosystemBurn?: object}>}
  */
 async function isTokenAccepted(mint) {
   // 1. Check DIAMOND_TOKENS locally (instant, no network call)
@@ -65,6 +65,20 @@ async function isTokenAccepted(mint) {
     // Diamond tokens get perfect scores
     const kRank = holdex.getKRank(100);
     const creditRating = holdex.getCreditRating(100);
+
+    // For $ASDF specifically, still fetch burn data for dual-burn flywheel
+    let supply = null;
+    let ecosystemBurn = null;
+    if (mint === config.ASDF_MINT) {
+      try {
+        const tokenData = await holdex.getToken(mint);
+        supply = tokenData.supply;
+        ecosystemBurn = tokenData.ecosystemBurn;
+      } catch {
+        // Ignore errors, burn data is optional for display
+      }
+    }
+
     return {
       accepted: true,
       reason: 'diamond',
@@ -72,6 +86,8 @@ async function isTokenAccepted(mint) {
       kScore: 100,
       kRank,
       creditRating,
+      supply,
+      ecosystemBurn,
     };
   }
 
