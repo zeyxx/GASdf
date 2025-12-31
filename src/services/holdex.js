@@ -36,6 +36,8 @@
 
 const config = require('../utils/config');
 const logger = require('../utils/logger');
+const rpc = require('../utils/rpc');
+const { PublicKey } = require('@solana/web3.js');
 
 // Cache token data (reduces API calls)
 const tokenCache = new Map();
@@ -214,7 +216,43 @@ function calculateEcosystemBurnBonus(burnedPercent) {
 }
 
 /**
+ * Fallback: Get token supply directly from Solana RPC
+ * On-chain is truth - use this when HolDex is unavailable
+ * @param {string} mint - Token mint address
+ * @returns {Promise<{supply: number, burnedPercent: number} | null>}
+ */
+async function getOnChainSupply(mint) {
+  try {
+    const connection = rpc.getConnection();
+    const mintPubkey = new PublicKey(mint);
+    const supplyInfo = await connection.getTokenSupply(mintPubkey);
+
+    if (supplyInfo?.value) {
+      // Convert to raw amount (with decimals)
+      const currentSupply = parseInt(supplyInfo.value.amount);
+      const burnedPercent = calculateBurnedPercent(currentSupply);
+
+      logger.debug('HOLDEX', 'On-chain supply fallback', {
+        mint: mint.slice(0, 8),
+        supply: currentSupply,
+        burnedPercent: burnedPercent.toFixed(2) + '%',
+      });
+
+      return { supply: currentSupply, burnedPercent };
+    }
+    return null;
+  } catch (error) {
+    logger.warn('HOLDEX', 'On-chain supply fallback failed', {
+      mint: mint.slice(0, 8),
+      error: error.message,
+    });
+    return null;
+  }
+}
+
+/**
  * Get token data from HolDex
+ * Falls back to on-chain data if HolDex is unavailable
  * @param {string} mint - Token mint address
  * @returns {Promise<{tier: string, kScore: number, kRank: object, creditRating: object, hasCommunityUpdate: boolean, conviction?: object, cached: boolean, error?: string}>}
  */
@@ -328,21 +366,57 @@ async function getToken(mint) {
 
     return { ...result, cached: false };
   } catch (error) {
-    logger.warn('HOLDEX', 'Token fetch failed', {
+    logger.warn('HOLDEX', 'Token fetch failed, trying on-chain fallback', {
       mint: mint.slice(0, 8),
       error: error.message,
     });
 
-    // Cache the error to avoid hammering a failing service
+    // ==========================================================================
+    // FALLBACK: On-chain is truth - get supply directly from Solana
+    // ==========================================================================
+    const onChainData = await getOnChainSupply(mint);
+
     const kRank = getKRank(0);
     const creditRating = getCreditRating(0);
+
+    // If on-chain fallback succeeded, include burn data
+    let supply = null;
+    let ecosystemBurn = null;
+
+    if (onChainData) {
+      supply = {
+        current: onChainData.supply,
+        initial: PUMP_FUN_INITIAL_SUPPLY,
+        burnedPercent: onChainData.burnedPercent,
+        burnedAmount: PUMP_FUN_INITIAL_SUPPLY - onChainData.supply,
+        source: 'on-chain', // Mark as on-chain fallback
+      };
+      ecosystemBurn = calculateEcosystemBurnBonus(onChainData.burnedPercent);
+
+      logger.info('HOLDEX', 'Using on-chain fallback for burn data', {
+        mint: mint.slice(0, 8),
+        burnedPercent: onChainData.burnedPercent.toFixed(2) + '%',
+      });
+    }
+
+    // Cache the result (with shorter TTL for errors)
+    const result = {
+      tier: 'Rust',
+      kScore: 0,
+      kRank,
+      creditRating,
+      hasCommunityUpdate: false,
+      supply,
+      ecosystemBurn,
+    };
+
     tokenCache.set(mint, {
-      data: { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false },
+      data: result,
       timestamp: Date.now(),
       isError: true,
     });
 
-    return { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false, cached: false, error: error.message };
+    return { ...result, cached: false, error: error.message, fallback: 'on-chain' };
   }
 }
 
@@ -429,6 +503,7 @@ module.exports = {
   // Pure Golden Dual-burn flywheel
   calculateBurnedPercent,
   calculateEcosystemBurnBonus,
+  getOnChainSupply, // Fallback to Solana RPC
   // Golden Ratio constants
   PHI,
   PHI_SQUARED,
