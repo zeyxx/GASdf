@@ -3,7 +3,9 @@ const { jupiterBreaker } = require('../utils/circuit-breaker');
 const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
 const { fetchWithTimeout, JUPITER_TIMEOUT } = require('../utils/fetch-timeout');
 
-const JUPITER_API = 'https://api.jup.ag/swap/v1';
+// Using lite-api until January 31, 2026 (no API key required)
+// TODO: Migrate to api.jup.ag with API key before deprecation
+const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
 
 // Common token info (avoid extra API calls)
 const TOKEN_INFO = {
