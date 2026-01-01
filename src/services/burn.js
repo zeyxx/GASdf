@@ -367,9 +367,12 @@ async function checkAndExecuteBurn() {
 /**
  * Execute burn operation for all collected tokens
  *
- * Flow for each token:
- * - If $ASDF: Burn 80% directly, swap 20% → SOL for treasury
- * - If other: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
+ * BATCHED FLOW (optimized):
+ * 1. Process all tokens - do swaps, collect burn amounts
+ * 2. Execute ALL burns in a single batched transaction
+ * 3. Record stats
+ *
+ * This saves ~0.000005 SOL per additional burn (base tx fee)
  */
 async function executeBurnWithLock(tokenBalances) {
   const results = {
@@ -377,11 +380,16 @@ async function executeBurnWithLock(tokenBalances) {
     failed: [],
     totalBurned: 0,
     totalTreasury: 0,
+    batchSignature: null,
   };
 
+  // Collect all burns to execute in a single batch
+  const pendingBurns = [];
+
+  // Phase 1: Process tokens (swaps) and collect burn amounts
   for (const token of tokenBalances) {
     try {
-      const result = await processTokenBurn(token);
+      const result = await processTokenForBatch(token, pendingBurns);
       if (result) {
         results.processed.push(result);
         results.totalBurned += result.asdfBurned || 0;
@@ -397,12 +405,74 @@ async function executeBurnWithLock(tokenBalances) {
     }
   }
 
+  // Phase 2: Execute all burns in a single batched transaction
+  if (pendingBurns.length > 0) {
+    logger.info('BURN', 'Executing batched burns', {
+      burnCount: pendingBurns.length,
+      tokens: pendingBurns.map(b => b.mint.slice(0, 8)),
+    });
+
+    try {
+      const batchResult = await batchBurnFromTreasury(pendingBurns);
+      results.batchSignature = batchResult.signature;
+
+      if (batchResult.signature) {
+        // Update burn stats
+        const totalAsdfBurned = pendingBurns
+          .filter(b => b.type === 'asdf')
+          .reduce((sum, b) => sum + b.amount, 0);
+
+        if (totalAsdfBurned > 0) {
+          await redis.incrBurnTotal(totalAsdfBurned);
+        }
+
+        // Record batch burn proof
+        await redis.recordBurnProof({
+          burnSignature: batchResult.signature,
+          amountBurned: totalAsdfBurned,
+          method: 'batch',
+          burnCount: batchResult.burns,
+          tokens: pendingBurns.map(b => ({
+            mint: b.mint,
+            amount: b.amount,
+            type: b.type,
+          })),
+          network: config.NETWORK,
+        });
+      }
+    } catch (error) {
+      logger.error('BURN', 'Batch burn failed, falling back to individual burns', {
+        error: error.message,
+        pendingBurns: pendingBurns.length,
+      });
+
+      // Fallback: try individual burns
+      for (const burn of pendingBurns) {
+        try {
+          if (burn.type === 'asdf') {
+            await burnAsdfFromTreasury(burn.amount);
+            await redis.incrBurnTotal(burn.amount);
+          } else {
+            await burnTokenFromTreasury(burn.mint, burn.amount, getHealthyPayer());
+          }
+        } catch (fallbackError) {
+          logger.error('BURN', 'Individual burn also failed', {
+            mint: burn.mint.slice(0, 8),
+            error: fallbackError.message,
+          });
+        }
+      }
+    }
+  }
+
   if (results.processed.length > 0) {
     logger.info('BURN', 'Burn cycle completed', {
       tokensProcessed: results.processed.length,
       tokensFailed: results.failed.length,
       totalAsdfBurned: results.totalBurned,
       totalSolToTreasury: results.totalTreasury,
+      batchSignature: results.batchSignature,
+      burnsBatched: pendingBurns.length,
     });
   }
 
@@ -410,7 +480,149 @@ async function executeBurnWithLock(tokenBalances) {
 }
 
 /**
- * Process a single token type for burning
+ * Process a single token for batched burning
+ * Does swaps immediately, but collects burns for batch execution
+ *
+ * @param {Object} token - Token to process
+ * @param {Array} pendingBurns - Array to collect burns for batch execution
+ * @returns {Object} Processing result (without burn execution)
+ */
+async function processTokenForBatch(token, pendingBurns) {
+  const { mint, balance, symbol, valueUsd } = token;
+  const isAsdf = mint === config.ASDF_MINT;
+
+  // Get ecosystem burn bonus for non-ASDF tokens
+  let ecosystemBurnBonus = { ecosystemBurnPct: 0, asdfBurnPct: 0.80, treasuryPct: 0.20 };
+  let tokenBurnedPercent = 0;
+
+  if (!isAsdf) {
+    try {
+      const tokenData = await holdex.getToken(mint);
+      if (tokenData.ecosystemBurn) {
+        ecosystemBurnBonus = tokenData.ecosystemBurn;
+        tokenBurnedPercent = tokenData.supply?.burnedPercent || 0;
+      }
+    } catch (error) {
+      logger.debug('BURN', 'Could not get ecosystem burn data', { mint: mint.slice(0, 8) });
+    }
+  }
+
+  const feePayer = getHealthyPayer();
+  if (!feePayer) {
+    throw new Error('No healthy fee payer available');
+  }
+
+  let asdfBurned = 0;
+  let ecosystemBurned = 0;
+  let solToTreasury = 0;
+  const swapSignatures = [];
+
+  if (isAsdf) {
+    // ==========================================================================
+    // $ASDF: Burn directly (no swaps needed!)
+    // ==========================================================================
+    const { burnAmount, treasuryAmount } = calculateTreasurySplit(balance, config.BURN_RATIO);
+
+    if (burnAmount > 0) {
+      // Queue for batch burn
+      pendingBurns.push({
+        mint: config.ASDF_MINT,
+        amount: burnAmount,
+        type: 'asdf',
+        symbol: '$ASDF',
+      });
+      asdfBurned = burnAmount;
+    }
+
+    // Keep treasury portion as $ASDF (optimized model)
+    if (treasuryAmount > 0) {
+      await redis.recordTreasuryEvent({
+        type: 'asdf_retained',
+        tokenMint: mint,
+        tokenAmount: treasuryAmount,
+        source: 'optimized_treasury_retention',
+      });
+    }
+
+  } else {
+    // ==========================================================================
+    // OTHER TOKENS: Swap to ASDF, then queue for batch burn
+    // ==========================================================================
+    const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
+    const asdfBurnAmount = Math.floor(balance * ecosystemBurnBonus.asdfBurnPct);
+    const treasuryAmount = balance - ecosystemBurnAmount - asdfBurnAmount;
+
+    // 1. Ecosystem burn (queue for batch)
+    if (ecosystemBurnAmount > 0) {
+      pendingBurns.push({
+        mint,
+        amount: ecosystemBurnAmount,
+        type: 'ecosystem',
+        symbol,
+      });
+      ecosystemBurned = ecosystemBurnAmount;
+    }
+
+    // 2. Swap to ASDF and queue for burn
+    const effectiveAsdfBurnAmount = ecosystemBurned > 0 ? asdfBurnAmount : asdfBurnAmount + ecosystemBurnAmount;
+    if (effectiveAsdfBurnAmount > 0) {
+      const burnSwap = await swapTokenToAsdf(mint, effectiveAsdfBurnAmount, feePayer);
+      if (burnSwap.success && burnSwap.asdfReceived) {
+        const asdfToBurn = parseInt(burnSwap.asdfReceived);
+        swapSignatures.push(burnSwap.signature);
+
+        // Queue ASDF for batch burn
+        pendingBurns.push({
+          mint: config.ASDF_MINT,
+          amount: asdfToBurn,
+          type: 'asdf',
+          symbol: '$ASDF',
+          sourceToken: mint,
+        });
+        asdfBurned = asdfToBurn;
+      }
+    }
+
+    // 3. Treasury portion → SOL (still needed for other tokens)
+    if (treasuryAmount > 0) {
+      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
+      if (treasurySwap.success) {
+        solToTreasury = parseInt(treasurySwap.solReceived);
+        swapSignatures.push(treasurySwap.signature);
+
+        await redis.incrTreasuryTotal(solToTreasury);
+        await redis.recordTreasuryEvent({
+          type: 'fee_conversion',
+          tokenMint: mint,
+          tokenAmount: treasuryAmount,
+          solAmount: solToTreasury,
+          source: 'token_treasury_portion',
+        });
+      }
+    }
+  }
+
+  logger.info('BURN', `Processed ${symbol} for batch`, {
+    mint: mint.slice(0, 8),
+    asdfBurned,
+    ecosystemBurned,
+    solToTreasury,
+    pendingBurnsTotal: pendingBurns.length,
+  });
+
+  return {
+    mint,
+    symbol,
+    asdfBurned,
+    ecosystemBurned,
+    solToTreasury,
+    swapSignatures,
+    batched: true,
+  };
+}
+
+/**
+ * Process a single token type for burning (legacy - used as fallback)
  *
  * DUAL-BURN FLYWHEEL:
  * - Tokens that have burned their own supply get an "ecosystem burn bonus"
@@ -743,6 +955,82 @@ async function burnAsdf(amount) {
   await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
 
   return signature;
+}
+
+/**
+ * BATCHED BURN: Execute multiple burn operations in a single transaction
+ * Saves ~0.000005 SOL per additional burn (base tx fee)
+ *
+ * @param {Array<{mint: string, amount: number, type: 'asdf'|'ecosystem'}>} burns
+ * @returns {Promise<{signature: string, burns: number}>}
+ */
+async function batchBurnFromTreasury(burns) {
+  if (!burns || burns.length === 0) {
+    return { signature: null, burns: 0 };
+  }
+
+  const feePayer = getHealthyPayer();
+  const treasury = getTreasuryAddress();
+
+  if (!feePayer.publicKey.equals(treasury)) {
+    logger.warn('BURN', 'Treasury differs from fee payer, cannot batch burn directly');
+    return { signature: null, burns: 0, error: 'Treasury mismatch' };
+  }
+
+  const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+
+  const transaction = new Transaction({
+    feePayer: feePayer.publicKey,
+    blockhash,
+    lastValidBlockHeight,
+  });
+
+  let burnCount = 0;
+
+  for (const burn of burns) {
+    try {
+      const tokenMint = new PublicKey(burn.mint);
+      const treasuryAta = await getAssociatedTokenAddress(tokenMint, treasury);
+
+      const burnIx = createBurnInstruction(
+        treasuryAta,
+        tokenMint,
+        treasury,
+        burn.amount
+      );
+
+      transaction.add(burnIx);
+      burnCount++;
+
+      logger.debug('BURN', 'Added burn instruction to batch', {
+        mint: burn.mint.slice(0, 8),
+        amount: burn.amount,
+        type: burn.type,
+      });
+    } catch (error) {
+      logger.warn('BURN', 'Failed to add burn to batch', {
+        mint: burn.mint?.slice(0, 8),
+        error: error.message,
+      });
+    }
+  }
+
+  if (burnCount === 0) {
+    return { signature: null, burns: 0 };
+  }
+
+  transaction.sign(feePayer);
+
+  const signature = await rpc.sendTransaction(transaction);
+  await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
+
+  logger.info('BURN', 'Batch burn executed', {
+    signature,
+    burnCount,
+    savedTxFees: `~${((burnCount - 1) * 0.000005).toFixed(6)} SOL`,
+  });
+
+  return { signature, burns: burnCount };
 }
 
 /**

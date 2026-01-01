@@ -323,13 +323,21 @@ describe('Burn Service', () => {
       );
     });
 
-    it('should record burn proof', async () => {
+    it('should record burn proof with batch method', async () => {
       await burnService.checkAndExecuteBurn();
 
+      // Now uses batched burning - all burns in one tx
       expect(redis.recordBurnProof).toHaveBeenCalledWith(
         expect.objectContaining({
-          method: 'swap',
-          sourceToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          method: 'batch',
+          burnCount: expect.any(Number),
+          tokens: expect.arrayContaining([
+            expect.objectContaining({
+              mint: expect.any(String),
+              amount: expect.any(Number),
+              type: 'asdf',
+            }),
+          ]),
         })
       );
     });
@@ -371,13 +379,20 @@ describe('Burn Service', () => {
       );
     });
 
-    it('should record burn proof with direct method', async () => {
+    it('should record burn proof with batch method', async () => {
       await burnService.checkAndExecuteBurn();
 
+      // $ASDF burns now use batched method too
       expect(redis.recordBurnProof).toHaveBeenCalledWith(
         expect.objectContaining({
-          method: 'direct',
-          sourceToken: 'AsdfMint111111111111111111111111111111111111',
+          method: 'batch',
+          burnCount: expect.any(Number),
+          tokens: expect.arrayContaining([
+            expect.objectContaining({
+              mint: 'AsdfMint111111111111111111111111111111111111',
+              type: 'asdf',
+            }),
+          ]),
         })
       );
     });
