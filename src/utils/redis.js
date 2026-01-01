@@ -392,6 +392,7 @@ const TX_HASH_TTL_SECONDS = 90;
 /**
  * Check if a transaction hash has been seen before (anti-replay)
  * Returns true if hash exists (transaction already submitted)
+ * @deprecated Use claimTransactionSlot for atomic check-and-mark
  */
 async function hasTransactionHash(txHash) {
   return withRedis(
@@ -407,6 +408,7 @@ async function hasTransactionHash(txHash) {
 
 /**
  * Mark a transaction hash as submitted (anti-replay)
+ * @deprecated Use claimTransactionSlot for atomic check-and-mark
  */
 async function markTransactionHash(txHash) {
   return withRedis(
@@ -415,6 +417,56 @@ async function markTransactionHash(txHash) {
     },
     () => {
       memoryStore.set(`txhash:${txHash}`, '1', TX_HASH_TTL_SECONDS);
+    }
+  );
+}
+
+/**
+ * ATOMIC: Claim a transaction slot (SET NX) - prevents race conditions
+ * Returns { claimed: true } if this is a new transaction (slot claimed)
+ * Returns { claimed: false } if transaction was already submitted (replay)
+ *
+ * This is the secure replacement for hasTransactionHash + markTransactionHash
+ * The atomic SET NX ensures no race condition between check and mark.
+ */
+async function claimTransactionSlot(txHash) {
+  const key = `txhash:${txHash}`;
+
+  return withRedis(
+    async (redis) => {
+      // SET key value NX EX ttl - atomic set-if-not-exists with expiry
+      // Returns 'OK' if set, null if key already exists
+      const result = await redis.set(key, Date.now().toString(), {
+        NX: true,
+        EX: TX_HASH_TTL_SECONDS
+      });
+      return { claimed: result === 'OK' };
+    },
+    () => {
+      // Memory fallback with atomic-like behavior
+      const existing = memoryStore.get(key);
+      if (existing !== null) {
+        return { claimed: false };
+      }
+      memoryStore.set(key, Date.now().toString(), TX_HASH_TTL_SECONDS);
+      return { claimed: true };
+    }
+  );
+}
+
+/**
+ * Release a transaction slot (if we claimed it but transaction failed)
+ * Only call this if you claimed the slot and need to allow retry
+ */
+async function releaseTransactionSlot(txHash) {
+  const key = `txhash:${txHash}`;
+
+  return withRedis(
+    async (redis) => {
+      await redis.del(key);
+    },
+    () => {
+      memoryStore.del(key);
     }
   );
 }
@@ -905,7 +957,10 @@ module.exports = {
   getTreasuryBalance,
   recordTreasuryEvent,
   getTreasuryHistory,
-  // Anti-Replay Protection
+  // Anti-Replay Protection (atomic)
+  claimTransactionSlot,
+  releaseTransactionSlot,
+  // Deprecated (non-atomic, kept for backward compatibility)
   hasTransactionHash,
   markTransactionHash,
   // Per-Wallet Rate Limiting

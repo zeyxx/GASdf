@@ -104,13 +104,15 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     }
 
     // =========================================================================
-    // SECURITY: Anti-Replay Protection
+    // SECURITY: Anti-Replay Protection (Atomic SET NX)
     // =========================================================================
     const txHash = computeTransactionHash(tx);
 
-    // Check if this transaction was already submitted
-    const isReplay = await redis.hasTransactionHash(txHash);
-    if (isReplay) {
+    // Atomically claim this transaction slot - prevents race conditions
+    // If claimed=true, we own this slot and can proceed
+    // If claimed=false, another request already claimed it (replay)
+    const { claimed } = await redis.claimTransactionSlot(txHash);
+    if (!claimed) {
       logger.warn('SUBMIT', 'Replay attack detected', {
         requestId: req.requestId,
         quoteId,
@@ -134,6 +136,8 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       });
     }
 
+    // We now own this transaction slot - must release on failure
+
     // =========================================================================
     // SECURITY: Blockhash Freshness Validation
     // =========================================================================
@@ -154,6 +158,11 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
         userPubkey,
         ip: clientIp,
       });
+
+      // Note: We don't release the transaction slot here.
+      // The user must get a new quote with fresh blockhash, which creates
+      // a new transaction with a different hash. This prevents replay attacks.
+      // The slot auto-expires after TX_HASH_TTL_SECONDS (90s).
 
       return res.status(400).json({
         error: 'Transaction blockhash expired, please get a new quote',
@@ -291,20 +300,32 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     const signedTx = signTransaction(tx, validation.feePayer);
 
     // =========================================================================
-    // SECURITY: Simulate transaction before sending
+    // SECURITY: Simulate transaction with CPI Protection (balance check)
+    // This detects malicious CPI attacks that could drain fee payer funds
     // =========================================================================
-    const simulation = await rpc.simulateTransaction(signedTx);
+    const simulation = await rpc.simulateWithBalanceCheck(
+      signedTx,
+      validation.feePayer,
+      50000 // Max expected SOL change: ~0.00005 SOL for tx fee
+    );
+
     if (!simulation.success) {
-      logger.warn('SUBMIT', 'Transaction simulation failed', {
+      const isCpiAttack = simulation.securityViolation === 'CPI_DRAIN_DETECTED';
+
+      logger.warn('SUBMIT', isCpiAttack ? 'CPI drain attack detected' : 'Transaction simulation failed', {
         requestId: req.requestId,
         quoteId,
         error: simulation.error,
-        logs: simulation.logs?.slice(-5), // Last 5 log lines
+        securityViolation: simulation.securityViolation,
+        balanceChanges: simulation.balanceChanges,
+        logs: simulation.logs?.slice(-5),
       });
 
-      logSecurityEvent(AUDIT_EVENTS.SIMULATION_FAILED, {
+      logSecurityEvent(isCpiAttack ? AUDIT_EVENTS.CPI_ATTACK_DETECTED : AUDIT_EVENTS.SIMULATION_FAILED, {
         quoteId,
         error: simulation.error,
+        securityViolation: simulation.securityViolation,
+        balanceChanges: simulation.balanceChanges,
         userPubkey,
         ip: clientIp,
       });
@@ -315,8 +336,8 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       releaseReservation(quoteId);
 
       return res.status(400).json({
-        error: 'Transaction simulation failed',
-        code: 'SIMULATION_FAILED',
+        error: isCpiAttack ? 'Transaction rejected: suspicious balance change detected' : 'Transaction simulation failed',
+        code: isCpiAttack ? 'CPI_ATTACK_DETECTED' : 'SIMULATION_FAILED',
         details: simulation.error,
         logs: simulation.logs?.slice(-3),
       });
@@ -326,6 +347,7 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       requestId: req.requestId,
       quoteId,
       unitsConsumed: simulation.unitsConsumed,
+      balanceChanges: simulation.balanceChanges,
     });
 
     // Mark as processing
@@ -349,8 +371,8 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     await redis.deleteQuote(quoteId);
     releaseReservation(quoteId);
 
-    // Mark transaction hash to prevent replay attacks
-    await redis.markTransactionHash(txHash);
+    // Transaction slot already claimed atomically at the start
+    // No need to mark again - the slot will auto-expire after TX_HASH_TTL_SECONDS
 
     // Track for burn worker
     await redis.addPendingSwap(quote.feeAmountLamports);

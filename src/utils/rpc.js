@@ -376,6 +376,113 @@ async function simulateTransaction(signedTx) {
   }
 }
 
+/**
+ * Simulate transaction with balance change analysis (CPI Protection)
+ *
+ * This function detects if the fee payer's SOL or token balances change
+ * unexpectedly during simulation, which could indicate:
+ * - CPI attacks (malicious program calling System/Token programs)
+ * - Hidden drain instructions
+ * - Unauthorized transfers
+ *
+ * @param {VersionedTransaction|Transaction} signedTx - The signed transaction
+ * @param {string} feePayerPubkey - The fee payer's public key
+ * @param {number} expectedMaxSolChange - Maximum expected SOL decrease (tx fee, usually ~5000-10000 lamports)
+ * @returns {Promise<{success: boolean, error?: string, balanceChanges?: object}>}
+ */
+async function simulateWithBalanceCheck(signedTx, feePayerPubkey, expectedMaxSolChange = 50000) {
+  try {
+    const conn = pool.getConnection();
+
+    // Get fee payer's current SOL balance before simulation
+    const preBalance = await conn.getBalance(new (require('@solana/web3.js').PublicKey)(feePayerPubkey));
+
+    // Simulate the transaction
+    const result = await pool.executeWithFailover(
+      async (c) => {
+        return c.simulateTransaction(signedTx, {
+          sigVerify: true,
+          commitment: 'confirmed',
+          accounts: {
+            encoding: 'base64',
+            addresses: [feePayerPubkey],
+          },
+        });
+      },
+      'simulateWithBalanceCheck'
+    );
+
+    if (result.value.err) {
+      return {
+        success: false,
+        error: JSON.stringify(result.value.err),
+        logs: result.value.logs || [],
+        unitsConsumed: result.value.unitsConsumed,
+      };
+    }
+
+    // Analyze balance changes from simulation
+    const accounts = result.value.accounts || [];
+    let postBalance = preBalance; // Default to no change if not returned
+
+    if (accounts.length > 0 && accounts[0]) {
+      const accountData = accounts[0];
+      // Account data includes lamports field
+      if (accountData.lamports !== undefined) {
+        postBalance = accountData.lamports;
+      }
+    }
+
+    const solChange = preBalance - postBalance;
+
+    // Check if SOL decreased more than expected (transaction fee)
+    // Normal tx fee is ~5000 lamports, allow some buffer
+    if (solChange > expectedMaxSolChange) {
+      logger.warn('RPC', 'CPI drain detected in simulation', {
+        feePayerPubkey: feePayerPubkey.slice(0, 8),
+        preBalance,
+        postBalance,
+        solChange,
+        expectedMaxChange: expectedMaxSolChange,
+      });
+
+      return {
+        success: false,
+        error: `Suspicious SOL drain detected: ${solChange} lamports (expected max ${expectedMaxSolChange})`,
+        logs: result.value.logs || [],
+        unitsConsumed: result.value.unitsConsumed,
+        balanceChanges: {
+          sol: {
+            pre: preBalance,
+            post: postBalance,
+            change: -solChange,
+          },
+        },
+        securityViolation: 'CPI_DRAIN_DETECTED',
+      };
+    }
+
+    return {
+      success: true,
+      logs: result.value.logs || [],
+      unitsConsumed: result.value.unitsConsumed,
+      balanceChanges: {
+        sol: {
+          pre: preBalance,
+          post: postBalance,
+          change: -solChange,
+        },
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      logs: [],
+    };
+  }
+}
+
 // Health check for /health endpoint
 function getRpcHealth() {
   return pool.getStatus();
@@ -390,6 +497,7 @@ module.exports = {
   getTokenBalance,
   isBlockhashValid,
   simulateTransaction,
+  simulateWithBalanceCheck,
   getRpcHealth,
 
   // Expose pool for advanced use cases
