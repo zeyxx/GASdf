@@ -23,6 +23,7 @@ jest.mock('../../../src/utils/redis', () => ({
   deleteQuote: jest.fn().mockResolvedValue(true),
   hasTransactionHash: jest.fn().mockResolvedValue(false),
   markTransactionHash: jest.fn().mockResolvedValue(true),
+  claimTransactionSlot: jest.fn().mockResolvedValue({ claimed: true }),
   addPendingSwap: jest.fn().mockResolvedValue(true),
   incrTxCount: jest.fn().mockResolvedValue(true),
   incrWalletBurn: jest.fn().mockResolvedValue(true),
@@ -31,6 +32,7 @@ jest.mock('../../../src/utils/redis', () => ({
 jest.mock('../../../src/utils/rpc', () => ({
   isBlockhashValid: jest.fn().mockResolvedValue(true),
   simulateTransaction: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
+  simulateWithBalanceCheck: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
   sendTransaction: jest.fn().mockResolvedValue('test-signature-abc123'),
   confirmTransaction: jest.fn().mockResolvedValue(true),
 }));
@@ -43,6 +45,9 @@ jest.mock('../../../src/services/signer', () => ({
 jest.mock('../../../src/services/fee-payer-pool', () => ({
   releaseReservation: jest.fn(),
   getReservation: jest.fn().mockReturnValue(null),
+  pool: {
+    balances: new Map([['FeePayerPubkey111111111111111111111111111111', 1000000000]]),
+  },
 }));
 
 jest.mock('../../../src/services/validator', () => ({
@@ -75,6 +80,7 @@ jest.mock('../../../src/services/tx-queue', () => ({
   MAX_RETRIES: 3,
   RETRY_DELAYS: [1000, 2000, 4000],
   isRetryableError: jest.fn().mockReturnValue(false),
+  getRetryDelay: jest.fn().mockReturnValue(10), // Fast retry for tests
 }));
 
 jest.mock('../../../src/utils/metrics', () => ({
@@ -145,9 +151,9 @@ describe('Submit Route', () => {
 
     // Reset all mocks to default values
     redis.getQuote.mockResolvedValue(validQuote);
-    redis.hasTransactionHash.mockResolvedValue(false);
+    redis.claimTransactionSlot.mockResolvedValue({ claimed: true });
     rpc.isBlockhashValid.mockResolvedValue(true);
-    rpc.simulateTransaction.mockResolvedValue({ success: true, unitsConsumed: 200000 });
+    rpc.simulateWithBalanceCheck.mockResolvedValue({ success: true, unitsConsumed: 200000 });
     rpc.sendTransaction.mockResolvedValue('test-signature-abc123');
     validator.deserializeTransaction.mockReturnValue({ message: {} });
     validator.validateTransaction.mockReturnValue({
@@ -204,13 +210,13 @@ describe('Submit Route', () => {
       expect(redis.deleteQuote).toHaveBeenCalledWith(validRequest.quoteId);
     });
 
-    it('should mark transaction hash to prevent replay', async () => {
+    it('should claim transaction slot to prevent replay', async () => {
       await request(app)
         .post('/submit')
         .send(validRequest)
         .expect(200);
 
-      expect(redis.markTransactionHash).toHaveBeenCalled();
+      expect(redis.claimTransactionSlot).toHaveBeenCalled();
     });
 
     it('should track pending swap', async () => {
@@ -347,7 +353,7 @@ describe('Submit Route', () => {
 
   describe('anti-replay protection', () => {
     it('should return 400 for replay attack', async () => {
-      redis.hasTransactionHash.mockResolvedValue(true);
+      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
       const response = await request(app)
         .post('/submit')
@@ -359,7 +365,7 @@ describe('Submit Route', () => {
     });
 
     it('should log security event for replay', async () => {
-      redis.hasTransactionHash.mockResolvedValue(true);
+      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
       await request(app)
         .post('/submit')
@@ -374,7 +380,7 @@ describe('Submit Route', () => {
     });
 
     it('should track failure for anomaly detection', async () => {
-      redis.hasTransactionHash.mockResolvedValue(true);
+      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
       await request(app)
         .post('/submit')
@@ -467,7 +473,7 @@ describe('Submit Route', () => {
 
   describe('transaction simulation', () => {
     it('should return 400 for failed simulation', async () => {
-      rpc.simulateTransaction.mockResolvedValue({
+      rpc.simulateWithBalanceCheck.mockResolvedValue({
         success: false,
         error: 'Simulation failed',
         logs: ['Error log 1', 'Error log 2'],
@@ -483,7 +489,7 @@ describe('Submit Route', () => {
     });
 
     it('should release reservation on simulation failure', async () => {
-      rpc.simulateTransaction.mockResolvedValue({
+      rpc.simulateWithBalanceCheck.mockResolvedValue({
         success: false,
         error: 'Simulation failed',
       });
