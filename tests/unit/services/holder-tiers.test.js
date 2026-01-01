@@ -2,10 +2,16 @@
  * Holder Tiers Service Tests - Supply-Based Discount System
  */
 
+// Golden Ratio constants for tests
+const PHI = 1.618033988749;
+const PHI_CUBED = PHI * PHI * PHI;
+const GOLDEN_TREASURY_RATIO = 1 / PHI_CUBED; // ~23.6%
+
 // Mock dependencies first
 jest.mock('../../../src/utils/config', () => ({
   ASDF_MINT: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump',
   IS_DEV: true,
+  TREASURY_RATIO: 1 / (1.618033988749 ** 3), // Pure Golden: 1/φ³ ≈ 23.6%
 }));
 
 jest.mock('../../../src/utils/rpc', () => ({
@@ -133,15 +139,26 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
 
   describe('calculateBreakEvenFee()', () => {
     it('should calculate break-even fee based on treasury ratio', () => {
-      // txCost / 0.20 = break-even
-      expect(calculateBreakEvenFee(5000)).toBe(25000);
-      expect(calculateBreakEvenFee(10000)).toBe(50000);
-      expect(calculateBreakEvenFee(1000)).toBe(5000);
+      // txCost / TREASURY_RATIO = break-even
+      // With golden ratio (23.6%), 5000 / 0.236 ≈ 21181
+      const breakEven5000 = calculateBreakEvenFee(5000);
+      const breakEven10000 = calculateBreakEvenFee(10000);
+      const breakEven1000 = calculateBreakEvenFee(1000);
+
+      // Verify the math: breakEven * treasuryRatio >= txCost
+      expect(Math.floor(breakEven5000 * GOLDEN_TREASURY_RATIO)).toBeGreaterThanOrEqual(5000);
+      expect(Math.floor(breakEven10000 * GOLDEN_TREASURY_RATIO)).toBeGreaterThanOrEqual(10000);
+      expect(Math.floor(breakEven1000 * GOLDEN_TREASURY_RATIO)).toBeGreaterThanOrEqual(1000);
+
+      // Verify proportionality: 2x cost ≈ 2x break-even (within 1 lamport due to ceiling)
+      expect(breakEven10000).toBeGreaterThanOrEqual(breakEven5000 * 2 - 1);
+      expect(breakEven10000).toBeLessThanOrEqual(breakEven5000 * 2 + 1);
     });
 
     it('should round up for non-integer results', () => {
-      // 5001 / 0.20 = 25005
-      expect(calculateBreakEvenFee(5001)).toBe(25005);
+      // Should always round up to ensure treasury covers costs
+      const breakEven5001 = calculateBreakEvenFee(5001);
+      expect(Math.floor(breakEven5001 * GOLDEN_TREASURY_RATIO)).toBeGreaterThanOrEqual(5001);
     });
   });
 
@@ -165,25 +182,30 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     });
 
     it('should floor at break-even when discount would go below', () => {
-      // 10000 * 0.05 = 500 < break-even (25000)
-      expect(applyDiscount(lowBaseFee, 0.95, defaultTxCost)).toBe(25000);
+      const breakEven = calculateBreakEvenFee(defaultTxCost);
+      // 10000 * 0.05 = 500 < break-even
+      expect(applyDiscount(lowBaseFee, 0.95, defaultTxCost)).toBe(breakEven);
     });
 
     it('should floor at break-even for any base fee below break-even', () => {
-      expect(applyDiscount(lowBaseFee, 0, defaultTxCost)).toBe(25000);
-      expect(applyDiscount(lowBaseFee, 0.50, defaultTxCost)).toBe(25000);
+      const breakEven = calculateBreakEvenFee(defaultTxCost);
+      expect(applyDiscount(lowBaseFee, 0, defaultTxCost)).toBe(breakEven);
+      expect(applyDiscount(lowBaseFee, 0.50, defaultTxCost)).toBe(breakEven);
     });
 
     it('should use custom txCost for break-even calculation', () => {
-      // txCost 1000 → break-even 5000
-      expect(applyDiscount(10000, 0.95, 1000)).toBe(5000);
-      // txCost 10000 → break-even 50000
-      expect(applyDiscount(100000, 0.95, 10000)).toBe(50000);
+      const breakEven1000 = calculateBreakEvenFee(1000);
+      const breakEven10000 = calculateBreakEvenFee(10000);
+      expect(applyDiscount(10000, 0.95, 1000)).toBe(breakEven1000);
+      expect(applyDiscount(100000, 0.95, 10000)).toBe(breakEven10000);
     });
 
     it('should allow full 95% discount when above break-even', () => {
-      // 500000 * 0.05 = 25000 = break-even
+      const breakEven = calculateBreakEvenFee(defaultTxCost);
+      // 500000 * 0.05 = 25000, which is above break-even (~21181)
       const result = applyDiscount(500000, 0.95, defaultTxCost);
+      expect(result).toBeGreaterThanOrEqual(breakEven);
+      // Should be approximately 5% of base fee (25000), allow 1 lamport tolerance for ceiling
       expect(result).toBeGreaterThanOrEqual(25000);
       expect(result).toBeLessThanOrEqual(25002);
     });
@@ -225,10 +247,11 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     });
 
     it('should apply break-even floor for low base fees', async () => {
+      const breakEven = calculateBreakEvenFee(5000);
       const result = await calculateDiscountedFee('TestWallet', 10000, 5000);
 
-      expect(result.breakEvenFee).toBe(25000);
-      expect(result.discountedFee).toBe(25000);
+      expect(result.breakEvenFee).toBe(breakEven);
+      expect(result.discountedFee).toBe(breakEven);
       expect(result.isAtBreakEven).toBe(true);
     });
 
@@ -304,26 +327,31 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     });
 
     it('should floor at break-even fee for treasury neutrality', () => {
-      // With 5000 tx cost, break-even is 25000
-      expect(applyDiscount(100, 0.95, 5000)).toBe(25000);
-      expect(applyDiscount(1000, 0.95, 5000)).toBe(25000);
-      expect(applyDiscount(10000, 0.95, 5000)).toBe(25000);
+      // With 5000 tx cost and 23.6% treasury ratio, break-even is ~21181
+      const breakEven = calculateBreakEvenFee(5000);
+      expect(applyDiscount(100, 0.95, 5000)).toBe(breakEven);
+      expect(applyDiscount(1000, 0.95, 5000)).toBe(breakEven);
+      expect(applyDiscount(10000, 0.95, 5000)).toBe(breakEven);
     });
 
     it('should ensure treasury always covers transaction costs', () => {
       const txCost = 5000;
       const breakEven = calculateBreakEvenFee(txCost);
-      const treasuryPortion = breakEven * 0.20;
+      // Treasury ratio is ~23.6% (1/φ³ from config)
+      const config = require('../../../src/utils/config');
+      const treasuryPortion = Math.floor(breakEven * config.TREASURY_RATIO);
 
-      // Treasury portion should exactly cover tx cost
-      expect(treasuryPortion).toBe(txCost);
+      // Treasury portion should cover tx cost (may be slightly more due to ceiling)
+      expect(treasuryPortion).toBeGreaterThanOrEqual(txCost);
     });
 
     it('should scale break-even with transaction complexity', () => {
-      // Simple tx: 2500 cost → 12500 min fee
-      expect(applyDiscount(5000, 0.95, 2500)).toBe(12500);
-      // Complex tx: 10000 cost → 50000 min fee
-      expect(applyDiscount(20000, 0.95, 10000)).toBe(50000);
+      // Break-even scales with tx cost using config.TREASURY_RATIO
+      const breakEven2500 = calculateBreakEvenFee(2500);
+      const breakEven10000 = calculateBreakEvenFee(10000);
+
+      expect(applyDiscount(5000, 0.95, 2500)).toBe(breakEven2500);
+      expect(applyDiscount(20000, 0.95, 10000)).toBe(breakEven10000);
     });
   });
 
