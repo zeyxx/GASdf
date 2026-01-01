@@ -4,6 +4,7 @@ const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
+const holdex = require('../services/holdex');
 const { withTimeout, HEALTH_CHECK_TIMEOUT } = require('../utils/fetch-timeout');
 
 const router = express.Router();
@@ -44,6 +45,9 @@ router.get('/', async (req, res) => {
 
   // Add oracle health
   health.oracle = oracle.getOracleHealth();
+
+  // Add HolDex status (K-score oracle)
+  health.holdex = holdex.getStatus();
 
   // Add RPC pool health
   health.rpcPool = rpc.getRpcHealth();

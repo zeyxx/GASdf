@@ -38,6 +38,7 @@ const config = require('../utils/config');
 const logger = require('../utils/logger');
 const rpc = require('../utils/rpc');
 const { PublicKey } = require('@solana/web3.js');
+const { holdexBreaker } = require('../utils/circuit-breaker');
 
 // Cache token data (reduces API calls)
 const tokenCache = new Map();
@@ -275,15 +276,23 @@ async function getToken(mint) {
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), HOLDEX_TIMEOUT);
+    // Circuit breaker protects against HolDex outages
+    const response = await holdexBreaker.execute(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), HOLDEX_TIMEOUT);
 
-    const response = await fetch(`${holdexUrl}/token/${mint}`, {
-      signal: controller.signal,
-      headers: { 'Accept': 'application/json' },
+      try {
+        const res = await fetch(`${holdexUrl}/token/${mint}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        });
+        clearTimeout(timeout);
+        return res;
+      } catch (err) {
+        clearTimeout(timeout);
+        throw err;
+      }
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       // Token not found in HolDex = Rust tier
@@ -413,9 +422,14 @@ async function getToken(mint) {
 
     return { ...result, cached: false };
   } catch (error) {
-    logger.warn('HOLDEX', 'Token fetch failed, trying on-chain fallback', {
+    // Check if circuit breaker is open
+    const isCircuitOpen = error.code === 'CIRCUIT_OPEN';
+
+    logger.warn('HOLDEX', isCircuitOpen ? 'Circuit breaker open, using fallback' : 'Token fetch failed, trying on-chain fallback', {
       mint: mint.slice(0, 8),
       error: error.message,
+      circuitOpen: isCircuitOpen,
+      circuitState: holdexBreaker.getStatus().state,
     });
 
     // ==========================================================================
@@ -537,6 +551,27 @@ function getCacheStats() {
   };
 }
 
+/**
+ * Get HolDex service status including circuit breaker
+ */
+function getStatus() {
+  const cacheStats = getCacheStats();
+  const circuitStatus = holdexBreaker.getStatus();
+
+  return {
+    configured: !!config.HOLDEX_URL,
+    url: config.HOLDEX_URL ? config.HOLDEX_URL.replace(/\/token.*/, '') : null,
+    cache: cacheStats,
+    circuitBreaker: {
+      state: circuitStatus.state,
+      failures: circuitStatus.failures,
+      failureThreshold: circuitStatus.failureThreshold,
+      timeUntilRetry: circuitStatus.timeUntilRetry,
+      lastFailure: circuitStatus.lastFailure,
+    },
+  };
+}
+
 module.exports = {
   getToken,
   isTokenAccepted,
@@ -545,6 +580,7 @@ module.exports = {
   isVerifiedCommunity, // deprecated, for backward compatibility
   clearCache,
   getCacheStats,
+  getStatus, // Includes circuit breaker status
   ACCEPTED_TIERS,
   VALID_TIERS,
   // Pure Golden Dual-burn flywheel

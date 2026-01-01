@@ -301,6 +301,28 @@ const rpcBreaker = new CircuitBreaker({
   },
 });
 
+// HolDex API circuit breaker
+const holdexBreaker = new CircuitBreaker({
+  name: 'holdex',
+  failureThreshold: 3,       // Open after 3 failures
+  resetTimeout: 60000,       // 60 seconds - external API, give it time
+  isFailure: (error) => {
+    const msg = error.message?.toLowerCase() || '';
+    // Don't count 404 (token not found) as failure - that's expected
+    // Don't count client errors (400) as failure
+    // Only count network/service errors
+    return msg.includes('timeout') ||
+           msg.includes('aborted') ||
+           msg.includes('econnrefused') ||
+           msg.includes('enotfound') ||
+           msg.includes('service unavailable') ||
+           msg.includes('500') ||
+           msg.includes('502') ||
+           msg.includes('503') ||
+           msg.includes('504');
+  },
+});
+
 module.exports = {
   CircuitBreaker,
   STATE,
@@ -311,4 +333,5 @@ module.exports = {
   // Pre-configured breakers
   jupiterBreaker,
   rpcBreaker,
+  holdexBreaker,
 };
