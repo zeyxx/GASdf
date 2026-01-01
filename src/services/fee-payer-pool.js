@@ -14,8 +14,9 @@ const MIN_HEALTHY_BALANCE = process.env.NODE_ENV === 'development' ? 0 : 10_000_
 // Warning balance threshold (0.05 SOL)
 const WARNING_BALANCE = 50_000_000;
 
-// How often to refresh balances (10 seconds - reduced for better protection)
-const BALANCE_REFRESH_INTERVAL = 10_000;
+// How often to refresh balances (30 seconds - balances RPC efficiency vs responsiveness)
+// 10s was too aggressive, causing unnecessary RPC calls (~360/hour vs ~120/hour)
+const BALANCE_REFRESH_INTERVAL = 30_000;
 
 // Maximum pending reservations per fee payer (prevents over-commitment)
 const MAX_RESERVATIONS_PER_PAYER = 50;

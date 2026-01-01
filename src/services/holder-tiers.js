@@ -15,6 +15,10 @@ const config = require('../utils/config');
 const { getConnection } = require('../utils/rpc');
 const logger = require('../utils/logger');
 
+// Treasury ratio from config (Pure Golden: 1/φ³ ≈ 23.6%)
+// Used for break-even calculation to ensure consistency across codebase
+const TREASURY_RATIO = config.TREASURY_RATIO;
+
 // $ASDF has 6 decimals
 const ASDF_DECIMALS = 6;
 const ASDF_UNIT = Math.pow(10, ASDF_DECIMALS);
@@ -191,13 +195,13 @@ function getTierName(sharePercent) {
 
 /**
  * Calculate minimum fee to ensure treasury breaks even
- * Treasury receives 20% of fee, must cover transaction costs.
+ * Treasury receives ~23.6% of fee (1/φ³), must cover transaction costs.
  *
  * @param {number} txCost - Transaction cost in lamports
  * @returns {number} - Minimum fee for break-even
  */
 function calculateBreakEvenFee(txCost) {
-  const TREASURY_RATIO = 0.20;
+  // Use config TREASURY_RATIO (Pure Golden: 1/φ³ ≈ 23.6%)
   return Math.ceil(txCost / TREASURY_RATIO);
 }
 
