@@ -21,10 +21,75 @@ class RateLimitTracker {
     // Thresholds for proactive backoff
     this.warningThreshold = 0.2;  // Start slowing at 20% remaining
     this.criticalThreshold = 0.05; // Heavy backoff at 5% remaining
+
+    // 429 tracking (fallback when headers aren't available)
+    this.recent429s = [];         // Timestamps of recent 429 errors
+    this.consecutive429s = 0;     // Count of consecutive 429s
+    this.last429At = null;        // Last 429 timestamp
+    this.backoffUntil = null;     // Don't make requests until this time
+    this.requestsSince429 = 0;    // Successful requests since last 429
+
+    // 429 backoff configuration
+    this.baseBackoffMs = 1000;    // Start with 1 second
+    this.maxBackoffMs = 30000;    // Cap at 30 seconds
+    this.recoveryWindow = 60000; // Forget 429s after 60 seconds of success
+  }
+
+  /**
+   * Record a 429 error - triggers exponential backoff
+   */
+  record429() {
+    const now = Date.now();
+    this.recent429s.push(now);
+    this.consecutive429s++;
+    this.last429At = now;
+    this.requestsSince429 = 0;
+
+    // Clean old 429s (keep last 60 seconds)
+    this.recent429s = this.recent429s.filter(t => now - t < this.recoveryWindow);
+
+    // Calculate exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+    const backoffMs = Math.min(
+      this.baseBackoffMs * Math.pow(2, this.consecutive429s - 1),
+      this.maxBackoffMs
+    );
+
+    // Add jitter (0-20% of backoff)
+    const jitter = Math.floor(Math.random() * backoffMs * 0.2);
+    this.backoffUntil = now + backoffMs + jitter;
+
+    logger.warn('RATE_LIMIT', `429 received from ${this.endpointName}`, {
+      consecutive429s: this.consecutive429s,
+      recent429sCount: this.recent429s.length,
+      backoffMs: backoffMs + jitter,
+      backoffUntil: new Date(this.backoffUntil).toISOString(),
+    });
+  }
+
+  /**
+   * Record a successful request - helps recovery from 429 state
+   */
+  recordSuccess() {
+    this.requestsSince429++;
+
+    // After enough successful requests, start recovering
+    if (this.requestsSince429 >= 10 && this.consecutive429s > 0) {
+      this.consecutive429s = Math.max(0, this.consecutive429s - 1);
+      this.requestsSince429 = 0;
+
+      if (this.consecutive429s === 0) {
+        logger.info('RATE_LIMIT', `${this.endpointName} recovered from rate limiting`);
+      }
+    }
+
+    // Clear backoff if we're past the backoff window
+    if (this.backoffUntil && Date.now() > this.backoffUntil) {
+      this.backoffUntil = null;
+    }
   }
 
   update(headers) {
-    // Helius rate limit headers
+    // Helius rate limit headers (may not be present)
     const limit = headers.get('x-ratelimit-limit-requests') ||
                   headers.get('x-ratelimit-limit');
     const remaining = headers.get('x-ratelimit-remaining-requests') ||
@@ -35,15 +100,14 @@ class RateLimitTracker {
     if (limit) this.limit = parseInt(limit, 10);
     if (remaining) this.remaining = parseInt(remaining, 10);
     if (resetSeconds) {
-      // Reset can be seconds from now or a timestamp
       const resetValue = parseFloat(resetSeconds);
       this.resetAt = resetValue > 1e9 ? resetValue * 1000 : Date.now() + (resetValue * 1000);
     }
 
     this.lastUpdated = Date.now();
 
-    // Log when approaching limits
-    if (this.shouldWarn()) {
+    // Log when approaching limits (only if headers are present)
+    if (this.limit && this.shouldWarn()) {
       logger.warn('RATE_LIMIT', `${this.endpointName} approaching limit`, {
         remaining: this.remaining,
         limit: this.limit,
@@ -72,37 +136,70 @@ class RateLimitTracker {
   }
 
   /**
+   * Check if we're in 429 backoff mode
+   */
+  isIn429Backoff() {
+    return this.backoffUntil && Date.now() < this.backoffUntil;
+  }
+
+  /**
+   * Get remaining backoff time from 429
+   */
+  get429BackoffRemaining() {
+    if (!this.backoffUntil) return 0;
+    return Math.max(0, this.backoffUntil - Date.now());
+  }
+
+  /**
    * Get recommended delay before next request
-   * Returns 0 if no backoff needed
+   * Now includes 429-based backoff as fallback
    */
   getBackoffDelay() {
+    // Priority 1: Active 429 backoff (most important)
+    const backoff429 = this.get429BackoffRemaining();
+    if (backoff429 > 0) {
+      return backoff429;
+    }
+
+    // Priority 2: Header-based rate limit (if available)
     const percentRemaining = this.getPercentRemaining();
 
-    // No limit info or plenty remaining
-    if (percentRemaining > this.warningThreshold) {
-      return 0;
-    }
-
-    // Critical: wait until reset or use heavy backoff
-    if (percentRemaining <= this.criticalThreshold) {
-      const resetIn = this.getResetInMs();
-      if (resetIn > 0 && resetIn < 5000) {
-        return resetIn + 100; // Wait for reset + small buffer
+    if (percentRemaining <= this.warningThreshold) {
+      if (percentRemaining <= this.criticalThreshold) {
+        const resetIn = this.getResetInMs();
+        if (resetIn > 0 && resetIn < 5000) {
+          return resetIn + 100;
+        }
+        return 1000;
       }
-      return 1000; // Heavy backoff: 1 second between requests
+
+      const backoffFactor = 1 - (percentRemaining / this.warningThreshold);
+      return Math.floor(100 + (backoffFactor * 400));
     }
 
-    // Warning zone: gradual backoff (100-500ms)
-    const backoffFactor = 1 - (percentRemaining / this.warningThreshold);
-    return Math.floor(100 + (backoffFactor * 400));
+    // Priority 3: Preventive slowdown if we've had recent 429s
+    if (this.recent429s.length > 0 && this.consecutive429s > 0) {
+      // Gradual slowdown: 50ms per recent 429
+      return Math.min(this.recent429s.length * 50, 500);
+    }
+
+    return 0;
   }
 
   getStatus() {
     return {
+      // Header-based tracking
       limit: this.limit,
       remaining: this.remaining,
       percentRemaining: Math.round(this.getPercentRemaining() * 100),
       resetInMs: this.getResetInMs(),
+      // 429-based tracking
+      consecutive429s: this.consecutive429s,
+      recent429sCount: this.recent429s.length,
+      isIn429Backoff: this.isIn429Backoff(),
+      backoff429RemainingMs: this.get429BackoffRemaining(),
+      requestsSince429: this.requestsSince429,
+      // Combined
       backoffDelay: this.getBackoffDelay(),
       lastUpdated: this.lastUpdated,
     };
@@ -120,7 +217,7 @@ function getRateLimitTracker(endpointName) {
 }
 
 /**
- * Create a fetch wrapper that extracts rate limit headers
+ * Create a fetch wrapper that extracts rate limit headers and tracks 429s
  */
 function createRateLimitAwareFetch(endpointName) {
   const tracker = getRateLimitTracker(endpointName);
@@ -129,9 +226,10 @@ function createRateLimitAwareFetch(endpointName) {
     // Check if we should proactively back off
     const backoffDelay = tracker.getBackoffDelay();
     if (backoffDelay > 0) {
-      logger.debug('RATE_LIMIT', `Proactive backoff for ${endpointName}`, {
+      logger.debug('RATE_LIMIT', `Backoff for ${endpointName}`, {
         delay: backoffDelay,
-        remaining: tracker.remaining,
+        isIn429Backoff: tracker.isIn429Backoff(),
+        consecutive429s: tracker.consecutive429s,
       });
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
@@ -139,7 +237,14 @@ function createRateLimitAwareFetch(endpointName) {
     // Make the actual request
     const response = await fetch(url, options);
 
-    // Extract and track rate limit headers
+    // Track 429 errors (fallback rate limiting)
+    if (response.status === 429) {
+      tracker.record429();
+    } else if (response.ok) {
+      tracker.recordSuccess();
+    }
+
+    // Extract and track rate limit headers (if present)
     tracker.update(response.headers);
 
     return response;
