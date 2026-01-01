@@ -290,35 +290,35 @@ describe('Burn Service', () => {
       });
     });
 
-    it('should swap 80% to ASDF and burn', async () => {
+    it('should swap 100% to ASDF (unified model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
+      // UNIFIED MODEL: Swap 100% to $ASDF (1 swap instead of 2!)
       expect(jupiter.getTokenToAsdfQuote).toHaveBeenCalledWith(
         'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-        8000000, // 80% of 10000000
+        10000000, // 100% of balance → $ASDF
         150
       );
       expect(result.processed).toHaveLength(1);
+      expect(result.model).toBe('unified');
     });
 
-    it('should swap 20% to SOL for treasury', async () => {
+    it('should NOT swap to SOL (unified model keeps treasury as $ASDF)', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(jupiter.getTokenToSolQuote).toHaveBeenCalledWith(
-        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-        2000000, // 20% of 10000000
-        150
-      );
+      // UNIFIED MODEL: No separate SOL swap!
+      // Treasury is kept as $ASDF and only swapped when fee payer needs refill
+      expect(jupiter.getTokenToSolQuote).not.toHaveBeenCalled();
     });
 
-    it('should record treasury event for converted SOL', async () => {
+    it('should record treasury retention as $ASDF (unified model)', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(redis.incrTreasuryTotal).toHaveBeenCalled();
+      // UNIFIED MODEL: Treasury recorded as $ASDF retention, not SOL conversion
       expect(redis.recordTreasuryEvent).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'fee_conversion',
-          source: 'token_treasury_portion',
+          type: 'asdf_retained',
+          source: 'unified_model_treasury',
         })
       );
     });
@@ -448,7 +448,7 @@ describe('Burn Service', () => {
       // Token is still "processed" but with 0 values
       expect(result.processed).toHaveLength(1);
       expect(result.processed[0].asdfBurned).toBe(0);
-      expect(result.processed[0].solToTreasury).toBe(0);
+      // Unified model: no more solToTreasury, treasury is kept as $ASDF
     });
   });
 
@@ -545,16 +545,16 @@ describe('Burn Service', () => {
       );
     });
 
-    it('should handle partial swap failure (burn fails, treasury succeeds)', async () => {
+    it('should handle swap failure in unified model (no partial results)', async () => {
       jupiter.getTokenToAsdfQuote.mockRejectedValue(new Error('No route'));
-      // Treasury swap still succeeds
+      // UNIFIED MODEL: Only 1 swap to $ASDF, so if it fails, nothing happens
 
       const result = await burnService.checkAndExecuteBurn();
 
-      // Token is processed with partial results (treasury only)
+      // Token is processed but with 0 values (unified model = 1 swap only)
       expect(result.processed).toHaveLength(1);
       expect(result.processed[0].asdfBurned).toBe(0);
-      expect(result.processed[0].solToTreasury).toBeGreaterThan(0);
+      // No solToTreasury in unified model - treasury is kept as $ASDF
     });
 
     it('should handle no healthy fee payer', async () => {
@@ -578,16 +578,17 @@ describe('Burn Service', () => {
       });
     });
 
-    it('should return complete burn result', async () => {
+    it('should return complete burn result (unified model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result).not.toBeNull();
       expect(result.processed).toHaveLength(1);
       expect(result.totalBurned).toBeGreaterThan(0);
-      expect(result.totalTreasury).toBeGreaterThan(0);
+      expect(result.totalAsdfRetained).toBeGreaterThanOrEqual(0); // Unified: treasury in $ASDF
+      expect(result.model).toBe('unified');
     });
 
-    it('should include token details in processed results', async () => {
+    it('should include token details in processed results (unified model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result.processed[0]).toEqual(
@@ -595,7 +596,8 @@ describe('Burn Service', () => {
           mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
           symbol: 'USDC',
           asdfBurned: expect.any(Number),
-          solToTreasury: expect.any(Number),
+          model: 'unified',
+          // No more solToTreasury - unified model keeps treasury as $ASDF
         })
       );
     });

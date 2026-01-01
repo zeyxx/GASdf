@@ -379,21 +379,23 @@ async function executeBurnWithLock(tokenBalances) {
     processed: [],
     failed: [],
     totalBurned: 0,
-    totalTreasury: 0,
+    totalAsdfRetained: 0,
     batchSignature: null,
+    model: 'unified',
   };
 
   // Collect all burns to execute in a single batch
   const pendingBurns = [];
 
-  // Phase 1: Process tokens (swaps) and collect burn amounts
+  // Phase 1: Process tokens (swaps to $ASDF) and collect burn amounts
+  // UNIFIED MODEL: All value flows through $ASDF
   for (const token of tokenBalances) {
     try {
       const result = await processTokenForBatch(token, pendingBurns);
       if (result) {
         results.processed.push(result);
         results.totalBurned += result.asdfBurned || 0;
-        results.totalTreasury += result.solToTreasury || 0;
+        results.totalAsdfRetained += result.asdfRetained || 0;
       }
     } catch (error) {
       logger.error('BURN', 'Failed to process token', {
@@ -466,13 +468,15 @@ async function executeBurnWithLock(tokenBalances) {
   }
 
   if (results.processed.length > 0) {
-    logger.info('BURN', 'Burn cycle completed', {
+    logger.info('BURN', 'Burn cycle completed (unified model)', {
       tokensProcessed: results.processed.length,
       tokensFailed: results.failed.length,
       totalAsdfBurned: results.totalBurned,
-      totalSolToTreasury: results.totalTreasury,
+      totalAsdfRetained: results.totalAsdfRetained,
       batchSignature: results.batchSignature,
       burnsBatched: pendingBurns.length,
+      model: 'unified',
+      philosophy: 'All value → $ASDF → burn/treasury',
     });
   }
 
@@ -514,7 +518,6 @@ async function processTokenForBatch(token, pendingBurns) {
 
   let asdfBurned = 0;
   let ecosystemBurned = 0;
-  let solToTreasury = 0;
   const swapSignatures = [];
 
   if (isAsdf) {
@@ -546,13 +549,21 @@ async function processTokenForBatch(token, pendingBurns) {
 
   } else {
     // ==========================================================================
-    // OTHER TOKENS: Swap to ASDF, then queue for batch burn
+    // UNIFIED $ASDF MODEL: Everything flows through $ASDF
+    //
+    // Philosophy: All value → $ASDF → burn/treasury
+    // - 1 swap instead of 2 (50% less swap fees!)
+    // - Treasury kept in $ASDF (more $ASDF in ecosystem)
+    // - Only swap $ASDF → SOL when fee payer needs refill
     // ==========================================================================
-    const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
-    const asdfBurnAmount = Math.floor(balance * ecosystemBurnBonus.asdfBurnPct);
-    const treasuryAmount = balance - ecosystemBurnAmount - asdfBurnAmount;
 
-    // 1. Ecosystem burn (queue for batch)
+    // Ecosystem burn portion (direct token burn for dual-burn flywheel)
+    const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
+
+    // Everything else → swap to $ASDF (1 swap only!)
+    const amountToSwapToAsdf = balance - ecosystemBurnAmount;
+
+    // 1. Ecosystem burn (queue for batch) - supports token burning ecosystem
     if (ecosystemBurnAmount > 0) {
       pendingBurns.push({
         mint,
@@ -563,51 +574,57 @@ async function processTokenForBatch(token, pendingBurns) {
       ecosystemBurned = ecosystemBurnAmount;
     }
 
-    // 2. Swap to ASDF and queue for burn
-    const effectiveAsdfBurnAmount = ecosystemBurned > 0 ? asdfBurnAmount : asdfBurnAmount + ecosystemBurnAmount;
-    if (effectiveAsdfBurnAmount > 0) {
-      const burnSwap = await swapTokenToAsdf(mint, effectiveAsdfBurnAmount, feePayer);
-      if (burnSwap.success && burnSwap.asdfReceived) {
-        const asdfToBurn = parseInt(burnSwap.asdfReceived);
-        swapSignatures.push(burnSwap.signature);
+    // 2. UNIFIED: Swap remaining 100% → $ASDF (1 swap instead of 2!)
+    if (amountToSwapToAsdf > 0) {
+      const swapResult = await swapTokenToAsdf(mint, amountToSwapToAsdf, feePayer);
 
-        // Queue ASDF for batch burn
-        pendingBurns.push({
-          mint: config.ASDF_MINT,
-          amount: asdfToBurn,
-          type: 'asdf',
-          symbol: '$ASDF',
-          sourceToken: mint,
-        });
-        asdfBurned = asdfToBurn;
-      }
-    }
+      if (swapResult.success && swapResult.asdfReceived) {
+        const asdfReceived = parseInt(swapResult.asdfReceived);
+        swapSignatures.push(swapResult.signature);
 
-    // 3. Treasury portion → SOL (still needed for other tokens)
-    if (treasuryAmount > 0) {
-      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
-      if (treasurySwap.success) {
-        solToTreasury = parseInt(treasurySwap.solReceived);
-        swapSignatures.push(treasurySwap.signature);
+        // Split received $ASDF using Golden Ratio (same as $ASDF fees)
+        const { burnAmount, treasuryAmount } = calculateTreasurySplit(asdfReceived, config.BURN_RATIO);
 
-        await redis.incrTreasuryTotal(solToTreasury);
-        await redis.recordTreasuryEvent({
-          type: 'fee_conversion',
-          tokenMint: mint,
-          tokenAmount: treasuryAmount,
-          solAmount: solToTreasury,
-          source: 'token_treasury_portion',
-        });
+        // 2a. Queue 76.4% for burn
+        if (burnAmount > 0) {
+          pendingBurns.push({
+            mint: config.ASDF_MINT,
+            amount: burnAmount,
+            type: 'asdf',
+            symbol: '$ASDF',
+            sourceToken: mint,
+          });
+          asdfBurned = burnAmount;
+        }
+
+        // 2b. Keep 23.6% as $ASDF in treasury (UNIFIED MODEL!)
+        // This $ASDF will be used to refill fee payer only when needed
+        if (treasuryAmount > 0) {
+          await redis.recordTreasuryEvent({
+            type: 'asdf_retained',
+            tokenMint: config.ASDF_MINT,
+            tokenAmount: treasuryAmount,
+            sourceToken: mint,
+            source: 'unified_model_treasury',
+          });
+
+          logger.info('BURN', 'Treasury retained as $ASDF (unified model)', {
+            sourceToken: mint.slice(0, 8),
+            asdfRetained: treasuryAmount,
+            willSwapToSolWhen: 'fee payer < 0.1 SOL',
+          });
+        }
       }
     }
   }
 
-  logger.info('BURN', `Processed ${symbol} for batch`, {
+  logger.info('BURN', `Processed ${symbol} for batch (unified model)`, {
     mint: mint.slice(0, 8),
     asdfBurned,
     ecosystemBurned,
-    solToTreasury,
+    swapsUsed: swapSignatures.length,
     pendingBurnsTotal: pendingBurns.length,
+    model: isAsdf ? 'direct' : 'unified',
   });
 
   return {
@@ -615,9 +632,13 @@ async function processTokenForBatch(token, pendingBurns) {
     symbol,
     asdfBurned,
     ecosystemBurned,
-    solToTreasury,
+    asdfRetained: !isAsdf && asdfBurned > 0
+      ? Math.floor(asdfBurned * (1 - config.BURN_RATIO) / config.BURN_RATIO) // Approximate
+      : 0,
     swapSignatures,
+    swapsUsed: swapSignatures.length,
     batched: true,
+    model: 'unified',
   };
 }
 
