@@ -411,9 +411,28 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       ip: clientIp,
     });
 
-    // Confirm in background (don't block response)
-    rpc.confirmTransaction(result.signature).catch((err) => {
-      logger.warn('SUBMIT', 'Confirmation failed', {
+    // Verify transaction landed in background (don't block response)
+    // Uses getSignatureStatus which doesn't require blockhash (avoids "block height exceeded")
+    rpc.checkSignatureStatus(result.signature, 3, 2000).then((status) => {
+      if (status.confirmed) {
+        logger.info('SUBMIT', 'Transaction confirmed', {
+          signature: result.signature,
+          slot: status.slot,
+          confirmationStatus: status.confirmationStatus,
+        });
+      } else if (status.err) {
+        logger.warn('SUBMIT', 'Transaction failed on-chain', {
+          signature: result.signature,
+          error: status.err,
+        });
+      } else {
+        logger.debug('SUBMIT', 'Transaction status unknown (may still be processing)', {
+          signature: result.signature,
+        });
+      }
+    }).catch((err) => {
+      // Non-critical: tx was already sent successfully
+      logger.debug('SUBMIT', 'Background confirmation check failed', {
         signature: result.signature,
         error: err.message,
       });

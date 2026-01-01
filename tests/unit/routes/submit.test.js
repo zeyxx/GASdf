@@ -35,6 +35,7 @@ jest.mock('../../../src/utils/rpc', () => ({
   simulateWithBalanceCheck: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
   sendTransaction: jest.fn().mockResolvedValue('test-signature-abc123'),
   confirmTransaction: jest.fn().mockResolvedValue(true),
+  checkSignatureStatus: jest.fn().mockResolvedValue({ confirmed: true, slot: 12345, confirmationStatus: 'confirmed' }),
 }));
 
 jest.mock('../../../src/services/signer', () => ({

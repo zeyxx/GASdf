@@ -636,6 +636,55 @@ async function confirmTransaction(signature, blockhash, lastValidBlockHeight) {
   );
 }
 
+/**
+ * Check if a transaction signature has been confirmed
+ * Uses getSignatureStatus which doesn't require blockhash
+ * This is useful for verifying tx landed after "block height exceeded" errors
+ *
+ * @param {string} signature - Transaction signature
+ * @param {number} maxRetries - Maximum retries (default: 3)
+ * @param {number} retryDelayMs - Delay between retries (default: 1000)
+ * @returns {Promise<{confirmed: boolean, slot?: number, err?: any}>}
+ */
+async function checkSignatureStatus(signature, maxRetries = 3, retryDelayMs = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await pool.executeWithFailover(
+        async (conn) => conn.getSignatureStatus(signature, { searchTransactionHistory: true }),
+        'getSignatureStatus'
+      );
+
+      if (result.value) {
+        // Transaction found
+        const status = result.value;
+        return {
+          confirmed: status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized',
+          slot: status.slot,
+          err: status.err,
+          confirmationStatus: status.confirmationStatus,
+        };
+      }
+
+      // Not found yet, retry
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
+    } catch (error) {
+      logger.debug('RPC', 'Signature status check failed', {
+        signature: signature.slice(0, 12),
+        attempt,
+        error: error.message,
+      });
+
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
+    }
+  }
+
+  return { confirmed: false };
+}
+
 async function getBalance(pubkey) {
   return pool.executeWithFailover(
     async (conn) => conn.getBalance(pubkey),
@@ -874,6 +923,7 @@ module.exports = {
   invalidateBlockhashCache,
   sendTransaction,
   confirmTransaction,
+  checkSignatureStatus,
   getBalance,
   getMultipleBalances,
   getTokenBalance,
