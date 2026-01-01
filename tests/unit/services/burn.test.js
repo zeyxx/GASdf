@@ -155,6 +155,7 @@ describe('Burn Service', () => {
     // Set up mock connection
     mockConnection = {
       getParsedTokenAccountsByOwner: jest.fn().mockResolvedValue({ value: [] }),
+      getBalance: jest.fn().mockResolvedValue(500_000_000), // 0.5 SOL (above refill threshold)
     };
     rpc.getConnection.mockReturnValue(mockConnection);
 
@@ -350,13 +351,23 @@ describe('Burn Service', () => {
       expect(result.processed[0].asdfBurned).toBe(8000000);
     });
 
-    it('should swap 20% to SOL for treasury', async () => {
+    it('should keep 20% as $ASDF in treasury (optimized: no swap)', async () => {
       await burnService.checkAndExecuteBurn();
 
-      expect(jupiter.getTokenToSolQuote).toHaveBeenCalledWith(
+      // OPTIMIZED MODEL: For $ASDF, we DON'T swap to SOL
+      // We keep the treasury portion as $ASDF and only swap when fee payer needs refill
+      expect(jupiter.getTokenToSolQuote).not.toHaveBeenCalledWith(
         'AsdfMint111111111111111111111111111111111111',
-        2000000,
-        150
+        expect.any(Number),
+        expect.any(Number)
+      );
+
+      // Should record retention event instead of swap
+      expect(redis.recordTreasuryEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'asdf_retained',
+          source: 'optimized_treasury_retention',
+        })
       );
     });
 

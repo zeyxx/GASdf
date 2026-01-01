@@ -37,12 +37,20 @@ const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
 // =============================================================================
 // ECONOMIC EFFICIENCY: Minimum USD value to process
 // =============================================================================
-// Swap costs: ~0.1-0.3% Jupiter fee + slippage
+// OPTIMIZED MODEL: Minimize swaps by keeping $ASDF in treasury
+// - $ASDF fees: Burn 76.4% directly, keep 23.6% as $ASDF (0 swaps!)
+// - Only swap $ASDF → SOL when fee payer needs refill
+// - Other tokens: Swap to $ASDF for burn, keep treasury portion
+//
 // TX costs: ~0.000005 SOL (~$0.001) per transaction
-// We do 2-3 swaps per token, so ~$0.003-0.005 in TX fees
-// To be efficient, we want fees to be <5% of value
-// Minimum: $0.50 ensures fees are ~1% of value (efficient)
+// With optimized model: 0-1 swaps instead of 2-3 → ~80% fee reduction
 const MIN_VALUE_USD = 0.50;
+
+// Fee payer refill threshold: Only swap to SOL when balance drops below this
+// 0.1 SOL ≈ $20 ≈ ~2000 transactions worth of gas
+const FEE_PAYER_REFILL_THRESHOLD_SOL = 0.1;
+const FEE_PAYER_REFILL_TARGET_SOL = 0.3; // Refill to 0.3 SOL when triggered
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 // SOL price cache (refreshed each burn cycle)
 let cachedSolPrice = null;
@@ -117,6 +125,117 @@ async function getTokenValueUsd(mint, amount, decimals) {
     } catch {
       return 0; // Can't determine value
     }
+  }
+}
+
+/**
+ * Check if fee payer needs SOL refill
+ * Returns { needsRefill, currentBalance, refillAmount } or null if no fee payer
+ */
+async function checkFeePayerNeedsRefill() {
+  const feePayer = getHealthyPayer();
+  if (!feePayer) return null;
+
+  try {
+    const connection = rpc.getConnection();
+    const balance = await connection.getBalance(feePayer.publicKey);
+    const balanceSol = balance / LAMPORTS_PER_SOL;
+
+    const needsRefill = balanceSol < FEE_PAYER_REFILL_THRESHOLD_SOL;
+    const refillAmount = needsRefill
+      ? Math.ceil((FEE_PAYER_REFILL_TARGET_SOL - balanceSol) * LAMPORTS_PER_SOL)
+      : 0;
+
+    logger.debug('BURN', 'Fee payer balance check', {
+      balance: balanceSol.toFixed(4),
+      threshold: FEE_PAYER_REFILL_THRESHOLD_SOL,
+      needsRefill,
+    });
+
+    return { needsRefill, currentBalance: balance, balanceSol, refillAmount };
+  } catch (error) {
+    logger.error('BURN', 'Failed to check fee payer balance', { error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Refill fee payer SOL by swapping $ASDF from treasury
+ * Only called when fee payer SOL drops below threshold
+ *
+ * @returns {{ success: boolean, solReceived?: number, signature?: string }}
+ */
+async function refillFeePayerFromAsdf() {
+  const refillCheck = await checkFeePayerNeedsRefill();
+  if (!refillCheck || !refillCheck.needsRefill) {
+    return { success: true, message: 'No refill needed' };
+  }
+
+  const feePayer = getHealthyPayer();
+  const treasury = getTreasuryAddress();
+  const asdfMint = getAsdfMint();
+
+  // Get treasury's $ASDF balance
+  try {
+    const treasuryAsdfAta = await getAssociatedTokenAddress(asdfMint, treasury);
+    const account = await getAccount(rpc.getConnection(), treasuryAsdfAta);
+    const asdfBalance = Number(account.amount);
+
+    if (asdfBalance <= 0) {
+      logger.warn('BURN', 'No $ASDF in treasury for fee payer refill');
+      return { success: false, error: 'No ASDF balance' };
+    }
+
+    // Calculate how much $ASDF to swap for target SOL
+    // Get quote: ASDF → SOL
+    const solNeeded = refillCheck.refillAmount;
+    const quote = await jupiter.getQuote(
+      config.ASDF_MINT,
+      config.WSOL_MINT,
+      asdfBalance, // Quote max available
+      100 // 1% slippage
+    );
+
+    const solOut = parseInt(quote.outAmount);
+
+    // If we can get enough SOL, swap only what we need
+    // Otherwise swap all available $ASDF
+    let asdfToSwap = asdfBalance;
+    if (solOut > solNeeded * 1.1) {
+      // We have more than enough, calculate exact amount needed
+      // Rough estimate: (solNeeded / solOut) * asdfBalance
+      asdfToSwap = Math.ceil((solNeeded / solOut) * asdfBalance * 1.05); // 5% buffer
+      asdfToSwap = Math.min(asdfToSwap, asdfBalance); // Don't exceed balance
+    }
+
+    logger.info('BURN', 'Refilling fee payer SOL from treasury $ASDF', {
+      feePayerBalance: refillCheck.balanceSol.toFixed(4),
+      solNeeded: (solNeeded / LAMPORTS_PER_SOL).toFixed(4),
+      asdfToSwap,
+      asdfBalance,
+    });
+
+    // Execute swap
+    const swapResult = await swapTokenToSol(config.ASDF_MINT, asdfToSwap, feePayer);
+
+    if (swapResult.success) {
+      logger.info('BURN', 'Fee payer refilled successfully', {
+        solReceived: (parseInt(swapResult.solReceived) / LAMPORTS_PER_SOL).toFixed(4),
+        signature: swapResult.signature,
+      });
+
+      await redis.recordTreasuryEvent({
+        type: 'fee_payer_refill',
+        asdfAmount: asdfToSwap,
+        solAmount: swapResult.solReceived,
+        previousBalance: refillCheck.currentBalance,
+      });
+    }
+
+    return swapResult;
+  } catch (error) {
+    logger.error('BURN', 'Fee payer refill failed', { error: error.message });
+    return { success: false, error: error.message };
   }
 }
 
@@ -199,6 +318,19 @@ async function getTreasuryTokenBalances() {
  * Now scans actual treasury token balances instead of tracked amounts
  */
 async function checkAndExecuteBurn() {
+  // ==========================================================================
+  // OPTIMIZED MODEL: Check if fee payer needs refill before processing burns
+  // Only swap $ASDF → SOL when fee payer SOL drops below threshold
+  // ==========================================================================
+  const refillCheck = await checkFeePayerNeedsRefill();
+  if (refillCheck?.needsRefill) {
+    logger.info('BURN', 'Fee payer needs refill, swapping $ASDF → SOL', {
+      currentBalance: refillCheck.balanceSol.toFixed(4),
+      threshold: FEE_PAYER_REFILL_THRESHOLD_SOL,
+    });
+    await refillFeePayerFromAsdf();
+  }
+
   // Get actual token balances in treasury
   const tokenBalances = await getTreasuryTokenBalances();
 
@@ -346,38 +478,39 @@ async function processTokenBurn(token) {
 
   if (isAsdf) {
     // ==========================================================================
-    // $ASDF TOKEN: Burn 80% directly, swap 20% → SOL for treasury
+    // $ASDF TOKEN: OPTIMIZED MODEL - 0 swaps!
+    // - Burn 76.4% directly
+    // - Keep 23.6% as $ASDF in treasury (no swap needed)
+    // - Only swap $ASDF → SOL when fee payer needs refill (handled separately)
     // ==========================================================================
 
     const { burnAmount: directBurnAmount, treasuryAmount: asdfTreasuryAmount } =
       calculateTreasurySplit(balance, config.BURN_RATIO);
 
-    // 1. Burn 80% directly
+    // 1. Burn 76.4% directly (1 transaction, 0 swaps!)
     if (directBurnAmount > 0) {
       burnSignature = await burnAsdfFromTreasury(directBurnAmount);
       asdfBurned = directBurnAmount;
-      logger.info('BURN', 'Direct ASDF burn', {
+      logger.info('BURN', 'Direct ASDF burn (optimized: 0 swaps)', {
         amount: directBurnAmount,
         signature: burnSignature,
       });
     }
 
-    // 2. Swap 20% → SOL for treasury operations
+    // 2. Keep 23.6% as $ASDF in treasury - NO SWAP!
+    // This $ASDF will be used to refill fee payer only when SOL drops below threshold
     if (asdfTreasuryAmount > 0) {
-      const treasurySwap = await swapTokenToSol(mint, asdfTreasuryAmount, feePayer);
-      if (treasurySwap.success) {
-        solToTreasury = parseInt(treasurySwap.solReceived);
-        swapSignatures.push(treasurySwap.signature);
+      logger.info('BURN', 'ASDF kept in treasury (optimized: no swap)', {
+        amount: asdfTreasuryAmount,
+        reason: 'Will swap to SOL only when fee payer needs refill',
+      });
 
-        await redis.incrTreasuryTotal(solToTreasury);
-        await redis.recordTreasuryEvent({
-          type: 'fee_conversion',
-          tokenMint: mint,
-          tokenAmount: asdfTreasuryAmount,
-          solAmount: solToTreasury,
-          source: 'asdf_treasury_portion',
-        });
-      }
+      await redis.recordTreasuryEvent({
+        type: 'asdf_retained',
+        tokenMint: mint,
+        tokenAmount: asdfTreasuryAmount,
+        source: 'optimized_treasury_retention',
+      });
     }
 
   } else {
