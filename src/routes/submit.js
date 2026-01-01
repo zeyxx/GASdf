@@ -482,13 +482,14 @@ async function sendWithRetry(signedTx, txId, feePayerPubkey) {
         markPayerUnhealthy(feePayerPubkey, 60_000); // 1 minute cooldown
       }
 
-      // Wait before retry if not last attempt
+      // Wait before retry if not last attempt (exponential backoff with jitter)
       if (attempts < txQueue.MAX_RETRIES) {
-        const delay = txQueue.RETRY_DELAYS[attempts - 1] || txQueue.RETRY_DELAYS[txQueue.RETRY_DELAYS.length - 1];
+        const delay = txQueue.getRetryDelay(attempts);
         logger.info('SUBMIT', 'Retrying transaction', {
           txId,
           attempt: attempts,
           nextAttemptIn: delay,
+          backoffType: 'exponential+jitter',
           error: error.message,
         });
         await sleep(delay);

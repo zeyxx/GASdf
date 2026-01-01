@@ -12,7 +12,38 @@ const FAILED_KEY = 'tx:failed';
 
 // Retry configuration
 const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1000, 5000, 15000]; // ms
+const RETRY_DELAYS = [1000, 5000, 15000]; // ms (legacy, kept for compatibility)
+
+// Exponential backoff configuration
+const BACKOFF_CONFIG = {
+  baseDelayMs: 500,      // Initial delay
+  maxDelayMs: 15000,     // Cap at 15 seconds
+  jitterMs: 500,         // Random jitter range (0 to jitterMs)
+};
+
+/**
+ * Calculate retry delay with exponential backoff and jitter
+ * Formula: min(baseDelay * 2^attempt, maxDelay) + random(0, jitter)
+ *
+ * This prevents thundering herd when multiple instances retry simultaneously
+ *
+ * @param {number} attempt - Current attempt number (1-based)
+ * @returns {number} Delay in milliseconds
+ */
+function getRetryDelay(attempt) {
+  const { baseDelayMs, maxDelayMs, jitterMs } = BACKOFF_CONFIG;
+
+  // Exponential: 500ms, 1000ms, 2000ms, 4000ms, 8000ms... capped at maxDelay
+  const exponentialDelay = Math.min(
+    baseDelayMs * Math.pow(2, attempt - 1),
+    maxDelayMs
+  );
+
+  // Add random jitter to prevent synchronized retries
+  const jitter = Math.floor(Math.random() * jitterMs);
+
+  return exponentialDelay + jitter;
+}
 
 // Retryable error patterns
 const RETRYABLE_ERRORS = [
@@ -130,7 +161,7 @@ async function markRetryOrFailed(txId, error) {
   const canRetry = attempts < MAX_RETRIES && isRetryableError(error);
 
   if (canRetry) {
-    const retryDelay = RETRY_DELAYS[attempts - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+    const retryDelay = getRetryDelay(attempts);
     const nextRetry = Date.now() + retryDelay;
 
     const updated = await updateEntry(txId, {
@@ -210,8 +241,12 @@ module.exports = {
   getStats,
   cleanup,
 
+  // Retry utilities
+  getRetryDelay,
+
   // Constants
   MAX_RETRIES,
-  RETRY_DELAYS,
+  RETRY_DELAYS,      // Legacy, use getRetryDelay() instead
   RETRYABLE_ERRORS,
+  BACKOFF_CONFIG,
 };

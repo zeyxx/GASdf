@@ -7,6 +7,146 @@ const logger = require('./logger');
 const { CircuitBreaker } = require('./circuit-breaker');
 
 // =============================================================================
+// Rate Limit Tracking (Proactive backoff before 429)
+// =============================================================================
+
+class RateLimitTracker {
+  constructor(endpointName) {
+    this.endpointName = endpointName;
+    this.limit = null;           // x-ratelimit-limit-requests
+    this.remaining = null;       // x-ratelimit-remaining-requests
+    this.resetAt = null;         // When limit resets (timestamp)
+    this.lastUpdated = 0;
+
+    // Thresholds for proactive backoff
+    this.warningThreshold = 0.2;  // Start slowing at 20% remaining
+    this.criticalThreshold = 0.05; // Heavy backoff at 5% remaining
+  }
+
+  update(headers) {
+    // Helius rate limit headers
+    const limit = headers.get('x-ratelimit-limit-requests') ||
+                  headers.get('x-ratelimit-limit');
+    const remaining = headers.get('x-ratelimit-remaining-requests') ||
+                      headers.get('x-ratelimit-remaining');
+    const resetSeconds = headers.get('x-ratelimit-reset-requests') ||
+                         headers.get('x-ratelimit-reset');
+
+    if (limit) this.limit = parseInt(limit, 10);
+    if (remaining) this.remaining = parseInt(remaining, 10);
+    if (resetSeconds) {
+      // Reset can be seconds from now or a timestamp
+      const resetValue = parseFloat(resetSeconds);
+      this.resetAt = resetValue > 1e9 ? resetValue * 1000 : Date.now() + (resetValue * 1000);
+    }
+
+    this.lastUpdated = Date.now();
+
+    // Log when approaching limits
+    if (this.shouldWarn()) {
+      logger.warn('RATE_LIMIT', `${this.endpointName} approaching limit`, {
+        remaining: this.remaining,
+        limit: this.limit,
+        percentRemaining: this.getPercentRemaining(),
+        resetIn: this.getResetInMs(),
+      });
+    }
+  }
+
+  getPercentRemaining() {
+    if (!this.limit || this.remaining === null) return 1;
+    return this.remaining / this.limit;
+  }
+
+  shouldWarn() {
+    return this.getPercentRemaining() <= this.warningThreshold;
+  }
+
+  shouldBackoff() {
+    return this.getPercentRemaining() <= this.criticalThreshold;
+  }
+
+  getResetInMs() {
+    if (!this.resetAt) return 0;
+    return Math.max(0, this.resetAt - Date.now());
+  }
+
+  /**
+   * Get recommended delay before next request
+   * Returns 0 if no backoff needed
+   */
+  getBackoffDelay() {
+    const percentRemaining = this.getPercentRemaining();
+
+    // No limit info or plenty remaining
+    if (percentRemaining > this.warningThreshold) {
+      return 0;
+    }
+
+    // Critical: wait until reset or use heavy backoff
+    if (percentRemaining <= this.criticalThreshold) {
+      const resetIn = this.getResetInMs();
+      if (resetIn > 0 && resetIn < 5000) {
+        return resetIn + 100; // Wait for reset + small buffer
+      }
+      return 1000; // Heavy backoff: 1 second between requests
+    }
+
+    // Warning zone: gradual backoff (100-500ms)
+    const backoffFactor = 1 - (percentRemaining / this.warningThreshold);
+    return Math.floor(100 + (backoffFactor * 400));
+  }
+
+  getStatus() {
+    return {
+      limit: this.limit,
+      remaining: this.remaining,
+      percentRemaining: Math.round(this.getPercentRemaining() * 100),
+      resetInMs: this.getResetInMs(),
+      backoffDelay: this.getBackoffDelay(),
+      lastUpdated: this.lastUpdated,
+    };
+  }
+}
+
+// Global rate limit trackers per endpoint
+const rateLimitTrackers = new Map();
+
+function getRateLimitTracker(endpointName) {
+  if (!rateLimitTrackers.has(endpointName)) {
+    rateLimitTrackers.set(endpointName, new RateLimitTracker(endpointName));
+  }
+  return rateLimitTrackers.get(endpointName);
+}
+
+/**
+ * Create a fetch wrapper that extracts rate limit headers
+ */
+function createRateLimitAwareFetch(endpointName) {
+  const tracker = getRateLimitTracker(endpointName);
+
+  return async (url, options) => {
+    // Check if we should proactively back off
+    const backoffDelay = tracker.getBackoffDelay();
+    if (backoffDelay > 0) {
+      logger.debug('RATE_LIMIT', `Proactive backoff for ${endpointName}`, {
+        delay: backoffDelay,
+        remaining: tracker.remaining,
+      });
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    }
+
+    // Make the actual request
+    const response = await fetch(url, options);
+
+    // Extract and track rate limit headers
+    tracker.update(response.headers);
+
+    return response;
+  };
+}
+
+// =============================================================================
 // RPC Endpoint Pool
 // =============================================================================
 
@@ -47,12 +187,26 @@ class RpcEndpoint {
 
   getConnection() {
     if (!this.connection) {
+      // Use rate-limit-aware fetch for Helius endpoints
+      const isHelius = this.url.includes('helius');
+      const fetchFn = isHelius ? createRateLimitAwareFetch(this.name) : undefined;
+
       this.connection = new Connection(this.url, {
         commitment: 'confirmed',
         confirmTransactionInitialTimeout: 30000,
+        fetch: fetchFn,
       });
+
+      // Store tracker reference for status reporting
+      if (isHelius) {
+        this.rateLimitTracker = getRateLimitTracker(this.name);
+      }
     }
     return this.connection;
+  }
+
+  getRateLimitStatus() {
+    return this.rateLimitTracker?.getStatus() || null;
   }
 
   async execute(operation) {
@@ -96,7 +250,7 @@ class RpcEndpoint {
       ? ((this.health.successfulRequests / this.health.totalRequests) * 100).toFixed(1)
       : 0;
 
-    return {
+    const status = {
       name: this.name,
       url: this.url.replace(/api-key=[^&]+/, 'api-key=***'),
       priority: this.priority,
@@ -107,6 +261,14 @@ class RpcEndpoint {
       lastSuccess: this.health.lastSuccess,
       lastError: this.health.lastError,
     };
+
+    // Add rate limit info for Helius endpoints
+    const rateLimitStatus = this.getRateLimitStatus();
+    if (rateLimitStatus) {
+      status.rateLimit = rateLimitStatus;
+    }
+
+    return status;
   }
 }
 
@@ -267,6 +429,34 @@ class RpcPool {
 const pool = new RpcPool();
 
 // =============================================================================
+// Blockhash Cache (reduces RPC calls during submit retries)
+// =============================================================================
+
+const blockhashCache = {
+  data: null,        // { blockhash, lastValidBlockHeight }
+  fetchedAt: 0,      // Timestamp when fetched
+  ttlMs: 30_000,     // 30s TTL (blockhash valid ~60s, so 30s is safe)
+
+  isValid() {
+    return this.data && (Date.now() - this.fetchedAt) < this.ttlMs;
+  },
+
+  set(blockhashInfo) {
+    this.data = blockhashInfo;
+    this.fetchedAt = Date.now();
+  },
+
+  get() {
+    return this.isValid() ? this.data : null;
+  },
+
+  invalidate() {
+    this.data = null;
+    this.fetchedAt = 0;
+  },
+};
+
+// =============================================================================
 // Exported Functions (backwards compatible API)
 // =============================================================================
 
@@ -274,11 +464,44 @@ function getConnection() {
   return pool.getConnection();
 }
 
-async function getLatestBlockhash() {
-  return pool.executeWithFailover(
+/**
+ * Get latest blockhash with 30s cache
+ * Blockhash is valid for ~60s (150 slots), so 30s cache is safe
+ * Reduces RPC calls significantly during submit retries
+ *
+ * @param {boolean} forceRefresh - Force fetch from RPC, bypassing cache
+ * @returns {Promise<{blockhash: string, lastValidBlockHeight: number}>}
+ */
+async function getLatestBlockhash(forceRefresh = false) {
+  // Return cached if valid and not forcing refresh
+  if (!forceRefresh) {
+    const cached = blockhashCache.get();
+    if (cached) {
+      logger.debug('RPC', 'Using cached blockhash', {
+        age: Date.now() - blockhashCache.fetchedAt,
+        blockhash: cached.blockhash.slice(0, 8),
+      });
+      return cached;
+    }
+  }
+
+  // Fetch fresh blockhash
+  const result = await pool.executeWithFailover(
     async (conn) => conn.getLatestBlockhash('confirmed'),
     'getLatestBlockhash'
   );
+
+  // Cache it
+  blockhashCache.set(result);
+
+  return result;
+}
+
+/**
+ * Invalidate blockhash cache (call after tx failure due to expired blockhash)
+ */
+function invalidateBlockhashCache() {
+  blockhashCache.invalidate();
 }
 
 async function sendTransaction(signedTx) {
@@ -312,6 +535,44 @@ async function getBalance(pubkey) {
   return pool.executeWithFailover(
     async (conn) => conn.getBalance(pubkey),
     'getBalance'
+  );
+}
+
+/**
+ * Batch fetch balances for multiple pubkeys in a single RPC call
+ * Reduces RPC calls from N to 1 for fee payer balance refresh
+ *
+ * @param {PublicKey[]} pubkeys - Array of public keys to fetch balances for
+ * @returns {Promise<Map<string, number>>} Map of pubkey string -> balance in lamports
+ */
+async function getMultipleBalances(pubkeys) {
+  if (!pubkeys || pubkeys.length === 0) {
+    return new Map();
+  }
+
+  // Single pubkey - use regular getBalance
+  if (pubkeys.length === 1) {
+    const balance = await getBalance(pubkeys[0]);
+    return new Map([[pubkeys[0].toBase58(), balance]]);
+  }
+
+  return pool.executeWithFailover(
+    async (conn) => {
+      // Build batch RPC request using getMultipleAccounts
+      // This is more efficient than individual getBalance calls
+      const accounts = await conn.getMultipleAccountsInfo(pubkeys, 'confirmed');
+
+      const results = new Map();
+      for (let i = 0; i < pubkeys.length; i++) {
+        const pubkey = pubkeys[i].toBase58();
+        const account = accounts[i];
+        // Account exists: return lamports. Account doesn't exist: 0
+        results.set(pubkey, account ? account.lamports : 0);
+      }
+
+      return results;
+    },
+    'getMultipleBalances'
   );
 }
 
@@ -385,6 +646,9 @@ async function simulateTransaction(signedTx) {
  * - Hidden drain instructions
  * - Unauthorized transfers
  *
+ * OPTIMIZED: Uses cached pre-balance from fee-payer-pool instead of separate RPC call.
+ * The simulation already returns post-tx account state, so we only need 1 RPC call total.
+ *
  * @param {VersionedTransaction|Transaction} signedTx - The signed transaction
  * @param {string} feePayerPubkey - The fee payer's public key
  * @param {number} expectedMaxSolChange - Maximum expected SOL decrease (tx fee, usually ~5000-10000 lamports)
@@ -392,12 +656,12 @@ async function simulateTransaction(signedTx) {
  */
 async function simulateWithBalanceCheck(signedTx, feePayerPubkey, expectedMaxSolChange = 50000) {
   try {
-    const conn = pool.getConnection();
+    // Get cached pre-balance from fee-payer-pool (refreshed every 30s)
+    // This eliminates a separate RPC call - simulation returns post-balance
+    const feePayerPool = require('../services/fee-payer-pool');
+    const preBalance = feePayerPool.pool.balances.get(feePayerPubkey) || 0;
 
-    // Get fee payer's current SOL balance before simulation
-    const preBalance = await conn.getBalance(new (require('@solana/web3.js').PublicKey)(feePayerPubkey));
-
-    // Simulate the transaction
+    // Simulate the transaction - returns post-tx account state in 'accounts'
     const result = await pool.executeWithFailover(
       async (c) => {
         return c.simulateTransaction(signedTx, {
@@ -488,17 +752,31 @@ function getRpcHealth() {
   return pool.getStatus();
 }
 
+/**
+ * Get rate limit status for all tracked endpoints
+ */
+function getRateLimitStatus() {
+  const status = {};
+  for (const [name, tracker] of rateLimitTrackers) {
+    status[name] = tracker.getStatus();
+  }
+  return status;
+}
+
 module.exports = {
   getConnection,
   getLatestBlockhash,
+  invalidateBlockhashCache,
   sendTransaction,
   confirmTransaction,
   getBalance,
+  getMultipleBalances,
   getTokenBalance,
   isBlockhashValid,
   simulateTransaction,
   simulateWithBalanceCheck,
   getRpcHealth,
+  getRateLimitStatus,
 
   // Expose pool for advanced use cases
   pool,

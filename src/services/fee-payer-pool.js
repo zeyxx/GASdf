@@ -18,6 +18,9 @@ const WARNING_BALANCE = 50_000_000;
 // 10s was too aggressive, causing unnecessary RPC calls (~360/hour vs ~120/hour)
 const BALANCE_REFRESH_INTERVAL = 30_000;
 
+// Jitter range to prevent thundering herd across multiple instances (0-5 seconds)
+const BALANCE_REFRESH_JITTER = 5_000;
+
 // Maximum pending reservations per fee payer (prevents over-commitment)
 const MAX_RESERVATIONS_PER_PAYER = 50;
 
@@ -43,6 +46,10 @@ class FeePayerPool {
     this.unhealthyUntil = new Map(); // pubkey -> timestamp
     this.lastBalanceRefresh = 0;
     this.initialized = false;
+
+    // Instance-specific jitter to prevent thundering herd across replicas
+    // Each instance gets a random offset so they don't all refresh at the same time
+    this.instanceJitter = Math.floor(Math.random() * BALANCE_REFRESH_JITTER);
 
     // Balance reservation system
     this.reservations = new Map(); // quoteId -> { pubkey, amount, expiresAt }
@@ -136,20 +143,32 @@ class FeePayerPool {
   }
 
   /**
-   * Refresh balances for all payers
+   * Refresh balances for all payers using batch RPC
+   * Optimized: Uses single getMultipleAccountsInfo call instead of N getBalance calls
+   * This reduces RPC usage by ~80% for multi-payer setups
+   *
+   * Includes instance jitter to prevent thundering herd across multiple replicas
    */
   async refreshBalances() {
     const now = Date.now();
-    if (now - this.lastBalanceRefresh < BALANCE_REFRESH_INTERVAL) {
+    // Add instance-specific jitter to prevent all replicas hitting RPC at once
+    const effectiveInterval = BALANCE_REFRESH_INTERVAL + this.instanceJitter;
+    if (now - this.lastBalanceRefresh < effectiveInterval) {
       return;
     }
 
     this.lastBalanceRefresh = now;
 
-    const balancePromises = this.payers.map(async (payer) => {
-      const pubkey = payer.publicKey.toBase58();
-      try {
-        const balance = await rpc.getBalance(payer.publicKey);
+    try {
+      // Batch fetch all balances in a single RPC call
+      const pubkeys = this.payers.map(p => p.publicKey);
+      const balanceMap = await rpc.getMultipleBalances(pubkeys);
+
+      // Update balances and check health status
+      for (const payer of this.payers) {
+        const pubkey = payer.publicKey.toBase58();
+        const balance = balanceMap.get(pubkey) ?? 0;
+
         this.balances.set(pubkey, balance);
 
         // Auto-heal if balance is now healthy
@@ -157,12 +176,15 @@ class FeePayerPool {
           this.unhealthyUntil.delete(pubkey);
           logger.info('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... recovered (balance: ${balance / 1e9} SOL)`);
         }
-      } catch (error) {
-        logger.warn('FEE_PAYER_POOL', `Failed to get balance for ${pubkey.slice(0, 8)}...`, { error: error.message });
       }
-    });
 
-    await Promise.allSettled(balancePromises);
+      logger.debug('FEE_PAYER_POOL', 'Batch balance refresh completed', {
+        payers: this.payers.length,
+        rpcCalls: 1, // Single batch call
+      });
+    } catch (error) {
+      logger.warn('FEE_PAYER_POOL', 'Batch balance refresh failed', { error: error.message });
+    }
   }
 
   /**
