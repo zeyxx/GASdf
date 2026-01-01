@@ -44,7 +44,8 @@ const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
 //
 // TX costs: ~0.000005 SOL (~$0.001) per transaction
 // With optimized model: 0-1 swaps instead of 2-3 → ~80% fee reduction
-const MIN_VALUE_USD = 0.50;
+// TODO: Revert to 0.50 after testing
+const MIN_VALUE_USD = 0.01;
 
 // Fee payer refill threshold: Only swap to SOL when balance drops below this
 // 0.1 SOL ≈ $20 ≈ ~2000 transactions worth of gas
