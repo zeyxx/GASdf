@@ -12,7 +12,7 @@ const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
-const { getHealthyPayer } = require('./fee-payer-pool');
+const { pool: feePayerPool } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
 const holdex = require('./holdex');
@@ -134,7 +134,7 @@ async function getTokenValueUsd(mint, amount, decimals) {
  * Returns { needsRefill, currentBalance, refillAmount } or null if no fee payer
  */
 async function checkFeePayerNeedsRefill() {
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   if (!feePayer) return null;
 
   try {
@@ -172,7 +172,7 @@ async function refillFeePayerFromAsdf() {
     return { success: true, message: 'No refill needed' };
   }
 
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   const treasury = getTreasuryAddress();
   const asdfMint = getAsdfMint();
 
@@ -456,7 +456,7 @@ async function executeBurnWithLock(tokenBalances) {
             await burnAsdfFromTreasury(burn.amount);
             await redis.incrBurnTotal(burn.amount);
           } else {
-            await burnTokenFromTreasury(burn.mint, burn.amount, getHealthyPayer());
+            await burnTokenFromTreasury(burn.mint, burn.amount, feePayerPool.getHealthyPayer());
           }
         } catch (fallbackError) {
           logger.error('BURN', 'Individual burn also failed', {
@@ -512,7 +512,7 @@ async function processTokenForBatch(token, pendingBurns) {
     }
   }
 
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   if (!feePayer) {
     throw new Error('No healthy fee payer available');
   }
@@ -705,7 +705,7 @@ async function processTokenBurn(token) {
   let ecosystemBurnSignature = null;
   let swapSignatures = [];
 
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   if (!feePayer) {
     throw new Error('No healthy fee payer available');
   }
@@ -945,7 +945,7 @@ async function swapTokenToSol(tokenMint, amount, feePayer) {
  * Burn ASDF from fee payer's token account
  */
 async function burnAsdf(amount) {
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   const asdfMint = getAsdfMint();
 
   // Get fee payer's ASDF token account
@@ -991,7 +991,7 @@ async function batchBurnFromTreasury(burns) {
     return { signature: null, burns: 0 };
   }
 
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   const treasury = getTreasuryAddress();
 
   if (!feePayer.publicKey.equals(treasury)) {
@@ -1060,7 +1060,7 @@ async function batchBurnFromTreasury(burns) {
  * Used when treasury already holds ASDF
  */
 async function burnAsdfFromTreasury(amount) {
-  const feePayer = getHealthyPayer();
+  const feePayer = feePayerPool.getHealthyPayer();
   const treasury = getTreasuryAddress();
   const asdfMint = getAsdfMint();
 

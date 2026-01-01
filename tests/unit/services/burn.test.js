@@ -72,12 +72,14 @@ jest.mock('../../../src/utils/rpc', () => ({
 }));
 
 jest.mock('../../../src/services/fee-payer-pool', () => ({
-  getHealthyPayer: jest.fn().mockReturnValue({
-    publicKey: {
-      toBase58: () => 'FeePayer111111111111111111111111111111111111',
-      equals: jest.fn(() => true), // Fee payer is treasury
-    },
-  }),
+  pool: {
+    getHealthyPayer: jest.fn().mockReturnValue({
+      publicKey: {
+        toBase58: () => 'FeePayer111111111111111111111111111111111111',
+        equals: jest.fn(() => true), // Fee payer is treasury
+      },
+    }),
+  },
 }));
 
 jest.mock('../../../src/services/treasury-ata', () => ({
@@ -166,7 +168,7 @@ describe('Burn Service', () => {
     });
 
     // Default fee payer
-    feePayerPool.getHealthyPayer.mockReturnValue({
+    feePayerPool.pool.getHealthyPayer.mockReturnValue({
       publicKey: {
         toBase58: () => 'FeePayer111111111111111111111111111111111111',
         equals: jest.fn(() => true),
@@ -558,7 +560,7 @@ describe('Burn Service', () => {
     });
 
     it('should handle no healthy fee payer', async () => {
-      feePayerPool.getHealthyPayer.mockReturnValue(null);
+      feePayerPool.pool.getHealthyPayer.mockReturnValue(null);
 
       const result = await burnService.checkAndExecuteBurn();
 
