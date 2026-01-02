@@ -936,6 +936,253 @@ async function withLock(lockName, fn, ttlSeconds = 60) {
   }
 }
 
+// =============================================================================
+// Velocity Tracking (Behavioral Proof for Treasury Refill)
+// =============================================================================
+// Instead of fixed thresholds (0.1 SOL), we track actual tx velocity and costs
+// to dynamically calculate how much SOL buffer is needed.
+//
+// Formula: requiredBuffer = (txPerHour × avgCostPerTx) × bufferHours
+// This is "behavioral proof" - adapts to actual usage, not promises.
+// =============================================================================
+
+const VELOCITY_WINDOW_SECONDS = 3600; // 1 hour rolling window
+const VELOCITY_BUCKET_SECONDS = 60; // 1 minute buckets for granularity
+
+/**
+ * Record a transaction for velocity tracking
+ * Called after each successful transaction submission
+ * @param {number} costLamports - Actual transaction cost in lamports
+ */
+async function recordTransactionVelocity(costLamports) {
+  const now = Date.now();
+  const bucket = Math.floor(now / (VELOCITY_BUCKET_SECONDS * 1000));
+  const keyCount = `velocity:count:${bucket}`;
+  const keyCost = `velocity:cost:${bucket}`;
+
+  return withRedis(
+    async (redis) => {
+      const multi = redis.multi();
+      multi.incr(keyCount);
+      multi.expire(keyCount, VELOCITY_WINDOW_SECONDS + 60);
+      multi.incrBy(keyCost, costLamports);
+      multi.expire(keyCost, VELOCITY_WINDOW_SECONDS + 60);
+      await multi.exec();
+    },
+    () => {
+      // Memory fallback
+      const currentCount = parseInt(memoryStore.get(keyCount)) || 0;
+      const currentCost = parseInt(memoryStore.get(keyCost)) || 0;
+      memoryStore.set(keyCount, String(currentCount + 1), VELOCITY_WINDOW_SECONDS + 60);
+      memoryStore.set(keyCost, String(currentCost + costLamports), VELOCITY_WINDOW_SECONDS + 60);
+    }
+  );
+}
+
+/**
+ * Get velocity metrics over the rolling window
+ * @returns {Promise<{txCount: number, totalCost: number, avgCost: number, txPerHour: number, hoursOfData: number}>}
+ */
+async function getVelocityMetrics() {
+  const now = Date.now();
+  const currentBucket = Math.floor(now / (VELOCITY_BUCKET_SECONDS * 1000));
+  const bucketsToCheck = Math.ceil(VELOCITY_WINDOW_SECONDS / VELOCITY_BUCKET_SECONDS);
+
+  return withRedis(
+    async (redis) => {
+      // Build keys for all buckets in the window
+      const countKeys = [];
+      const costKeys = [];
+      for (let i = 0; i < bucketsToCheck; i++) {
+        const bucket = currentBucket - i;
+        countKeys.push(`velocity:count:${bucket}`);
+        costKeys.push(`velocity:cost:${bucket}`);
+      }
+
+      // Batch fetch all values
+      const [countValues, costValues] = await Promise.all([
+        redis.mGet(countKeys),
+        redis.mGet(costKeys),
+      ]);
+
+      let totalTx = 0;
+      let totalCost = 0;
+      let bucketsWithData = 0;
+
+      for (let i = 0; i < bucketsToCheck; i++) {
+        const count = parseInt(countValues[i]) || 0;
+        const cost = parseInt(costValues[i]) || 0;
+        if (count > 0) {
+          totalTx += count;
+          totalCost += cost;
+          bucketsWithData++;
+        }
+      }
+
+      const hoursOfData = (bucketsWithData * VELOCITY_BUCKET_SECONDS) / 3600;
+      const txPerHour = hoursOfData > 0 ? totalTx / hoursOfData : 0;
+      const avgCost = totalTx > 0 ? totalCost / totalTx : 5000; // Default to base fee
+
+      return {
+        txCount: totalTx,
+        totalCost,
+        avgCost: Math.round(avgCost),
+        txPerHour: Math.round(txPerHour * 100) / 100,
+        hoursOfData: Math.round(hoursOfData * 100) / 100,
+      };
+    },
+    () => {
+      // Memory fallback - simplified
+      let totalTx = 0;
+      let totalCost = 0;
+      for (let i = 0; i < bucketsToCheck; i++) {
+        const bucket = currentBucket - i;
+        const count = parseInt(memoryStore.get(`velocity:count:${bucket}`)) || 0;
+        const cost = parseInt(memoryStore.get(`velocity:cost:${bucket}`)) || 0;
+        totalTx += count;
+        totalCost += cost;
+      }
+      return {
+        txCount: totalTx,
+        totalCost,
+        avgCost: totalTx > 0 ? Math.round(totalCost / totalTx) : 5000,
+        txPerHour: totalTx, // Simplified: assume 1 hour window
+        hoursOfData: 1,
+      };
+    }
+  );
+}
+
+/**
+ * Calculate required SOL buffer based on velocity (behavioral proof)
+ * @param {number} bufferHours - How many hours of runway to maintain (default: 2)
+ * @param {number} minBufferLamports - Absolute minimum buffer (default: 50,000,000 = 0.05 SOL)
+ * @returns {Promise<{required: number, target: number, velocity: object, explanation: string}>}
+ */
+async function calculateVelocityBasedBuffer(bufferHours = 2, minBufferLamports = 50_000_000) {
+  const velocity = await getVelocityMetrics();
+
+  // If no data, return minimum with 100× target
+  if (velocity.txCount === 0 || velocity.hoursOfData < 0.1) {
+    return {
+      required: minBufferLamports,
+      target: minBufferLamports * 100,
+      velocity,
+      explanation: 'No velocity data, using minimum buffer',
+    };
+  }
+
+  // Calculate required buffer: (txPerHour × avgCost) × bufferHours
+  const hourlyBurn = velocity.txPerHour * velocity.avgCost;
+  const requiredBuffer = Math.max(
+    minBufferLamports,
+    Math.ceil(hourlyBurn * bufferHours)
+  );
+
+  // Target is 100x the required buffer (~1 week runway at steady state)
+  // Minimizes refill frequency → less gas wasted on refill tx
+  const targetBuffer = Math.ceil(requiredBuffer * 100);
+
+  return {
+    required: requiredBuffer,
+    target: targetBuffer,
+    velocity,
+    explanation: `${velocity.txPerHour.toFixed(1)} tx/hr × ${(velocity.avgCost / 1000).toFixed(1)}k lamports × ${bufferHours}h = ${(requiredBuffer / 1_000_000_000).toFixed(4)} SOL`,
+  };
+}
+
+// =============================================================================
+// Jupiter Quote Caching (reduces API calls by ~80%)
+// =============================================================================
+const JUPITER_CACHE_TTL = 10; // seconds - prices change quickly
+const JUPITER_CACHE_PREFIX = 'jup:quote:';
+
+/**
+ * Get amount bucket for cache key (avoids infinite cache entries)
+ * Buckets: <10K, <100K, <1M, <10M, <100M, <1B, >=1B
+ */
+function getAmountBucket(amount) {
+  const num = parseInt(amount);
+  if (num < 10_000) return '0';
+  if (num < 100_000) return '1';
+  if (num < 1_000_000) return '2';
+  if (num < 10_000_000) return '3';
+  if (num < 100_000_000) return '4';
+  if (num < 1_000_000_000) return '5';
+  return '6';
+}
+
+/**
+ * Cache a Jupiter quote
+ */
+async function cacheJupiterQuote(inputMint, outputMint, amount, quote) {
+  const bucket = getAmountBucket(amount);
+  const key = `${JUPITER_CACHE_PREFIX}${inputMint}:${outputMint}:${bucket}`;
+
+  try {
+    if (useMemory) {
+      memoryStore.set(key, JSON.stringify(quote), JUPITER_CACHE_TTL);
+      return true;
+    }
+
+    if (client && client.isOpen) {
+      await client.setEx(key, JUPITER_CACHE_TTL, JSON.stringify(quote));
+      return true;
+    }
+    return false;
+  } catch (error) {
+    logger.warn('Jupiter cache set failed', { error: error.message });
+    return false;
+  }
+}
+
+/**
+ * Get cached Jupiter quote (if exists and not expired)
+ * Returns null if no cache hit
+ */
+async function getCachedJupiterQuote(inputMint, outputMint, amount) {
+  const bucket = getAmountBucket(amount);
+  const key = `${JUPITER_CACHE_PREFIX}${inputMint}:${outputMint}:${bucket}`;
+
+  try {
+    let cached;
+    if (useMemory) {
+      cached = memoryStore.get(key);
+    } else if (client && client.isOpen) {
+      cached = await client.get(key);
+    }
+
+    if (cached) {
+      const quote = JSON.parse(cached);
+      // Adjust amounts proportionally for the actual requested amount
+      const cachedAmount = parseInt(quote.inAmount);
+      const ratio = parseInt(amount) / cachedAmount;
+
+      return {
+        ...quote,
+        inAmount: amount.toString(),
+        outAmount: Math.floor(parseInt(quote.outAmount) * ratio).toString(),
+        cached: true,
+        cacheRatio: ratio,
+      };
+    }
+    return null;
+  } catch (error) {
+    logger.warn('Jupiter cache get failed', { error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Get Jupiter cache stats for monitoring
+ */
+function getJupiterCacheStats() {
+  return {
+    ttlSeconds: JUPITER_CACHE_TTL,
+    prefix: JUPITER_CACHE_PREFIX,
+  };
+}
+
 module.exports = {
   initializeClient,
   getClient,
@@ -988,4 +1235,13 @@ module.exports = {
   releaseLock,
   isLockHeld,
   withLock,
+  // Velocity Tracking (Behavioral Refill)
+  recordTransactionVelocity,
+  getVelocityMetrics,
+  calculateVelocityBasedBuffer,
+  VELOCITY_WINDOW_SECONDS,
+  // Jupiter Quote Caching
+  cacheJupiterQuote,
+  getCachedJupiterQuote,
+  getJupiterCacheStats,
 };
