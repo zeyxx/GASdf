@@ -149,4 +149,33 @@ router.get('/treasury', async (req, res) => {
   }
 });
 
+// =============================================================================
+// POST /admin/migrate-redis - Migrate old Redis keys to prefixed format
+// =============================================================================
+
+router.post('/migrate-redis', async (req, res) => {
+  const { dryRun = true } = req.body;
+
+  try {
+    logger.info('ADMIN', 'Redis key migration triggered', { dryRun, ip: req.ip });
+
+    const { migrateRedisKeys } = require('../../scripts/migrate-redis-keys');
+    const result = await migrateRedisKeys(dryRun);
+
+    logger.info('ADMIN', 'Redis key migration completed', {
+      success: result.success,
+      migrated: result.stats?.migrated || 0,
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error('ADMIN', 'Redis key migration failed', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      code: 'MIGRATION_FAILED',
+    });
+  }
+});
+
 module.exports = router;
