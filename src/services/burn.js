@@ -37,20 +37,34 @@ const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
 // =============================================================================
 // ECONOMIC EFFICIENCY: Minimum USD value to process
 // =============================================================================
-// OPTIMIZED MODEL: Minimize swaps by keeping $ASDF in treasury
-// - $ASDF fees: Burn 76.4% directly, keep 23.6% as $ASDF (0 swaps!)
+// HYBRID MODEL: $ASDF purist + unified treasury
+// - $ASDF fees: 100% burn (every $ASDF paid as fee is burned!)
+// - Other tokens: Swap → $ASDF → 76.4% burn / 23.6% treasury (unified)
 // - Only swap $ASDF → SOL when fee payer needs refill
-// - Other tokens: Swap to $ASDF for burn, keep treasury portion
 //
+// This maximizes $ASDF deflation while keeping unified model for other tokens
 // TX costs: ~0.000005 SOL (~$0.001) per transaction
-// With optimized model: 0-1 swaps instead of 2-3 → ~80% fee reduction
 const MIN_VALUE_USD = 0.50;
 
-// Fee payer refill threshold: Only swap to SOL when balance drops below this
-// 0.1 SOL ≈ $20 ≈ ~2000 transactions worth of gas
-const FEE_PAYER_REFILL_THRESHOLD_SOL = 0.1;
-const FEE_PAYER_REFILL_TARGET_SOL = 0.3; // Refill to 0.3 SOL when triggered
+// =============================================================================
+// VELOCITY-BASED REFILL (Behavioral Proof > Fixed Thresholds)
+// =============================================================================
+// Instead of fixed 0.1 SOL threshold, we calculate based on actual tx velocity:
+//   requiredBuffer = (txPerHour × avgCostPerTx) × bufferHours
+//
+// This adapts to actual usage patterns - behavioral proof, not promises.
+// =============================================================================
 const LAMPORTS_PER_SOL = 1_000_000_000;
+
+// Minimum buffer regardless of velocity (safety floor: 0.05 SOL)
+const MIN_BUFFER_LAMPORTS = 50_000_000;
+
+// How many hours of runway to maintain (2 hours = comfortable margin)
+const BUFFER_HOURS = 2;
+
+// Legacy fallback thresholds (used when no velocity data)
+const LEGACY_REFILL_THRESHOLD_SOL = 0.1;
+const LEGACY_REFILL_TARGET_SOL = 0.3;
 
 // SOL price cache (refreshed each burn cycle)
 let cachedSolPrice = null;
@@ -129,8 +143,14 @@ async function getTokenValueUsd(mint, amount, decimals) {
 }
 
 /**
- * Check if fee payer needs SOL refill
- * Returns { needsRefill, currentBalance, refillAmount } or null if no fee payer
+ * Check if fee payer needs SOL refill (VELOCITY-BASED)
+ *
+ * Instead of fixed threshold (0.1 SOL), we calculate based on actual tx velocity:
+ *   requiredBuffer = (txPerHour × avgCostPerTx) × bufferHours
+ *
+ * This is "behavioral proof" - the threshold adapts to actual usage patterns.
+ *
+ * Returns { needsRefill, currentBalance, refillAmount, velocity, explanation } or null if no fee payer
  */
 async function checkFeePayerNeedsRefill() {
   const feePayer = feePayerPool.getHealthyPayer();
@@ -141,29 +161,74 @@ async function checkFeePayerNeedsRefill() {
     const balance = await connection.getBalance(feePayer.publicKey);
     const balanceSol = balance / LAMPORTS_PER_SOL;
 
-    const needsRefill = balanceSol < FEE_PAYER_REFILL_THRESHOLD_SOL;
+    // Calculate velocity-based threshold
+    const bufferCalc = await redis.calculateVelocityBasedBuffer(BUFFER_HOURS, MIN_BUFFER_LAMPORTS);
+
+    const needsRefill = balance < bufferCalc.required;
     const refillAmount = needsRefill
-      ? Math.ceil((FEE_PAYER_REFILL_TARGET_SOL - balanceSol) * LAMPORTS_PER_SOL)
+      ? bufferCalc.target - balance
       : 0;
 
-    logger.debug('BURN', 'Fee payer balance check', {
+    logger.debug('BURN', 'Fee payer balance check (velocity-based)', {
       balance: balanceSol.toFixed(4),
-      threshold: FEE_PAYER_REFILL_THRESHOLD_SOL,
+      requiredBuffer: (bufferCalc.required / LAMPORTS_PER_SOL).toFixed(4),
+      targetBuffer: (bufferCalc.target / LAMPORTS_PER_SOL).toFixed(4),
+      velocity: bufferCalc.velocity,
       needsRefill,
+      explanation: bufferCalc.explanation,
     });
 
-    return { needsRefill, currentBalance: balance, balanceSol, refillAmount };
+    return {
+      needsRefill,
+      currentBalance: balance,
+      balanceSol,
+      refillAmount,
+      requiredBuffer: bufferCalc.required,
+      targetBuffer: bufferCalc.target,
+      velocity: bufferCalc.velocity,
+      explanation: bufferCalc.explanation,
+    };
   } catch (error) {
     logger.error('BURN', 'Failed to check fee payer balance', { error: error.message });
-    return null;
+
+    // Fallback to legacy fixed threshold if velocity check fails
+    try {
+      const connection = rpc.getConnection();
+      const balance = await connection.getBalance(feePayer.publicKey);
+      const balanceSol = balance / LAMPORTS_PER_SOL;
+      const needsRefill = balanceSol < LEGACY_REFILL_THRESHOLD_SOL;
+      const refillAmount = needsRefill
+        ? Math.ceil((LEGACY_REFILL_TARGET_SOL - balanceSol) * LAMPORTS_PER_SOL)
+        : 0;
+
+      logger.warn('BURN', 'Using legacy fixed threshold (velocity check failed)', {
+        balance: balanceSol.toFixed(4),
+        threshold: LEGACY_REFILL_THRESHOLD_SOL,
+        needsRefill,
+      });
+
+      return {
+        needsRefill,
+        currentBalance: balance,
+        balanceSol,
+        refillAmount,
+        requiredBuffer: LEGACY_REFILL_THRESHOLD_SOL * LAMPORTS_PER_SOL,
+        targetBuffer: LEGACY_REFILL_TARGET_SOL * LAMPORTS_PER_SOL,
+        velocity: null,
+        explanation: 'Legacy fixed threshold (velocity unavailable)',
+      };
+    } catch (fallbackError) {
+      logger.error('BURN', 'Fallback balance check also failed', { error: fallbackError.message });
+      return null;
+    }
   }
 }
 
 /**
  * Refill fee payer SOL by swapping $ASDF from treasury
- * Only called when fee payer SOL drops below threshold
+ * Uses VELOCITY-BASED thresholds for adaptive refill
  *
- * @returns {{ success: boolean, solReceived?: number, signature?: string }}
+ * @returns {{ success: boolean, solReceived?: number, signature?: string, velocity?: object }}
  */
 async function refillFeePayerFromAsdf() {
   const refillCheck = await checkFeePayerNeedsRefill();
@@ -186,7 +251,7 @@ async function refillFeePayerFromAsdf() {
       return { success: false, error: 'No ASDF balance' };
     }
 
-    // Calculate how much $ASDF to swap for target SOL
+    // Calculate how much $ASDF to swap for target SOL (velocity-based target)
     // Get quote: ASDF → SOL
     const solNeeded = refillCheck.refillAmount;
     const quote = await jupiter.getQuote(
@@ -208,20 +273,25 @@ async function refillFeePayerFromAsdf() {
       asdfToSwap = Math.min(asdfToSwap, asdfBalance); // Don't exceed balance
     }
 
-    logger.info('BURN', 'Refilling fee payer SOL from treasury $ASDF', {
+    logger.info('BURN', 'Refilling fee payer SOL from treasury $ASDF (velocity-based)', {
       feePayerBalance: refillCheck.balanceSol.toFixed(4),
+      requiredBuffer: (refillCheck.requiredBuffer / LAMPORTS_PER_SOL).toFixed(4),
+      targetBuffer: (refillCheck.targetBuffer / LAMPORTS_PER_SOL).toFixed(4),
       solNeeded: (solNeeded / LAMPORTS_PER_SOL).toFixed(4),
       asdfToSwap,
       asdfBalance,
+      velocity: refillCheck.velocity,
+      explanation: refillCheck.explanation,
     });
 
     // Execute swap
     const swapResult = await swapTokenToSol(config.ASDF_MINT, asdfToSwap, feePayer);
 
     if (swapResult.success) {
-      logger.info('BURN', 'Fee payer refilled successfully', {
+      logger.info('BURN', 'Fee payer refilled successfully (velocity-based)', {
         solReceived: (parseInt(swapResult.solReceived) / LAMPORTS_PER_SOL).toFixed(4),
         signature: swapResult.signature,
+        velocity: refillCheck.velocity,
       });
 
       await redis.recordTreasuryEvent({
@@ -229,10 +299,18 @@ async function refillFeePayerFromAsdf() {
         asdfAmount: asdfToSwap,
         solAmount: swapResult.solReceived,
         previousBalance: refillCheck.currentBalance,
+        velocity: refillCheck.velocity,
+        requiredBuffer: refillCheck.requiredBuffer,
+        targetBuffer: refillCheck.targetBuffer,
+        explanation: refillCheck.explanation,
       });
     }
 
-    return swapResult;
+    return {
+      ...swapResult,
+      velocity: refillCheck.velocity,
+      explanation: refillCheck.explanation,
+    };
   } catch (error) {
     logger.error('BURN', 'Fee payer refill failed', { error: error.message });
     return { success: false, error: error.message };
@@ -381,7 +459,7 @@ async function executeBurnWithLock(tokenBalances) {
     totalBurned: 0,
     totalAsdfRetained: 0,
     batchSignature: null,
-    model: 'unified',
+    model: 'hybrid',
   };
 
   // Collect all burns to execute in a single batch
@@ -468,15 +546,15 @@ async function executeBurnWithLock(tokenBalances) {
   }
 
   if (results.processed.length > 0) {
-    logger.info('BURN', 'Burn cycle completed (unified model)', {
+    logger.info('BURN', 'Burn cycle completed (hybrid model)', {
       tokensProcessed: results.processed.length,
       tokensFailed: results.failed.length,
       totalAsdfBurned: results.totalBurned,
       totalAsdfRetained: results.totalAsdfRetained,
       batchSignature: results.batchSignature,
       burnsBatched: pendingBurns.length,
-      model: 'unified',
-      philosophy: 'All value → $ASDF → burn/treasury',
+      model: 'hybrid',
+      philosophy: '$ASDF → 100% burn | Others → unified (76.4% burn)',
     });
   }
 
@@ -496,7 +574,12 @@ async function processTokenForBatch(token, pendingBurns) {
   const isAsdf = mint === config.ASDF_MINT;
 
   // Get ecosystem burn bonus for non-ASDF tokens
-  let ecosystemBurnBonus = { ecosystemBurnPct: 0, asdfBurnPct: 0.80, treasuryPct: 0.20 };
+  // Default: Golden Ratio split (no ecosystem burn bonus for unverified tokens)
+  let ecosystemBurnBonus = {
+    ecosystemBurnPct: 0,
+    asdfBurnPct: config.BURN_RATIO,      // 76.4% (1 - 1/φ³)
+    treasuryPct: config.TREASURY_RATIO,  // 23.6% (1/φ³)
+  };
   let tokenBurnedPercent = 0;
 
   if (!isAsdf) {
@@ -522,28 +605,22 @@ async function processTokenForBatch(token, pendingBurns) {
 
   if (isAsdf) {
     // ==========================================================================
-    // $ASDF: Burn directly (no swaps needed!)
+    // $ASDF: 100% BURN - Every $ASDF paid as fee is burned!
+    // This maximizes $ASDF deflation - purist model
     // ==========================================================================
-    const { burnAmount, treasuryAmount } = calculateTreasurySplit(balance, config.BURN_RATIO);
-
-    if (burnAmount > 0) {
-      // Queue for batch burn
+    if (balance > 0) {
+      // Queue 100% for batch burn
       pendingBurns.push({
         mint: config.ASDF_MINT,
-        amount: burnAmount,
+        amount: balance,
         type: 'asdf',
         symbol: '$ASDF',
       });
-      asdfBurned = burnAmount;
-    }
+      asdfBurned = balance;
 
-    // Keep treasury portion as $ASDF (optimized model)
-    if (treasuryAmount > 0) {
-      await redis.recordTreasuryEvent({
-        type: 'asdf_retained',
-        tokenMint: mint,
-        tokenAmount: treasuryAmount,
-        source: 'optimized_treasury_retention',
+      logger.info('BURN', '$ASDF fee: 100% queued for burn (purist model)', {
+        amount: balance,
+        model: 'purist',
       });
     }
 
@@ -582,7 +659,7 @@ async function processTokenForBatch(token, pendingBurns) {
         const asdfReceived = parseInt(swapResult.asdfReceived);
         swapSignatures.push(swapResult.signature);
 
-        // Split received $ASDF using Golden Ratio (same as $ASDF fees)
+        // Split received $ASDF using Golden Ratio
         const { burnAmount, treasuryAmount } = calculateTreasurySplit(asdfReceived, config.BURN_RATIO);
 
         // 2a. Queue 76.4% for burn
@@ -618,13 +695,17 @@ async function processTokenForBatch(token, pendingBurns) {
     }
   }
 
-  logger.info('BURN', `Processed ${symbol} for batch (unified model)`, {
+  logger.info('BURN', `Processed ${symbol} for batch`, {
     mint: mint.slice(0, 8),
     asdfBurned,
     ecosystemBurned,
+    tokenBurnedPercent: tokenBurnedPercent > 0 ? tokenBurnedPercent.toFixed(1) + '%' : null,
+    ecosystemBurnBonus: ecosystemBurnBonus.ecosystemBurnPct > 0
+      ? (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%'
+      : null,
     swapsUsed: swapSignatures.length,
     pendingBurnsTotal: pendingBurns.length,
-    model: isAsdf ? 'direct' : 'unified',
+    model: isAsdf ? '100% burn' : 'unified (76.4% burn)',
   });
 
   return {
@@ -633,232 +714,12 @@ async function processTokenForBatch(token, pendingBurns) {
     asdfBurned,
     ecosystemBurned,
     asdfRetained: !isAsdf && asdfBurned > 0
-      ? Math.floor(asdfBurned * (1 - config.BURN_RATIO) / config.BURN_RATIO) // Approximate
+      ? Math.floor(asdfBurned * (1 - config.BURN_RATIO) / config.BURN_RATIO)
       : 0,
     swapSignatures,
     swapsUsed: swapSignatures.length,
     batched: true,
-    model: 'unified',
-  };
-}
-
-/**
- * Process a single token type for burning (legacy - used as fallback)
- *
- * DUAL-BURN FLYWHEEL:
- * - Tokens that have burned their own supply get an "ecosystem burn bonus"
- * - Instead of swapping 100% to ASDF, we burn a portion of the token directly
- * - This supports ecosystem-wide burning and incentivizes all tokens to burn
- *
- * Split calculation:
- * - ecosystemBurnPct% → Burn token directly (ecosystem support)
- * - (80% - ecosystemBurnPct)% → Swap to ASDF → Burn
- * - 20% → Swap to SOL (treasury)
- */
-async function processTokenBurn(token) {
-  const { mint, balance, symbol, decimals, valueUsd } = token;
-  const isAsdf = mint === config.ASDF_MINT;
-
-  // ==========================================================================
-  // DUAL-BURN FLYWHEEL: Get ecosystem burn bonus for HolDex tokens
-  // ==========================================================================
-  let ecosystemBurnBonus = { ecosystemBurnPct: 0, asdfBurnPct: 0.80, treasuryPct: 0.20 };
-  let tokenBurnedPercent = 0;
-
-  if (!isAsdf) {
-    try {
-      const tokenData = await holdex.getToken(mint);
-      if (tokenData.ecosystemBurn) {
-        ecosystemBurnBonus = tokenData.ecosystemBurn;
-        tokenBurnedPercent = tokenData.supply?.burnedPercent || 0;
-      }
-    } catch (error) {
-      logger.debug('BURN', 'Could not get ecosystem burn data, using default split', {
-        mint: mint.slice(0, 8),
-        error: error.message,
-      });
-    }
-  }
-
-  // Calculate amounts based on ecosystem burn bonus
-  const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
-  const asdfBurnAmount = Math.floor(balance * ecosystemBurnBonus.asdfBurnPct);
-  const treasuryAmount = balance - ecosystemBurnAmount - asdfBurnAmount; // Remainder to treasury
-
-  logger.info('BURN', `Processing ${symbol} with dual-burn flywheel`, {
-    mint: mint.slice(0, 8),
-    totalBalance: balance,
-    valueUsd: valueUsd?.toFixed(2) || 'unknown',
-    tokenBurnedPercent: tokenBurnedPercent.toFixed(2) + '%',
-    ecosystemBurnPct: (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%',
-    ecosystemBurnAmount,
-    asdfBurnAmount,
-    treasuryAmount,
-    isAsdf,
-  });
-
-  let asdfBurned = 0;
-  let ecosystemBurned = 0;
-  let solToTreasury = 0;
-  let burnSignature = null;
-  let ecosystemBurnSignature = null;
-  let swapSignatures = [];
-
-  const feePayer = feePayerPool.getHealthyPayer();
-  if (!feePayer) {
-    throw new Error('No healthy fee payer available');
-  }
-
-  if (isAsdf) {
-    // ==========================================================================
-    // $ASDF TOKEN: OPTIMIZED MODEL - 0 swaps!
-    // - Burn 76.4% directly
-    // - Keep 23.6% as $ASDF in treasury (no swap needed)
-    // - Only swap $ASDF → SOL when fee payer needs refill (handled separately)
-    // ==========================================================================
-
-    const { burnAmount: directBurnAmount, treasuryAmount: asdfTreasuryAmount } =
-      calculateTreasurySplit(balance, config.BURN_RATIO);
-
-    // 1. Burn 76.4% directly (1 transaction, 0 swaps!)
-    if (directBurnAmount > 0) {
-      burnSignature = await burnAsdfFromTreasury(directBurnAmount);
-      asdfBurned = directBurnAmount;
-      logger.info('BURN', 'Direct ASDF burn (optimized: 0 swaps)', {
-        amount: directBurnAmount,
-        signature: burnSignature,
-      });
-    }
-
-    // 2. Keep 23.6% as $ASDF in treasury - NO SWAP!
-    // This $ASDF will be used to refill fee payer only when SOL drops below threshold
-    if (asdfTreasuryAmount > 0) {
-      logger.info('BURN', 'ASDF kept in treasury (optimized: no swap)', {
-        amount: asdfTreasuryAmount,
-        reason: 'Will swap to SOL only when fee payer needs refill',
-      });
-
-      await redis.recordTreasuryEvent({
-        type: 'asdf_retained',
-        tokenMint: mint,
-        tokenAmount: asdfTreasuryAmount,
-        source: 'optimized_treasury_retention',
-      });
-    }
-
-  } else {
-    // ==========================================================================
-    // OTHER TOKENS: Dual-burn flywheel
-    // - ecosystemBurnPct% → Burn token directly (ecosystem support)
-    // - asdfBurnPct% → Swap to ASDF → Burn
-    // - treasuryPct% → Swap to SOL (treasury)
-    // ==========================================================================
-
-    // 1. ECOSYSTEM BURN: Burn token directly (supports ecosystem-wide burning)
-    if (ecosystemBurnAmount > 0) {
-      try {
-        ecosystemBurnSignature = await burnTokenFromTreasury(mint, ecosystemBurnAmount, feePayer);
-        ecosystemBurned = ecosystemBurnAmount;
-        logger.info('BURN', 'Ecosystem direct burn', {
-          symbol,
-          amount: ecosystemBurnAmount,
-          signature: ecosystemBurnSignature,
-          tokenBurnedPercent: tokenBurnedPercent.toFixed(2) + '%',
-        });
-      } catch (error) {
-        logger.warn('BURN', 'Ecosystem burn failed, will swap to ASDF instead', {
-          mint: mint.slice(0, 8),
-          error: error.message,
-        });
-        // Fall back: add to ASDF burn amount
-        // asdfBurnAmount += ecosystemBurnAmount; // Can't modify const, handled below
-      }
-    }
-
-    // 2. ASDF BURN: Swap portion → ASDF and burn
-    const effectiveAsdfBurnAmount = ecosystemBurned > 0 ? asdfBurnAmount : asdfBurnAmount + ecosystemBurnAmount;
-    if (effectiveAsdfBurnAmount > 0) {
-      const burnSwap = await swapTokenToAsdf(mint, effectiveAsdfBurnAmount, feePayer);
-      if (burnSwap.success) {
-        const asdfToBurn = parseInt(burnSwap.asdfReceived);
-        swapSignatures.push(burnSwap.signature);
-
-        // Burn the ASDF we received
-        burnSignature = await burnAsdf(asdfToBurn);
-        asdfBurned = asdfToBurn;
-
-        logger.info('BURN', 'Swap to ASDF and burn completed', {
-          tokenIn: effectiveAsdfBurnAmount,
-          asdfBurned: asdfToBurn,
-          swapSignature: burnSwap.signature,
-          burnSignature,
-        });
-      }
-    }
-
-    // 3. TREASURY: Swap portion → SOL for treasury operations
-    if (treasuryAmount > 0) {
-      const treasurySwap = await swapTokenToSol(mint, treasuryAmount, feePayer);
-      if (treasurySwap.success) {
-        solToTreasury = parseInt(treasurySwap.solReceived);
-        swapSignatures.push(treasurySwap.signature);
-
-        await redis.incrTreasuryTotal(solToTreasury);
-        await redis.recordTreasuryEvent({
-          type: 'fee_conversion',
-          tokenMint: mint,
-          tokenAmount: treasuryAmount,
-          solAmount: solToTreasury,
-          source: 'token_treasury_portion',
-        });
-
-        logger.info('TREASURY', 'Token converted to SOL', {
-          tokenMint: mint.slice(0, 8),
-          tokenAmount: treasuryAmount,
-          solReceived: solToTreasury,
-        });
-      }
-    }
-  }
-
-  // Update burn stats
-  if (asdfBurned > 0 || ecosystemBurned > 0) {
-    if (asdfBurned > 0) {
-      await redis.incrBurnTotal(asdfBurned);
-    }
-
-    // Record burn proof for transparency (includes ecosystem burn data)
-    await redis.recordBurnProof({
-      burnSignature,
-      ecosystemBurnSignature,
-      swapSignatures,
-      amountBurned: asdfBurned,
-      ecosystemBurned,
-      ecosystemBurnBonus: ecosystemBurnBonus.ecosystemBurnPct,
-      sourceToken: mint,
-      sourceSymbol: symbol,
-      sourceAmount: balance,
-      tokenBurnedPercent,
-      treasuryAmount: solToTreasury,
-      method: isAsdf ? 'direct' : (ecosystemBurned > 0 ? 'dual_burn' : 'swap'),
-      network: config.NETWORK,
-    });
-  }
-
-  return {
-    mint,
-    symbol,
-    asdfBurned,
-    ecosystemBurned,
-    solToTreasury,
-    burnSignature,
-    ecosystemBurnSignature,
-    swapSignatures,
-    dualBurn: {
-      tokenBurnedPercent,
-      ecosystemBurnPct: ecosystemBurnBonus.ecosystemBurnPct,
-      explanation: ecosystemBurnBonus.explanation,
-    },
+    model: isAsdf ? 'purist' : 'unified',
   };
 }
 

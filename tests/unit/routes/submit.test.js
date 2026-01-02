@@ -27,6 +27,7 @@ jest.mock('../../../src/utils/redis', () => ({
   addPendingSwap: jest.fn().mockResolvedValue(true),
   incrTxCount: jest.fn().mockResolvedValue(true),
   incrWalletBurn: jest.fn().mockResolvedValue(true),
+  recordTransactionVelocity: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../../src/utils/rpc', () => ({

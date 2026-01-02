@@ -382,6 +382,15 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     const burnAmount = quote.burnAmount || Math.floor(quote.feeAmountLamports * config.BURN_RATIO);
     await redis.incrWalletBurn(userPubkey, burnAmount);
 
+    // ==========================================================================
+    // VELOCITY TRACKING (Behavioral Proof for Treasury Refill)
+    // Record actual transaction cost for velocity-based threshold calculation
+    // ==========================================================================
+    const actualTxCost = simulation.unitsConsumed
+      ? Math.ceil(simulation.unitsConsumed * 0.000001 * 1_000_000_000) + 5000 // CU cost + base fee
+      : quote.feeAmountLamports; // Fallback to quoted fee
+    await redis.recordTransactionVelocity(actualTxCost);
+
     // Mark as successful
     await txQueue.markSuccess(quoteId, result.signature);
 

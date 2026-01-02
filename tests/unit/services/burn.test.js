@@ -1,9 +1,9 @@
 /**
  * Tests for Burn Service
  *
- * New logic: Scans actual treasury token balances, then:
- * - For $ASDF: Burn 80% directly, swap 20% → SOL for treasury
- * - For other tokens: Swap 80% → ASDF → Burn, swap 20% → SOL for treasury
+ * HYBRID MODEL:
+ * - For $ASDF: 100% burn (every $ASDF fee is burned!)
+ * - For other tokens: Swap 100% → $ASDF → 76.4% burn / 23.6% treasury (unified)
  */
 
 // Mock dependencies before requiring the module
@@ -292,7 +292,7 @@ describe('Burn Service', () => {
       });
     });
 
-    it('should swap 100% to ASDF (unified model)', async () => {
+    it('should swap 100% to ASDF (unified model for non-ASDF tokens)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       // UNIFIED MODEL: Swap 100% to $ASDF (1 swap instead of 2!)
@@ -302,7 +302,7 @@ describe('Burn Service', () => {
         150
       );
       expect(result.processed).toHaveLength(1);
-      expect(result.model).toBe('unified');
+      expect(result.model).toBe('hybrid'); // Hybrid: $ASDF=100% burn, others=unified
     });
 
     it('should NOT swap to SOL (unified model keeps treasury as $ASDF)', async () => {
@@ -353,30 +353,30 @@ describe('Burn Service', () => {
       });
     });
 
-    it('should burn 80% directly without swap', async () => {
+    it('should burn 100% directly without swap (purist model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       // Should NOT swap ASDF to ASDF
       expect(jupiter.getTokenToAsdfQuote).not.toHaveBeenCalled();
-      expect(result.processed[0].asdfBurned).toBe(8000000);
+      // PURIST MODEL: 100% of $ASDF fees are burned!
+      expect(result.processed[0].asdfBurned).toBe(10000000);
     });
 
-    it('should keep 20% as $ASDF in treasury (optimized: no swap)', async () => {
+    it('should NOT retain any $ASDF in treasury (100% burn)', async () => {
       await burnService.checkAndExecuteBurn();
 
-      // OPTIMIZED MODEL: For $ASDF, we DON'T swap to SOL
-      // We keep the treasury portion as $ASDF and only swap when fee payer needs refill
+      // PURIST MODEL: 100% burn, no treasury retention for $ASDF
       expect(jupiter.getTokenToSolQuote).not.toHaveBeenCalledWith(
         'AsdfMint111111111111111111111111111111111111',
         expect.any(Number),
         expect.any(Number)
       );
 
-      // Should record retention event instead of swap
-      expect(redis.recordTreasuryEvent).toHaveBeenCalledWith(
+      // NO retention event for $ASDF (100% burned)
+      expect(redis.recordTreasuryEvent).not.toHaveBeenCalledWith(
         expect.objectContaining({
+          tokenMint: 'AsdfMint111111111111111111111111111111111111',
           type: 'asdf_retained',
-          source: 'optimized_treasury_retention',
         })
       );
     });
@@ -580,17 +580,17 @@ describe('Burn Service', () => {
       });
     });
 
-    it('should return complete burn result (unified model)', async () => {
+    it('should return complete burn result (hybrid model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result).not.toBeNull();
       expect(result.processed).toHaveLength(1);
       expect(result.totalBurned).toBeGreaterThan(0);
       expect(result.totalAsdfRetained).toBeGreaterThanOrEqual(0); // Unified: treasury in $ASDF
-      expect(result.model).toBe('unified');
+      expect(result.model).toBe('hybrid'); // Hybrid: $ASDF=100% burn, others=unified
     });
 
-    it('should include token details in processed results (unified model)', async () => {
+    it('should include token details in processed results (hybrid model)', async () => {
       const result = await burnService.checkAndExecuteBurn();
 
       expect(result.processed[0]).toEqual(
@@ -598,7 +598,7 @@ describe('Burn Service', () => {
           mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
           symbol: 'USDC',
           asdfBurned: expect.any(Number),
-          model: 'unified',
+          model: 'unified', // Non-ASDF tokens use unified model
           // No more solToTreasury - unified model keeps treasury as $ASDF
         })
       );
