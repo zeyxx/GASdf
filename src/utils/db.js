@@ -63,11 +63,7 @@ async function initialize() {
     pool = new Pool({
       connectionString,
       // Render external requires SSL with self-signed certs
-      ssl: isRender ? {
-        rejectUnauthorized: false,
-        // Explicitly request SSL
-        require: true
-      } : false,
+      ssl: isRender ? { rejectUnauthorized: false } : false,
       max: 5, // Reduced for free tier
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 20000, // Increased for cross-region latency
