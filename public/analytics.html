@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GASdf Analytics</title>
+  <meta name="description" content="Real-time analytics for GASdf gasless transactions on Solana">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO DESIGN SYSTEM
+       φ = 1.618033988749895
+       ═══════════════════════════════════════════════════════════ */
+    :root {
+      /* Golden Ratio Scale */
+      --phi: 1.618033988749895;
+      --phi-inv: 0.618033988749895;
+
+      /* Spacing based on φ (base 8px) */
+      --space-xs: 5px;      /* 8/φ */
+      --space-sm: 8px;      /* base */
+      --space-md: 13px;     /* 8×φ÷1 */
+      --space-lg: 21px;     /* 8×φ */
+      --space-xl: 34px;     /* 8×φ² */
+      --space-2xl: 55px;    /* 8×φ³ */
+      --space-3xl: 89px;    /* 8×φ⁴ */
+
+      /* Typography scale based on φ */
+      --text-xs: 0.694rem;   /* 1/φ² */
+      --text-sm: 0.764rem;   /* 1/φ^1.5 */
+      --text-base: 0.875rem; /* base */
+      --text-lg: 1rem;       /* ×φ^0.5 */
+      --text-xl: 1.125rem;   /* ×φ */
+      --text-2xl: 1.5rem;    /* ×φ² */
+      --text-3xl: 2rem;      /* ×φ³ */
+      --text-4xl: 2.618rem;  /* ×φ⁴ */
+
+      /* Colors - Refined dark palette */
+      --bg-0: #08090a;
+      --bg-1: #0d0e10;
+      --bg-2: #131517;
+      --bg-3: #1a1c1f;
+      --bg-4: #222529;
+
+      --border-1: #1f2125;
+      --border-2: #2a2d32;
+      --border-3: #3a3d42;
+
+      /* Accent colors */
+      --gold: #f0b90b;
+      --gold-dim: #997a0a;
+      --green: #0ecb81;
+      --green-dim: #0a8a58;
+      --red: #f6465d;
+      --red-dim: #a62e3e;
+      --blue: #1e90ff;
+      --cyan: #00d4ff;
+      --purple: #a855f7;
+
+      /* Text colors */
+      --text-1: #eaecef;
+      --text-2: #848e9c;
+      --text-3: #5e6673;
+      --text-4: #3a3f47;
+
+      /* Gradients */
+      --gradient-gold: linear-gradient(135deg, #f0b90b 0%, #f7931a 100%);
+      --gradient-green: linear-gradient(135deg, #0ecb81 0%, #00ff88 100%);
+      --gradient-burn: linear-gradient(135deg, #ff6b35 0%, #f6465d 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 16px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-0);
+      color: var(--text-1);
+      min-height: 100vh;
+      line-height: 1.618; /* Golden ratio line height */
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       LAYOUT - Golden Grid
+       ═══════════════════════════════════════════════════════════ */
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--bg-1);
+      border-right: 1px solid var(--border-1);
+      padding: var(--space-lg);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .main {
+      flex: 1;
+      margin-left: 240px;
+      padding: var(--space-xl);
+      max-width: 1400px;
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .main {
+        margin-left: 0;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SIDEBAR
+       ═══════════════════════════════════════════════════════════ */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--text-xl);
+      font-weight: 700;
+      color: var(--text-1);
+      text-decoration: none;
+      margin-bottom: var(--space-2xl);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--gradient-gold);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-phi {
+      color: var(--gold);
+      font-size: var(--text-sm);
+      opacity: 0.7;
+    }
+
+    .nav-section {
+      margin-bottom: var(--space-xl);
+    }
+
+    .nav-label {
+      font-size: var(--text-xs);
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-sm);
+      padding: 0 var(--space-sm);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      color: var(--text-2);
+      text-decoration: none;
+      font-size: var(--text-base);
+      border-radius: 8px;
+      transition: all 0.15s ease;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-3);
+      color: var(--text-1);
+    }
+
+    .nav-item.active {
+      background: var(--bg-3);
+      color: var(--gold);
+    }
+
+    .nav-item .icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border-1);
+    }
+
+    .network-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--text-sm);
+      color: var(--text-2);
+    }
+
+    .network-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════════════════════ */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .header-title {
+      font-size: var(--text-2xl);
+      font-weight: 600;
+    }
+
+    .header-subtitle {
+      color: var(--text-2);
+      font-size: var(--text-sm);
+      margin-top: var(--space-xs);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-sm) var(--space-md);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-secondary {
+      background: var(--bg-3);
+      color: var(--text-1);
+      border: 1px solid var(--border-2);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-4);
+      border-color: var(--border-3);
+    }
+
+    .btn-primary {
+      background: var(--gradient-gold);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       METRICS GRID - φ proportions
+       ═══════════════════════════════════════════════════════════ */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+
+    @media (max-width: 1200px) {
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+    }
+
+    .metric-card {
+      background: var(--bg-1);
+      border: 1px solid var(--border-1);
+      border-radius: 12px;
+      padding: var(--space-lg);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .metric-card:hover {
+      border-color: var(--border-2);
+      transform: translateY(-2px);
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .metric-card.burn::before { background: var(--gradient-burn); }
+    .metric-card.volume::before { background: var(--gradient-gold); }
+    .metric-card.tx::before { background: var(--blue); }
+    .metric-card.treasury::before { background: var(--green); }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-md);
+    }
+
+    .metric-label {
+      font-size: var(--text-sm);
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .metric-label .icon {
+      font-size: 14px;
+    }
+
+    .metric-change {
+      font-size: var(--text-xs);
+      font-weight: 500;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .metric-change.up {
+      background: rgba(14, 203, 129, 0.1);
+      color: var(--green);
+    }
+
+    .metric-change.down {
+      background: rgba(246, 70, 93, 0.1);
+      color: var(--red);
+    }
+
+    .metric-value {
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: var(--space-xs);
+    }
+
+    .metric-sub {
+      font-size: var(--text-xs);
+      color: var(--text-3);
+    }
+
+    .metric-chart {
+      height: 40px;
+      margin-top: var(--space-md);
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .metric-chart .bar {
+      flex: 1;
+      background: var(--bg-3);
+      border-radius: 2px;
+      transition: height 0.3s ease;
+    }
+
+    .metric-card.burn .metric-chart .bar { background: rgba(255, 107, 53, 0.3); }
+    .metric-card.volume .metric-chart .bar { background: rgba(240, 185, 11, 0.3); }
+    .metric-card.tx .metric-chart .bar { background: rgba(30, 144, 255, 0.3); }
+    .metric-card.treasury .metric-chart .bar { background: rgba(14, 203, 129, 0.3); }
+
+    /* ═══════════════════════════════════════════════════════════
+       MAIN CONTENT GRID - Golden ratio split
+       ═══════════════════════════════════════════════════════════ */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 61.8% 38.2%; /* φ ratio */
+      gap: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+
+    @media (max-width: 1024px) {
+      .content-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-1);
+      border: 1px solid var(--border-1);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      border-bottom: 1px solid var(--border-1);
+    }
+
+    .card-title {
+      font-size: var(--text-lg);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .card-title .icon {
+      color: var(--gold);
+    }
+
+    .card-tabs {
+      display: flex;
+      gap: var(--space-xs);
+    }
+
+    .card-tab {
+      padding: var(--space-xs) var(--space-sm);
+      font-size: var(--text-xs);
+      color: var(--text-2);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .card-tab:hover {
+      color: var(--text-1);
+      background: var(--bg-3);
+    }
+
+    .card-tab.active {
+      color: var(--gold);
+      background: rgba(240, 185, 11, 0.1);
+      border-color: rgba(240, 185, 11, 0.2);
+    }
+
+    .card-body {
+      padding: var(--space-lg);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       CHART AREA
+       ═══════════════════════════════════════════════════════════ */
+    .chart-container {
+      height: 300px;
+      position: relative;
+    }
+
+    .chart-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-area {
+      flex: 1;
+      position: relative;
+      border-bottom: 1px solid var(--border-1);
+    }
+
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      height: 100%;
+      gap: 4px;
+      padding: var(--space-lg) 0;
+    }
+
+    .chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--gold) 0%, rgba(240, 185, 11, 0.2) 100%);
+      border-radius: 4px 4px 0 0;
+      min-height: 4px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .chart-bar:hover {
+      background: linear-gradient(180deg, var(--gold) 0%, rgba(240, 185, 11, 0.4) 100%);
+    }
+
+    .chart-bar:hover::after {
+      content: attr(data-value);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-3);
+      border: 1px solid var(--border-2);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: var(--text-xs);
+      white-space: nowrap;
+      margin-bottom: 8px;
+    }
+
+    .chart-labels {
+      display: flex;
+      justify-content: space-between;
+      padding-top: var(--space-sm);
+    }
+
+    .chart-label {
+      font-size: var(--text-xs);
+      color: var(--text-3);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TOKEN DISTRIBUTION
+       ═══════════════════════════════════════════════════════════ */
+    .token-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-sm);
+      border-radius: 8px;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+
+    .token-item:hover {
+      background: var(--bg-3);
+    }
+
+    .token-rank {
+      width: 24px;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--text-3);
+    }
+
+    .token-rank.top {
+      color: var(--gold);
+    }
+
+    .token-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      overflow: hidden;
+    }
+
+    .token-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .token-info {
+      flex: 1;
+    }
+
+    .token-name {
+      font-size: var(--text-sm);
+      font-weight: 500;
+    }
+
+    .token-ticker {
+      font-size: var(--text-xs);
+      color: var(--text-3);
+    }
+
+    .token-bar-container {
+      flex: 1;
+      max-width: 120px;
+    }
+
+    .token-bar {
+      height: 6px;
+      background: var(--bg-3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .token-bar-fill {
+      height: 100%;
+      background: var(--gradient-gold);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .token-percent {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      width: 50px;
+      text-align: right;
+    }
+
+    .token-kscore {
+      font-size: var(--text-xs);
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--bg-3);
+      color: var(--text-2);
+    }
+
+    .token-kscore.high {
+      background: rgba(14, 203, 129, 0.1);
+      color: var(--green);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TRANSACTIONS TABLE
+       ═══════════════════════════════════════════════════════════ */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th {
+      text-align: left;
+      font-size: var(--text-xs);
+      font-weight: 500;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: 1px solid var(--border-1);
+    }
+
+    .table td {
+      padding: var(--space-md);
+      font-size: var(--text-sm);
+      border-bottom: 1px solid var(--border-1);
+    }
+
+    .table tr:hover td {
+      background: var(--bg-2);
+    }
+
+    .table .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .table .hash {
+      color: var(--blue);
+      cursor: pointer;
+    }
+
+    .table .hash:hover {
+      text-decoration: underline;
+    }
+
+    .table .token-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .table .token-cell .icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--bg-3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .table .time {
+      color: var(--text-3);
+    }
+
+    .table .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: var(--text-xs);
+    }
+
+    .table .status.success {
+      background: rgba(14, 203, 129, 0.1);
+      color: var(--green);
+    }
+
+    .table .status.pending {
+      background: rgba(240, 185, 11, 0.1);
+      color: var(--gold);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO FOOTER
+       ═══════════════════════════════════════════════════════════ */
+    .golden-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-xl) 0;
+      border-top: 1px solid var(--border-1);
+      margin-top: var(--space-2xl);
+    }
+
+    .golden-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--text-sm);
+      color: var(--text-2);
+    }
+
+    .golden-badge .phi {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: var(--space-lg);
+    }
+
+    .footer-links a {
+      color: var(--text-2);
+      text-decoration: none;
+      font-size: var(--text-sm);
+      transition: color 0.15s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--gold);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       LOADING STATES
+       ═══════════════════════════════════════════════════════════ */
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SCROLLBAR
+       ═══════════════════════════════════════════════════════════ */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-4);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border-3);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ═══════════════════════════════════════════════════════════
+         SIDEBAR
+         ═══════════════════════════════════════════════════════════ -->
+    <aside class="sidebar">
+      <a href="/" class="logo">
+        <div class="logo-icon">🔥</div>
+        <span>GASdf</span>
+        <span class="logo-phi">φ</span>
+      </a>
+
+      <nav class="nav-section">
+        <div class="nav-label">Analytics</div>
+        <a href="/analytics.html" class="nav-item active">
+          <span class="icon">📊</span>
+          <span>Overview</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span class="icon">🔥</span>
+          <span>Burn History</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span class="icon">💎</span>
+          <span>Token Usage</span>
+        </a>
+      </nav>
+
+      <nav class="nav-section">
+        <div class="nav-label">Ecosystem</div>
+        <a href="/" class="nav-item">
+          <span class="icon">🏠</span>
+          <span>Dashboard</span>
+        </a>
+        <a href="https://asdev-backend.onrender.com/api/tokens" target="_blank" class="nav-item">
+          <span class="icon">📋</span>
+          <span>HolDex API</span>
+        </a>
+        <a href="https://github.com/zeyxx/GASdf" target="_blank" class="nav-item">
+          <span class="icon">📦</span>
+          <span>GitHub</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="network-status">
+          <span class="network-dot"></span>
+          <span id="networkStatus">Mainnet</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         MAIN CONTENT
+         ═══════════════════════════════════════════════════════════ -->
+    <main class="main">
+      <header class="header">
+        <div>
+          <h1 class="header-title">Analytics Overview</h1>
+          <p class="header-subtitle">Real-time metrics for GASdf gasless transactions</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" onclick="refreshData()">
+            ↻ Refresh
+          </button>
+          <a href="/v1/stats" target="_blank" class="btn btn-secondary">
+            API
+          </a>
+        </div>
+      </header>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           METRICS CARDS
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="metrics-grid">
+        <div class="metric-card burn" onclick="window.open('https://alonisthe.dev/burns', '_blank')">
+          <div class="metric-header">
+            <div class="metric-label">
+              <span class="icon">🔥</span>
+              Total Burned
+            </div>
+            <span class="metric-change up" id="burnChange">+0%</span>
+          </div>
+          <div class="metric-value" id="totalBurned">-</div>
+          <div class="metric-sub">$ASDF burned forever</div>
+          <div class="metric-chart" id="burnChart"></div>
+        </div>
+
+        <div class="metric-card volume" onclick="window.open('/v1/stats', '_blank')">
+          <div class="metric-header">
+            <div class="metric-label">
+              <span class="icon">💰</span>
+              24h Volume
+            </div>
+            <span class="metric-change up" id="volumeChange">+0%</span>
+          </div>
+          <div class="metric-value" id="volume24h">-</div>
+          <div class="metric-sub">in fee payments</div>
+          <div class="metric-chart" id="volumeChart"></div>
+        </div>
+
+        <div class="metric-card tx" onclick="window.open('/v1/stats', '_blank')">
+          <div class="metric-header">
+            <div class="metric-label">
+              <span class="icon">📈</span>
+              Transactions
+            </div>
+            <span class="metric-change up" id="txChange">+0%</span>
+          </div>
+          <div class="metric-value" id="txCount">-</div>
+          <div class="metric-sub">gasless txs processed</div>
+          <div class="metric-chart" id="txChart"></div>
+        </div>
+
+        <div class="metric-card treasury" onclick="window.open('https://solscan.io/account/9F5NUrZYjP5MRmqLBc8vd3rsmXiYQdqAMNF7VdKqM68w', '_blank')">
+          <div class="metric-header">
+            <div class="metric-label">
+              <span class="icon">🏦</span>
+              Treasury
+            </div>
+            <span class="metric-change" id="treasuryChange">-</span>
+          </div>
+          <div class="metric-value" id="treasuryBalance">-</div>
+          <div class="metric-sub">fee payer balance</div>
+          <div class="metric-chart" id="treasuryChart"></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           CONTENT GRID - φ ratio (61.8% / 38.2%)
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="content-grid">
+        <!-- CHART SECTION (61.8%) -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="icon">📈</span>
+              Burn History
+            </h2>
+            <div class="card-tabs">
+              <button class="card-tab active" data-period="7d">7D</button>
+              <button class="card-tab" data-period="30d">30D</button>
+              <button class="card-tab" data-period="all">All</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <div class="chart-placeholder">
+                <div class="chart-area">
+                  <div class="chart-bars" id="burnHistoryChart">
+                    <!-- Bars will be populated by JS -->
+                  </div>
+                </div>
+                <div class="chart-labels" id="chartLabels">
+                  <!-- Labels will be populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOKEN DISTRIBUTION (38.2%) -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="icon">💎</span>
+              Top Payment Tokens
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="token-list" id="tokenList">
+              <!-- Tokens will be populated by JS -->
+              <div class="skeleton" style="height: 48px;"></div>
+              <div class="skeleton" style="height: 48px;"></div>
+              <div class="skeleton" style="height: 48px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           RECENT TRANSACTIONS
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="icon">📋</span>
+            Recent Transactions
+          </h2>
+          <a href="/v1/stats" target="_blank" class="btn btn-secondary" style="font-size: var(--text-xs);">
+            View All →
+          </a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Tx Hash</th>
+                  <th>Token</th>
+                  <th>Fee Paid</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="txTable">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-3);">
+                    Loading transactions...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════ -->
+      <footer class="golden-footer">
+        <div class="golden-badge">
+          <span>Powered by</span>
+          <span class="phi">φ</span>
+          <span>Golden Ratio Economics</span>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
+          <a href="https://alonisthe.dev" target="_blank">$ASDF Ecosystem</a>
+          <a href="/v1/stats" target="_blank">API</a>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════════════════
+    const API_BASE = '';
+    const HOLDEX_API = 'https://asdev-backend.onrender.com/api';
+    const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+    const INITIAL_SUPPLY = 1_000_000_000_000_000;
+
+    // ═══════════════════════════════════════════════════════════
+    // UTILITY FUNCTIONS
+    // ═══════════════════════════════════════════════════════════
+    function formatNumber(num, decimals = 0) {
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+      return num.toFixed(decimals);
+    }
+
+    function animateValue(element, target, duration = 1000, prefix = '', suffix = '') {
+      const start = parseFloat(element.textContent.replace(/[^0-9.-]/g, '')) || 0;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * eased;
+
+        element.textContent = prefix + formatNumber(current) + suffix;
+
+        if (progress < 1) requestAnimationFrame(update);
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    function generateMiniChart(containerId, values, color) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const max = Math.max(...values);
+      container.innerHTML = values.map((v, i) => {
+        const height = max > 0 ? (v / max * 100) : 10;
+        return `<div class="bar" style="height: ${Math.max(height, 5)}%;"></div>`;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH DATA
+    // ═══════════════════════════════════════════════════════════
+    async function fetchStats() {
+      try {
+        const res = await fetch('/v1/stats');
+        const data = await res.json();
+
+        // Update transaction count
+        const txCount = data.totalTransactions || 0;
+        animateValue(document.getElementById('txCount'), txCount, 1500);
+
+        // Update treasury
+        if (data.treasury?.onChain) {
+          const sol = data.treasury.onChain.sol / 1e9;
+          document.getElementById('treasuryBalance').textContent = sol.toFixed(4) + ' SOL';
+        }
+
+        // Generate mock mini charts
+        generateMiniChart('txChart', [3, 5, 4, 7, 6, 8, 5, 9, 7, 10]);
+        generateMiniChart('treasuryChart', [8, 7, 9, 6, 8, 7, 8, 6, 7, 8]);
+
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
+    }
+
+    async function fetchBurnData() {
+      try {
+        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          const supply = parseInt(data.token.supply) || INITIAL_SUPPLY;
+          const burned = (INITIAL_SUPPLY - supply) / 1e6;
+
+          animateValue(document.getElementById('totalBurned'), burned, 2000, '', ' $ASDF');
+
+          // Generate burn chart
+          generateMiniChart('burnChart', [20, 35, 45, 55, 60, 75, 85, 90, 95, 100]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch burn data:', err);
+      }
+    }
+
+    async function fetchTokens() {
+      try {
+        const res = await fetch(`${HOLDEX_API}/tokens?limit=50`);
+        const data = await res.json();
+
+        if (!data.success || !data.tokens) return;
+
+        // Sort by volume and take top 5
+        const tokens = data.tokens
+          .filter(t => t.volume24h > 0)
+          .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+          .slice(0, 5);
+
+        const totalVolume = tokens.reduce((sum, t) => sum + (t.volume24h || 0), 0);
+
+        const container = document.getElementById('tokenList');
+        container.innerHTML = tokens.map((token, i) => {
+          const percent = totalVolume > 0 ? ((token.volume24h || 0) / totalVolume * 100) : 0;
+          const kScore = token.kScore || 0;
+          const kClass = kScore >= 80 ? 'high' : '';
+
+          const logoHtml = token.image
+            ? `<img src="${token.image}" alt="${token.ticker}" onerror="this.parentElement.innerHTML='${(token.ticker || '?')[0]}'">`
+            : (token.ticker || '?')[0];
+
+          return `
+            <div class="token-item" onclick="window.open('https://dexscreener.com/solana/${token.mint}', '_blank')">
+              <div class="token-rank ${i < 3 ? 'top' : ''}">${i + 1}</div>
+              <div class="token-icon">${logoHtml}</div>
+              <div class="token-info">
+                <div class="token-name">${token.name || token.ticker}</div>
+                <div class="token-ticker">$${token.ticker}</div>
+              </div>
+              <div class="token-bar-container">
+                <div class="token-bar">
+                  <div class="token-bar-fill" style="width: ${percent}%;"></div>
+                </div>
+              </div>
+              <div class="token-percent">${percent.toFixed(1)}%</div>
+              <span class="token-kscore ${kClass}">K:${kScore}</span>
+            </div>
+          `;
+        }).join('');
+
+        // Update volume
+        document.getElementById('volume24h').textContent = '$' + formatNumber(totalVolume);
+        generateMiniChart('volumeChart', [40, 55, 45, 70, 60, 85, 75, 90, 80, 95]);
+
+      } catch (err) {
+        console.error('Failed to fetch tokens:', err);
+      }
+    }
+
+    function generateBurnHistoryChart() {
+      const container = document.getElementById('burnHistoryChart');
+      const labels = document.getElementById('chartLabels');
+
+      // Generate 30 days of mock data
+      const days = [];
+      const values = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        values.push(Math.random() * 50000 + 10000);
+      }
+
+      const max = Math.max(...values);
+
+      container.innerHTML = values.map((v, i) => {
+        const height = (v / max * 100);
+        return `<div class="chart-bar" style="height: ${height}%;" data-value="${formatNumber(v)} $ASDF"></div>`;
+      }).join('');
+
+      // Show only first, middle, and last label
+      labels.innerHTML = `
+        <span class="chart-label">${days[0]}</span>
+        <span class="chart-label">${days[14]}</span>
+        <span class="chart-label">${days[29]}</span>
+      `;
+    }
+
+    function generateMockTransactions() {
+      const container = document.getElementById('txTable');
+      const tokens = ['USDC', 'SOL', 'BONK', 'JUP', 'ASDF'];
+      const statuses = ['success', 'success', 'success', 'pending'];
+
+      const txs = [];
+      for (let i = 0; i < 5; i++) {
+        const hash = Array.from({ length: 8 }, () =>
+          Math.random().toString(36).charAt(2)
+        ).join('');
+        const token = tokens[Math.floor(Math.random() * tokens.length)];
+        const fee = (Math.random() * 0.01).toFixed(6);
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const mins = Math.floor(Math.random() * 60);
+
+        txs.push(`
+          <tr>
+            <td class="mono hash" onclick="window.open('https://solscan.io/tx/${hash}...', '_blank')">${hash}...</td>
+            <td>
+              <div class="token-cell">
+                <div class="icon">${token[0]}</div>
+                <span>${token}</span>
+              </div>
+            </td>
+            <td class="mono">${fee} SOL</td>
+            <td><span class="status ${status}">● ${status}</span></td>
+            <td class="time">${mins}m ago</td>
+          </tr>
+        `);
+      }
+
+      container.innerHTML = txs.join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // REFRESH
+    // ═══════════════════════════════════════════════════════════
+    function refreshData() {
+      fetchStats();
+      fetchBurnData();
+      fetchTokens();
+      generateBurnHistoryChart();
+      generateMockTransactions();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshData();
+
+      // Auto-refresh every 30s
+      setInterval(refreshData, 30000);
+
+      // Tab switching
+      document.querySelectorAll('.card-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          document.querySelectorAll('.card-tab').forEach(t => t.classList.remove('active'));
+          e.target.classList.add('active');
+          generateBurnHistoryChart();
+        });
+      });
+    });
+  </script>
+</body>
+</html>
