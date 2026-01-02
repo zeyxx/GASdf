@@ -13,8 +13,33 @@ const SYSTEM_TRANSFER_DISCRIMINATOR = 2; // Transfer instruction index
 const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 
+// =============================================================================
+// SECURITY MODEL: Isolation-Based (Permissionless Compatible)
+// =============================================================================
+//
+// GASdf is permissionless - anyone can integrate via SDK.
+// We CANNOT restrict programs (would break integrations).
+//
+// Instead, security is achieved through ISOLATION:
+//
+// 1. FEE PAYER HOLDS ONLY SOL
+//    - No token accounts = no token drain possible
+//    - Only risk is SOL drain, which simulation catches
+//
+// 2. SIMULATION VALIDATES BALANCE DELTA
+//    - Pre-simulation: record fee payer SOL balance
+//    - Post-simulation: verify delta = network fee only
+//    - ANY unexpected balance change = reject
+//
+// 3. INSTRUCTION VALIDATION (defense in depth)
+//    - Still block obvious attacks (System.Transfer from fee payer)
+//    - But don't rely on this alone - simulation is the real guard
+//
+// This allows ANY program while maintaining security.
+// =============================================================================
+
 // Token Program dangerous instructions (fee payer as authority)
-// Using BLOCKLIST approach - these drain tokens or change ownership
+// Defense-in-depth: block obvious attacks, but simulation is primary defense
 const TOKEN_DANGEROUS_INSTRUCTIONS = {
   3: 'Transfer',
   4: 'Approve',           // Grants delegate access

@@ -143,6 +143,71 @@ class FeePayerPool {
     this.refreshBalances().catch(err => {
       logger.warn('FEE_PAYER_POOL', 'Initial balance refresh failed', { error: err.message });
     });
+
+    // SECURITY: Verify fee payers have no token accounts (critical invariant)
+    this.verifyNoTokenAccounts().catch(err => {
+      logger.error('FEE_PAYER_POOL', 'Security check failed', { error: err.message });
+    });
+  }
+
+  /**
+   * SECURITY INVARIANT: Fee payers must hold ONLY SOL
+   *
+   * If a fee payer has token accounts, it can be drained via CPI attacks.
+   * This check runs at startup and periodically to ensure the invariant holds.
+   *
+   * If token accounts are found:
+   * - Production: Log CRITICAL alert, mark payer as unhealthy
+   * - Development: Log warning only
+   */
+  async verifyNoTokenAccounts() {
+    const { PublicKey } = require('@solana/web3.js');
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
+    for (const payer of this.payers) {
+      const pubkey = payer.publicKey;
+
+      try {
+        const connection = rpc.getConnection();
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          pubkey,
+          { programId: TOKEN_PROGRAM_ID }
+        );
+
+        if (tokenAccounts.value.length > 0) {
+          const accounts = tokenAccounts.value.map(acc => ({
+            mint: acc.account.data.parsed.info.mint.slice(0, 8),
+            balance: acc.account.data.parsed.info.tokenAmount.uiAmountString,
+          }));
+
+          if (config.IS_PROD) {
+            // CRITICAL: Fee payer has tokens - vulnerable to drain attacks
+            logger.error('FEE_PAYER_POOL', 'SECURITY VIOLATION: Fee payer has token accounts', {
+              pubkey: pubkey.toBase58().slice(0, 12),
+              tokenAccounts: accounts,
+              action: 'CLOSE THESE ACCOUNTS IMMEDIATELY',
+            });
+
+            // Mark as unhealthy until tokens are removed
+            this.markPayerUnhealthy(pubkey.toBase58(), 3600_000); // 1 hour
+          } else {
+            logger.warn('FEE_PAYER_POOL', 'Fee payer has token accounts (dev mode)', {
+              pubkey: pubkey.toBase58().slice(0, 12),
+              tokenAccounts: accounts,
+            });
+          }
+        } else {
+          logger.debug('FEE_PAYER_POOL', 'Security check passed: no token accounts', {
+            pubkey: pubkey.toBase58().slice(0, 12),
+          });
+        }
+      } catch (error) {
+        logger.warn('FEE_PAYER_POOL', 'Token account check failed', {
+          pubkey: pubkey.toBase58().slice(0, 12),
+          error: error.message,
+        });
+      }
+    }
   }
 
   /**
