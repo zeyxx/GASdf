@@ -159,7 +159,7 @@ router.post('/migrate-redis', async (req, res) => {
   try {
     logger.info('ADMIN', 'Redis key migration triggered', { dryRun, ip: req.ip });
 
-    const { migrateRedisKeys } = require('../../scripts/migrate-redis-keys');
+    const { migrateRedisKeys, cleanupOldKeys } = require('../../scripts/migrate-redis-keys');
     const result = await migrateRedisKeys(dryRun);
 
     logger.info('ADMIN', 'Redis key migration completed', {
@@ -174,6 +174,35 @@ router.post('/migrate-redis', async (req, res) => {
       success: false,
       error: error.message,
       code: 'MIGRATION_FAILED',
+    });
+  }
+});
+
+// =============================================================================
+// POST /admin/cleanup-redis - Delete old unprefixed Redis keys
+// =============================================================================
+
+router.post('/cleanup-redis', async (req, res) => {
+  const { dryRun = true } = req.body;
+
+  try {
+    logger.info('ADMIN', 'Redis cleanup triggered', { dryRun, ip: req.ip });
+
+    const { cleanupOldKeys } = require('../../scripts/migrate-redis-keys');
+    const result = await cleanupOldKeys(dryRun);
+
+    logger.info('ADMIN', 'Redis cleanup completed', {
+      success: result.success,
+      deleted: result.stats?.deleted || 0,
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error('ADMIN', 'Redis cleanup failed', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      code: 'CLEANUP_FAILED',
     });
   }
 });

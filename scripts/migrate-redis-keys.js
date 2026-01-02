@@ -233,4 +233,102 @@ if (require.main === module) {
     });
 }
 
-module.exports = { migrateRedisKeys };
+/**
+ * Delete old unprefixed Redis keys after migration
+ */
+async function cleanupOldKeys(dryRun = true) {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    console.error('REDIS_URL not set');
+    return { success: false, error: 'REDIS_URL not set' };
+  }
+
+  console.log(`Cleaning up old Redis keys...`);
+  console.log(`Mode: ${dryRun ? 'DRY RUN (no changes)' : 'LIVE (will delete keys)'}`);
+
+  const client = createClient({ url: redisUrl });
+  await client.connect();
+
+  const stats = {
+    scanned: 0,
+    deleted: 0,
+    skipped: 0,
+    errors: 0,
+    keys: [],
+  };
+
+  try {
+    // Delete specific keys
+    console.log('\n--- Checking specific keys ---');
+    for (const oldKey of KEY_PATTERNS) {
+      stats.scanned++;
+
+      const exists = await client.exists(oldKey);
+      if (!exists) {
+        stats.skipped++;
+        continue;
+      }
+
+      console.log(`  DELETE: ${oldKey}`);
+      stats.keys.push(oldKey);
+
+      if (!dryRun) {
+        await client.del(oldKey);
+      }
+      stats.deleted++;
+    }
+
+    // Scan for pattern-based keys
+    console.log('\n--- Scanning pattern-based keys ---');
+    for (const pattern of PATTERN_KEYS) {
+      console.log(`  Scanning: ${pattern}`);
+
+      let cursor = 0;
+      do {
+        const result = await client.scan(cursor, { MATCH: pattern, COUNT: 100 });
+        cursor = result.cursor;
+
+        for (const oldKey of result.keys) {
+          // Skip if already prefixed (new keys)
+          if (oldKey.startsWith(KEY_PREFIX)) {
+            continue;
+          }
+
+          stats.scanned++;
+          const exists = await client.exists(oldKey);
+          if (!exists) {
+            stats.skipped++;
+            continue;
+          }
+
+          console.log(`    DELETE: ${oldKey}`);
+          stats.keys.push(oldKey);
+
+          if (!dryRun) {
+            await client.del(oldKey);
+          }
+          stats.deleted++;
+        }
+      } while (cursor !== 0);
+    }
+
+    console.log('\n--- Cleanup Summary ---');
+    console.log(`  Scanned: ${stats.scanned}`);
+    console.log(`  Deleted: ${stats.deleted}`);
+    console.log(`  Skipped: ${stats.skipped}`);
+    console.log(`  Errors: ${stats.errors}`);
+
+    if (dryRun && stats.deleted > 0) {
+      console.log('\nRun with --live to perform actual deletion');
+    }
+
+    return { success: true, stats };
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    return { success: false, error: error.message, stats };
+  } finally {
+    await client.quit();
+  }
+}
+
+module.exports = { migrateRedisKeys, cleanupOldKeys };
