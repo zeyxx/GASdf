@@ -71,8 +71,11 @@ const config = {
   RPC_URL: getRpcUrl(),
   NETWORK: USE_MAINNET ? 'mainnet' : 'devnet',
 
-  // Redis
+  // Redis (hot data: quotes, cache, rate limits)
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+
+  // PostgreSQL (cold data: history, analytics, audit)
+  DATABASE_URL: process.env.DATABASE_URL,
 
   // Fee payer wallet(s)
   FEE_PAYER_PRIVATE_KEY: process.env.FEE_PAYER_PRIVATE_KEY,

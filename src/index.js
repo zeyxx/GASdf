@@ -4,6 +4,7 @@ const path = require('path');
 const config = require('./utils/config');
 const logger = require('./utils/logger');
 const redis = require('./utils/redis');
+const db = require('./utils/db');
 const { securityHeaders, globalLimiter } = require('./middleware/security');
 const { startBurnWorker } = require('./services/burn');
 const { collect: collectMetrics, metricsMiddleware } = require('./utils/metrics');
@@ -248,6 +249,11 @@ async function start() {
     await redis.initializeClient();
     const redisState = redis.getConnectionState();
 
+    // Initialize PostgreSQL (optional - for analytics/history)
+    logger.info('BOOT', 'Initializing PostgreSQL connection...');
+    await db.initialize();
+    const dbConnected = db.isConnected();
+
     // Start HTTP server
     server = app.listen(config.PORT, () => {
       console.log(`
@@ -267,6 +273,7 @@ async function start() {
         ['ASDF_MINT', !!config.ASDF_MINT && !config.ASDF_MINT.includes('DEVNET')],
         ['RPC', !!config.RPC_URL],
         ['REDIS', redisState.isHealthy, redisState.isMemoryFallback ? '(memory)' : ''],
+        ['POSTGRES', dbConnected, dbConnected ? '' : '(disabled)'],
       ];
 
       checks.forEach(([name, ok, extra = '']) => {
@@ -314,11 +321,17 @@ async function shutdown(signal) {
   // Give active requests time to complete
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  // Disconnect Redis gracefully
+  // Disconnect databases gracefully
   try {
     await redis.disconnect();
   } catch (err) {
     logger.warn('SHUTDOWN', 'Redis disconnect error', { error: err.message });
+  }
+
+  try {
+    await db.disconnect();
+  } catch (err) {
+    logger.warn('SHUTDOWN', 'PostgreSQL disconnect error', { error: err.message });
   }
 
   logger.info('SHUTDOWN', 'Shutdown complete');

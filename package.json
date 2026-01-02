@@ -28,6 +28,7 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
+    "pg": "^8.16.0",
     "redis": "^4.7.0",
     "tweetnacl": "^1.0.3",
     "uuid": "^10.0.0"
