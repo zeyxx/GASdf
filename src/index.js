@@ -204,7 +204,7 @@ app.use('/admin', adminRouter);
 // Deprecation middleware
 const deprecationWarning = (req, res, next) => {
   res.set('Deprecation', 'true');
-  res.set('Sunset', 'Sat, 01 Jul 2025 00:00:00 GMT');
+  res.set('Sunset', 'Wed, 01 Jul 2026 00:00:00 GMT');
   res.set('Link', `</v1${req.path}>; rel="successor-version"`);
   next();
 };
