@@ -1,0 +1,44 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0505"/>
+      <stop offset="100%" style="stop-color:#1a0c0c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffd700"/>
+      <stop offset="50%" style="stop-color:#ff6b35"/>
+      <stop offset="100%" style="stop-color:#ff4444"/>
+    </linearGradient>
+    <linearGradient id="fire" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff4444"/>
+      <stop offset="50%" style="stop-color:#ff6b35"/>
+      <stop offset="100%" style="stop-color:#ffaa00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle golden glow -->
+  <ellipse cx="300" cy="200" rx="400" ry="300" fill="#ffd700" opacity="0.03"/>
+  <ellipse cx="900" cy="500" rx="300" ry="200" fill="#ff4444" opacity="0.02"/>
+
+  <!-- Logo -->
+  <text x="600" y="250" font-family="monospace" font-size="120" font-weight="bold" fill="url(#gold)" text-anchor="middle">GASdf</text>
+
+  <!-- Phi symbol -->
+  <text x="820" y="180" font-family="serif" font-size="50" fill="#ffd700" opacity="0.8">φ</text>
+
+  <!-- Tagline -->
+  <text x="600" y="340" font-family="monospace" font-size="36" fill="#a09080" text-anchor="middle">Gasless Transactions for Solana</text>
+
+  <!-- Value prop -->
+  <text x="600" y="420" font-family="monospace" font-size="28" fill="#f0e6d3" text-anchor="middle">Pay fees with any token. No SOL needed.</text>
+
+  <!-- Burn stat -->
+  <rect x="400" y="470" width="400" height="60" rx="8" fill="#120808" stroke="#ff4444" stroke-opacity="0.3"/>
+  <text x="600" y="510" font-family="monospace" font-size="24" fill="url(#fire)" text-anchor="middle">76.4% of fees burned forever</text>
+
+  <!-- Footer -->
+  <text x="600" y="590" font-family="monospace" font-size="18" fill="#605040" text-anchor="middle">asdfasdfa.tech</text>
+</svg>
