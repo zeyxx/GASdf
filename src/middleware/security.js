@@ -6,7 +6,24 @@ const logger = require('../utils/logger');
 
 // Security headers
 const securityHeaders = helmet({
-  contentSecurityPolicy: config.IS_DEV ? false : undefined,
+  contentSecurityPolicy: config.IS_DEV ? false : {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      // Allow dashboard to fetch from external APIs
+      connectSrc: [
+        "'self'",
+        "https://asdev-backend.onrender.com",  // HolDex API
+        "https://api.coingecko.com",           // SOL price
+        "https://price.jup.ag",                // Jupiter fallback
+      ],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 });
 
