@@ -36,24 +36,26 @@ const commonOptions = {
 };
 
 // Rate limiters
+// NOTE: These are per-IP limits. At scale with many users behind NAT/proxy,
+// may need to increase further or use wallet-based limits primarily.
 const globalLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000, // 1 minute
-  max: config.IS_DEV ? 1000 : 100, // 100 req/min in prod
+  max: config.IS_DEV ? 2000 : 600, // 600 req/min = 10 req/sec per IP
   message: { error: 'Too many requests, slow down' },
 });
 
 const quoteLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000,
-  max: config.IS_DEV ? 100 : 30, // 30 quotes/min per IP
+  max: config.IS_DEV ? 200 : 60, // 60 quotes/min = 1 quote/sec per IP
   message: { error: 'Quote rate limit exceeded' },
 });
 
 const submitLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000,
-  max: config.IS_DEV ? 50 : 10, // 10 submits/min per IP
+  max: config.IS_DEV ? 100 : 30, // 30 submits/min per IP
   message: { error: 'Submit rate limit exceeded' },
 });
 

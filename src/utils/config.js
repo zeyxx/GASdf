@@ -228,9 +228,11 @@ function validateConfig() {
   // Security warnings
   // -------------------------------------------------------------------------
 
-  // Warn if no CORS origins configured in production
+  // Require explicit CORS origins in production
   if (IS_PROD && config.ALLOWED_ORIGINS.length === 0) {
-    warnings.push('ALLOWED_ORIGINS not configured - CORS will allow all origins');
+    errors.push('ALLOWED_ORIGINS required in production - set allowed domains (comma-separated)');
+  } else if (IS_STAGING && config.ALLOWED_ORIGINS.length === 0) {
+    warnings.push('ALLOWED_ORIGINS not configured - CORS will block all cross-origin requests');
   }
 
   // Warn if using public RPC in production

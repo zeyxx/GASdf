@@ -23,7 +23,9 @@ const BALANCE_REFRESH_INTERVAL = 30_000;
 const BALANCE_REFRESH_JITTER = 5_000;
 
 // Maximum pending reservations per fee payer (prevents over-commitment)
-const MAX_RESERVATIONS_PER_PAYER = 50;
+// Increased from 50 to 200 for better throughput at scale
+// At 1000 tx/sec with 90s TTL, this supports ~2.2 concurrent quotes per payer
+const MAX_RESERVATIONS_PER_PAYER = 200;
 
 // Reservation TTL (matches quote TTL + buffer)
 const RESERVATION_TTL_MS = 90_000; // 90 seconds

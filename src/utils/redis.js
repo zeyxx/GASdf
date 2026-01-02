@@ -7,8 +7,12 @@ let useMemory = false;
 let connectionState = 'disconnected'; // disconnected, connecting, connected, error
 
 // In-memory fallback for local development ONLY
+// Includes periodic cleanup to prevent memory leaks
 const memoryStore = {
   data: new Map(),
+  lastCleanup: 0,
+  cleanupIntervalMs: 10000, // Clean up every 10 seconds
+
   get(key) {
     const item = this.data.get(key);
     if (!item) return null;
@@ -18,17 +22,42 @@ const memoryStore = {
     }
     return item.value;
   },
+
   set(key, value, ttlSeconds = null) {
     this.data.set(key, {
       value,
       expiry: ttlSeconds ? Date.now() + ttlSeconds * 1000 : null,
     });
+    // Trigger cleanup periodically on writes
+    this._maybeCleanup();
   },
+
   del(key) {
     this.data.delete(key);
   },
+
   clear() {
     this.data.clear();
+  },
+
+  // Periodic cleanup of expired entries to prevent memory leak
+  _maybeCleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanup < this.cleanupIntervalMs) return;
+
+    this.lastCleanup = now;
+    let deleted = 0;
+
+    for (const [key, item] of this.data) {
+      if (item.expiry && now > item.expiry) {
+        this.data.delete(key);
+        deleted++;
+      }
+    }
+
+    if (deleted > 0) {
+      logger.debug('REDIS', `Memory store cleanup: removed ${deleted} expired entries, ${this.data.size} remaining`);
+    }
   },
 };
 
