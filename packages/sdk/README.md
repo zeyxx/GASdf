@@ -284,6 +284,13 @@ function Stats() {
 4. **Submit**: GASdf validates, co-signs, and broadcasts
 5. **Burn**: Fees are swapped to $ASDF and burned
 
+## Examples
+
+See [`examples/`](./examples/) for complete working examples:
+
+- **[`examples/basic.ts`](./examples/basic.ts)** - Basic TypeScript usage
+- **[`examples/react/`](./examples/react/)** - React components and hooks
+
 ## License
 
 MIT
