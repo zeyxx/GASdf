@@ -8,6 +8,7 @@ const oracle = require('../services/oracle');
 const holdex = require('../services/holdex');
 const jupiter = require('../services/jupiter');
 const pyth = require('../services/pyth');
+const jito = require('../services/jito');
 const { withTimeout, HEALTH_CHECK_TIMEOUT } = require('../utils/fetch-timeout');
 
 const router = express.Router();
@@ -67,6 +68,9 @@ router.get('/', async (req, res) => {
 
   // Add ALT status (Address Lookup Tables for tx size reduction)
   health.alt = alt.getStatus();
+
+  // Add Jito status (MEV protection for swaps)
+  health.jito = jito.getStatus();
 
   // Determine overall status
   // In staging/production, Redis is CRITICAL - treat it as error

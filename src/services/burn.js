@@ -16,6 +16,7 @@ const { pool: feePayerPool } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
 const holdex = require('./holdex');
+const jito = require('./jito');
 const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
 
 // Lazy-load ASDF mint to avoid startup errors in dev
@@ -738,11 +739,45 @@ async function swapTokenToAsdf(tokenMint, amount, feePayer) {
     // Get swap transaction
     const swapResponse = await jupiter.getSwapTransaction(quote, feePayer.publicKey.toBase58());
 
-    // Deserialize, sign, and send
+    // Deserialize and sign
     const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
     const transaction = Transaction.from(swapTxBuf);
+
+    // Add Jito tip instruction for MEV protection (if enabled)
+    if (jito.isEnabled()) {
+      const tipIx = jito.createTipInstruction(feePayer.publicKey, jito.DEFAULT_TIP_LAMPORTS);
+      transaction.add(tipIx);
+    }
+
     transaction.sign(feePayer);
 
+    // Try Jito bundle first for MEV protection
+    if (jito.isEnabled()) {
+      const jitoResult = await jito.sendTransaction(transaction, { bundleOnly: true });
+
+      if (jitoResult.success && jitoResult.signature) {
+        logger.info('BURN', 'Swap sent via Jito', {
+          signature: jitoResult.signature,
+          tokenMint: tokenMint.slice(0, 8),
+        });
+
+        // Wait for confirmation
+        const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+        await rpc.confirmTransaction(jitoResult.signature, blockhash, lastValidBlockHeight);
+
+        return {
+          success: true,
+          asdfReceived: quote.outAmount,
+          signature: jitoResult.signature,
+          mevProtected: true,
+        };
+      }
+
+      // Jito failed, fall back to regular RPC
+      logger.warn('BURN', 'Jito failed, falling back to RPC', { error: jitoResult.error });
+    }
+
+    // Standard RPC submission (fallback or non-mainnet)
     const signature = await rpc.sendTransaction(transaction);
     const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
     await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
@@ -751,6 +786,7 @@ async function swapTokenToAsdf(tokenMint, amount, feePayer) {
       success: true,
       asdfReceived: quote.outAmount,
       signature,
+      mevProtected: false,
     };
   } catch (error) {
     logger.error('BURN', 'Token → ASDF swap failed', {
@@ -777,11 +813,45 @@ async function swapTokenToSol(tokenMint, amount, feePayer) {
     // Get swap transaction
     const swapResponse = await jupiter.getSwapTransaction(quote, feePayer.publicKey.toBase58());
 
-    // Deserialize, sign, and send
+    // Deserialize and sign
     const swapTxBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
     const transaction = Transaction.from(swapTxBuf);
+
+    // Add Jito tip instruction for MEV protection (if enabled)
+    if (jito.isEnabled()) {
+      const tipIx = jito.createTipInstruction(feePayer.publicKey, jito.DEFAULT_TIP_LAMPORTS);
+      transaction.add(tipIx);
+    }
+
     transaction.sign(feePayer);
 
+    // Try Jito bundle first for MEV protection
+    if (jito.isEnabled()) {
+      const jitoResult = await jito.sendTransaction(transaction, { bundleOnly: true });
+
+      if (jitoResult.success && jitoResult.signature) {
+        logger.info('BURN', 'SOL swap sent via Jito', {
+          signature: jitoResult.signature,
+          tokenMint: tokenMint.slice(0, 8),
+        });
+
+        // Wait for confirmation
+        const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
+        await rpc.confirmTransaction(jitoResult.signature, blockhash, lastValidBlockHeight);
+
+        return {
+          success: true,
+          solReceived: quote.outAmount,
+          signature: jitoResult.signature,
+          mevProtected: true,
+        };
+      }
+
+      // Jito failed, fall back to regular RPC
+      logger.warn('BURN', 'Jito failed for SOL swap, falling back to RPC', { error: jitoResult.error });
+    }
+
+    // Standard RPC submission (fallback or non-mainnet)
     const signature = await rpc.sendTransaction(transaction);
     const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
     await rpc.confirmTransaction(signature, blockhash, lastValidBlockHeight);
@@ -790,6 +860,7 @@ async function swapTokenToSol(tokenMint, amount, feePayer) {
       success: true,
       solReceived: quote.outAmount,
       signature,
+      mevProtected: false,
     };
   } catch (error) {
     logger.error('BURN', 'Token → SOL swap failed', {
