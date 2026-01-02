@@ -2,6 +2,7 @@ const express = require('express');
 const config = require('../utils/config');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
+const alt = require('../utils/alt');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
 const holdex = require('../services/holdex');
@@ -63,6 +64,9 @@ router.get('/', async (req, res) => {
 
   // Add RPC pool health
   health.rpcPool = rpc.getRpcHealth();
+
+  // Add ALT status (Address Lookup Tables for tx size reduction)
+  health.alt = alt.getStatus();
 
   // Determine overall status
   // In staging/production, Redis is CRITICAL - treat it as error
