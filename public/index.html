@@ -25,16 +25,15 @@
       /* Golden Ratio */
       --phi: 1.618033988749;
 
-      /* Pure Golden Percentages */
+      /* Golden Percentages */
       --treasury-pct: 23.6;
       --burn-pct: 76.4;
-      --max-eco-pct: 38.2;
 
       /* Colors - Fire/Golden Theme */
-      --bg-dark: #0a0505;
-      --bg-card: #120808;
-      --bg-card-hover: #1a0c0c;
-      --border-subtle: #2a1515;
+      --bg-dark: #050508;
+      --bg-card: #0a0a10;
+      --bg-card-hover: #12121a;
+      --border-subtle: #1a1a25;
       --border-golden: #b8860b33;
 
       /* Golden palette */
@@ -47,21 +46,18 @@
       --fire-orange: #ff6b35;
       --fire-yellow: #ffaa00;
 
-      /* Ecosystem */
-      --eco-green: #00ff88;
-      --eco-cyan: #00d4ff;
+      /* Category colors */
+      --cat-trending: #ff6b35;
+      --cat-trusted: #00d4ff;
+      --cat-new: #00ff88;
 
       /* Text */
-      --text-primary: #f0e6d3;
-      --text-secondary: #a09080;
-      --text-muted: #605040;
+      --text-primary: #f0f0f5;
+      --text-secondary: #8888a0;
+      --text-muted: #55556a;
     }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'JetBrains Mono', monospace;
@@ -71,18 +67,16 @@
       overflow-x: hidden;
     }
 
-    /* Golden Spiral Background */
+    /* Subtle golden glow background */
     body::before {
       content: '';
       position: fixed;
-      top: 50%;
+      top: 0;
       left: 50%;
-      width: 200vmax;
-      height: 200vmax;
-      transform: translate(-50%, -50%);
-      background:
-        radial-gradient(ellipse at 30% 20%, rgba(255, 215, 0, 0.03) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 80%, rgba(255, 68, 68, 0.02) 0%, transparent 50%);
+      transform: translateX(-50%);
+      width: 100%;
+      height: 60vh;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.03) 0%, transparent 70%);
       pointer-events: none;
       z-index: -1;
     }
@@ -90,468 +84,511 @@
     .container {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 0 1.5rem;
     }
 
-    /* Header */
-    header {
-      text-align: center;
-      margin-bottom: 3rem;
-      position: relative;
-    }
-
-    .logo {
-      font-size: 4rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--gold-primary), var(--fire-orange), var(--fire-red));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -0.05em;
-      position: relative;
-      display: inline-block;
-    }
-
-    .logo::after {
-      content: 'φ';
-      position: absolute;
-      top: -0.5rem;
-      right: -1.5rem;
-      font-size: 1.5rem;
-      color: var(--gold-primary);
-      opacity: 0.8;
-    }
-
-    .tagline {
-      color: var(--text-secondary);
-      font-size: 1rem;
-      margin-top: 0.5rem;
-    }
-
-    .version-badge {
-      display: inline-block;
-      background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
-      color: #000;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      margin-left: 0.5rem;
-    }
-
-    /* Navigation */
-    nav {
+    /* ═══════════════════════════════════════════════════════════
+       HERO SECTION - The Hook
+       ═══════════════════════════════════════════════════════════ */
+    .hero {
+      min-height: 70vh;
       display: flex;
+      flex-direction: column;
       justify-content: center;
-      gap: 2rem;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-
-    nav a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      transition: all 0.2s;
-    }
-
-    nav a:hover {
-      color: var(--gold-primary);
-      background: var(--border-subtle);
-    }
-
-    nav a.active {
-      color: var(--gold-primary);
-      border-bottom: 2px solid var(--gold-primary);
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    @media (max-width: 900px) {
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-
-    @media (max-width: 500px) {
-      .stats-grid { grid-template-columns: 1fr; }
-    }
-
-    .stat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 12px;
-      padding: 1.5rem;
-      text-align: center;
-      transition: all 0.3s;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stat-card:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--border-golden);
-      transform: translateY(-2px);
-    }
-
-    .stat-card.golden {
-      border-color: var(--gold-muted);
-      background: linear-gradient(135deg, var(--bg-card), rgba(184, 134, 11, 0.05));
-    }
-
-    .stat-card.burn {
-      border-color: rgba(255, 68, 68, 0.3);
-      background: linear-gradient(135deg, var(--bg-card), rgba(255, 68, 68, 0.05));
-    }
-
-    .stat-label {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 0.5rem;
-      display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
+      text-align: center;
+      padding: 4rem 1rem;
+      position: relative;
     }
 
-    .live-dot {
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      color: var(--gold-primary);
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.6s ease;
+    }
+
+    .hero-badge .dot {
       width: 6px;
       height: 6px;
-      background: var(--eco-green);
+      background: var(--gold-primary);
       border-radius: 50%;
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
-      50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(255, 215, 0, 0); }
     }
 
-    .stat-value {
-      font-size: 1.6rem;
+    .hero-burn-counter {
+      animation: fadeInUp 0.6s ease 0.1s both;
+    }
+
+    .burn-amount {
+      font-size: clamp(3rem, 10vw, 7rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--fire-yellow) 0%, var(--fire-orange) 50%, var(--fire-red) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .burn-label {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .burn-label .fire {
+      animation: flicker 0.3s infinite alternate;
+    }
+
+    @keyframes flicker {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    .hero-tagline {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      color: var(--text-primary);
+      margin-top: 2rem;
+      animation: fadeInUp 0.6s ease 0.2s both;
+    }
+
+    .hero-tagline strong {
+      color: var(--gold-primary);
+    }
+
+    .hero-sub {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-top: 0.75rem;
+      max-width: 500px;
+      animation: fadeInUp 0.6s ease 0.3s both;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 3rem;
+      margin-top: 3rem;
+      animation: fadeInUp 0.6s ease 0.4s both;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat-value {
+      font-size: 1.5rem;
       font-weight: 600;
       color: var(--text-primary);
     }
 
-    .stat-value.gold { color: var(--gold-primary); }
-    .stat-value.fire { color: var(--fire-orange); }
-    .stat-value.green { color: var(--eco-green); }
-
-    .stat-sub {
-      font-size: 0.75rem;
+    .hero-stat-label {
+      font-size: 0.7rem;
       color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
       margin-top: 0.25rem;
     }
 
-    /* Pure Golden Section */
-    .golden-section {
-      background: var(--bg-card);
-      border: 1px solid var(--gold-muted);
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      position: relative;
-      overflow: hidden;
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .golden-section::before {
-      content: 'φ';
-      position: absolute;
-      top: -20px;
-      right: 20px;
-      font-size: 8rem;
-      color: var(--gold-primary);
-      opacity: 0.03;
-      font-weight: 700;
+    /* ═══════════════════════════════════════════════════════════
+       TOKEN CATEGORIES - Social Proof
+       ═══════════════════════════════════════════════════════════ */
+    .tokens-section {
+      padding: 4rem 0;
     }
 
-    .golden-section h2 {
-      color: var(--gold-primary);
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
+    .section-header {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-    }
-
-    .golden-section h2::before {
-      content: '◆';
-      font-size: 0.8rem;
-    }
-
-    /* Golden Split Bar */
-    .golden-split {
-      margin: 1.5rem 0;
-    }
-
-    .split-bar {
-      display: flex;
-      height: 12px;
-      border-radius: 6px;
-      overflow: hidden;
-      background: var(--bg-dark);
-    }
-
-    .split-segment {
-      transition: all 0.5s ease;
-      position: relative;
-    }
-
-    .split-segment.ecosystem {
-      background: linear-gradient(90deg, var(--eco-green), var(--eco-cyan));
-    }
-
-    .split-segment.asdf {
-      background: linear-gradient(90deg, var(--fire-orange), var(--fire-red));
-    }
-
-    .split-segment.treasury {
-      background: linear-gradient(90deg, var(--gold-secondary), var(--gold-primary));
-    }
-
-    .split-legend {
-      display: flex;
       justify-content: space-between;
-      margin-top: 0.75rem;
-      font-size: 0.75rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-secondary);
-    }
-
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-    }
-
-    .legend-dot.ecosystem { background: var(--eco-green); }
-    .legend-dot.asdf { background: var(--fire-orange); }
-    .legend-dot.treasury { background: var(--gold-primary); }
-
-    /* Formula Display */
-    .formula-box {
-      background: var(--bg-dark);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 1rem 1.5rem;
-      margin: 1rem 0;
-      font-family: 'JetBrains Mono', monospace;
-      overflow-x: auto;
-    }
-
-    .formula {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-    }
-
-    .formula .phi { color: var(--gold-primary); font-weight: 600; }
-    .formula .eco { color: var(--eco-green); }
-    .formula .num { color: var(--fire-orange); }
-
-    /* Dual-Burn Flywheel */
-    .flywheel-section {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 2rem;
       margin-bottom: 2rem;
-    }
-
-    .flywheel-section h2 {
-      color: var(--fire-orange);
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .flywheel-visual {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      margin: 2rem 0;
       flex-wrap: wrap;
+      gap: 1rem;
     }
 
-    .flywheel-step {
-      background: var(--bg-dark);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 1rem 1.5rem;
-      text-align: center;
-      min-width: 140px;
-    }
-
-    .flywheel-step .icon {
+    .section-title {
       font-size: 1.5rem;
-      margin-bottom: 0.5rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
-    .flywheel-step .label {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-    }
-
-    .flywheel-arrow {
+    .section-title .phi {
       color: var(--gold-primary);
-      font-size: 1.5rem;
+      font-size: 1.2rem;
     }
 
-    /* Token Burn Table */
-    .burn-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1rem 0;
+    .section-subtitle {
+      color: var(--text-muted);
       font-size: 0.85rem;
     }
 
-    .burn-table th {
+    .token-categories {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .token-categories { grid-template-columns: 1fr; }
+    }
+
+    .token-category {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .token-category:hover {
+      border-color: var(--border-golden);
+      transform: translateY(-2px);
+    }
+
+    .category-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .category-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .category-icon.trending { background: rgba(255, 107, 53, 0.15); }
+    .category-icon.trusted { background: rgba(0, 212, 255, 0.15); }
+    .category-icon.new { background: rgba(0, 255, 136, 0.15); }
+
+    .category-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .category-title.trending { color: var(--cat-trending); }
+    .category-title.trusted { color: var(--cat-trusted); }
+    .category-title.new { color: var(--cat-new); }
+
+    .category-badge {
+      margin-left: auto;
+      font-size: 0.65rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--bg-dark);
       color: var(--text-muted);
-      font-weight: 500;
-      text-align: left;
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--border-subtle);
-      text-transform: uppercase;
-      font-size: 0.7rem;
-      letter-spacing: 0.05em;
     }
 
-    .burn-table td {
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--border-subtle);
-      color: var(--text-secondary);
+    .token-list {
+      padding: 0.5rem;
+      max-height: 320px;
+      overflow-y: auto;
     }
 
-    .burn-table tr:hover td {
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .token-item:hover {
       background: var(--bg-card-hover);
     }
 
-    .burn-table .eco-pct { color: var(--eco-green); }
-    .burn-table .asdf-pct { color: var(--fire-orange); }
-    .burn-table .treasury-pct { color: var(--gold-primary); }
-
-    /* Burn Progress */
-    .burn-progress {
-      background: var(--bg-card);
-      border: 1px solid rgba(255, 68, 68, 0.3);
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    .burn-progress h2 {
-      color: var(--fire-red);
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
+    .token-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-dark);
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: center;
+      font-size: 0.8rem;
+      overflow: hidden;
     }
 
-    .progress-bar-container {
+    .token-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .token-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .token-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .token-ticker {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .token-metrics {
+      text-align: right;
+    }
+
+    .token-price {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .token-change {
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+
+    .token-change.up { color: #00ff88; }
+    .token-change.down { color: #ff4444; }
+
+    .token-kscore {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
       background: var(--bg-dark);
-      border-radius: 8px;
-      height: 24px;
+      color: var(--text-muted);
+    }
+
+    .token-kscore.high { color: var(--cat-trusted); border: 1px solid rgba(0, 212, 255, 0.3); }
+    .token-kscore.medium { color: var(--gold-primary); border: 1px solid rgba(255, 215, 0, 0.3); }
+
+    /* ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .golden-section {
+      padding: 4rem 0;
+    }
+
+    .golden-card {
+      background: var(--bg-card);
+      border: 1px solid var(--gold-muted);
+      border-radius: 20px;
+      padding: 3rem;
       position: relative;
       overflow: hidden;
-      margin: 1rem 0;
     }
 
-    .progress-bar-fill {
+    .golden-card::before {
+      content: 'φ';
+      position: absolute;
+      top: -40px;
+      right: 40px;
+      font-size: 12rem;
+      font-weight: 700;
+      color: var(--gold-primary);
+      opacity: 0.03;
+      pointer-events: none;
+    }
+
+    .golden-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    @media (max-width: 800px) {
+      .golden-grid { grid-template-columns: 1fr; }
+    }
+
+    .golden-visual {
+      position: relative;
+      aspect-ratio: 1.618 / 1;
+      max-width: 400px;
+    }
+
+    .spiral-container {
+      width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, var(--fire-red), var(--fire-orange), var(--fire-yellow));
-      border-radius: 8px;
+      position: relative;
+    }
+
+    /* Golden Spiral SVG will be injected via JS */
+    .golden-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .golden-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .bar-label {
+      width: 100px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-align: right;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 24px;
+      background: var(--bg-dark);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 12px;
       transition: width 1s ease;
       position: relative;
     }
 
-    .progress-bar-fill::after {
-      content: '🔥';
+    .bar-fill.burn {
+      background: linear-gradient(90deg, var(--fire-orange), var(--fire-red));
+    }
+
+    .bar-fill.treasury {
+      background: linear-gradient(90deg, var(--gold-secondary), var(--gold-primary));
+    }
+
+    .bar-fill.ecosystem {
+      background: linear-gradient(90deg, #00ff88, #00d4ff);
+    }
+
+    .bar-value {
       position: absolute;
-      right: -10px;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 1.2rem;
-      animation: flicker 0.5s infinite alternate;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: rgba(0,0,0,0.8);
     }
 
-    @keyframes flicker {
-      from { opacity: 1; transform: translateY(-50%) scale(1); }
-      to { opacity: 0.8; transform: translateY(-50%) scale(1.1); }
+    .golden-info {
+      position: relative;
+      z-index: 1;
     }
 
-    .progress-stats {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    /* Wallet Tracker */
-    .wallet-section {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    .wallet-section h2 {
-      color: var(--text-primary);
-      font-size: 1.2rem;
+    .golden-info h2 {
+      font-size: 1.8rem;
       margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    .wallet-input-group {
-      display: flex;
-      gap: 0.5rem;
+    .golden-info h2 .phi-symbol {
+      color: var(--gold-primary);
+    }
+
+    .golden-info p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.6;
       margin-bottom: 1.5rem;
     }
 
-    .wallet-input {
-      flex: 1;
+    .golden-formula {
       background: var(--bg-dark);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 0.75rem 1rem;
-      color: var(--text-primary);
-      font-family: inherit;
-      font-size: 0.9rem;
+      padding: 1rem 1.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      overflow-x: auto;
     }
 
-    .wallet-input:focus {
-      outline: none;
-      border-color: var(--gold-primary);
+    .golden-formula .phi { color: var(--gold-primary); font-weight: 600; }
+    .golden-formula .num { color: var(--fire-orange); }
+
+    /* ═══════════════════════════════════════════════════════════
+       CTA SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .cta-section {
+      padding: 4rem 0;
     }
 
-    .wallet-input::placeholder {
-      color: var(--text-muted);
+    .cta-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 255, 136, 0.02) 100%);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 20px;
+      padding: 3rem;
+      text-align: center;
     }
 
-    .btn-primary {
-      background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
+    .cta-title {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .cta-title span {
+      color: var(--cat-new);
+    }
+
+    .cta-subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .cta-code {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .cta-code code {
+      font-size: 1.1rem;
+      color: var(--cat-new);
+    }
+
+    .cta-code button {
+      background: var(--cat-new);
       border: none;
-      border-radius: 8px;
-      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
       color: #000;
       font-weight: 600;
       font-family: inherit;
@@ -559,62 +596,111 @@
       transition: all 0.2s;
     }
 
-    .btn-primary:hover {
-      transform: scale(1.02);
-      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
+    .cta-code button:hover {
+      transform: scale(1.05);
     }
 
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
 
-    /* API Section */
-    .api-section {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 2rem;
-      margin-bottom: 2rem;
+    .cta-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
     }
 
-    .api-section h2 {
-      color: var(--text-primary);
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
+    .cta-link.primary {
+      background: var(--gold-primary);
+      color: #000;
     }
 
-    .endpoint {
+    .cta-link.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255, 215, 0, 0.2);
+    }
+
+    .cta-link.secondary {
       background: var(--bg-dark);
       border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 0.75rem;
+      color: var(--text-secondary);
     }
 
-    .endpoint-method {
+    .cta-link.secondary:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       API SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .api-section {
+      padding: 4rem 0;
+    }
+
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .api-endpoint {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: all 0.2s;
+    }
+
+    .api-endpoint:hover {
+      border-color: var(--border-golden);
+    }
+
+    .api-method {
       display: inline-block;
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 600;
       margin-right: 0.5rem;
     }
 
-    .endpoint-method.post { background: #1e4a2e; color: #4ade80; }
-    .endpoint-method.get { background: #1e3a5f; color: #60a5fa; }
+    .api-method.post { background: rgba(0, 255, 136, 0.15); color: #00ff88; }
+    .api-method.get { background: rgba(0, 212, 255, 0.15); color: #00d4ff; }
 
-    .endpoint-path { color: var(--text-primary); }
-    .endpoint-desc { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
+    .api-path {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
 
-    /* Footer */
-    footer {
-      text-align: center;
+    .api-desc {
+      font-size: 0.75rem;
       color: var(--text-muted);
-      font-size: 0.8rem;
-      padding: 2rem;
+      margin-top: 0.5rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ */
+    footer {
+      padding: 3rem 1rem;
+      text-align: center;
       border-top: 1px solid var(--border-subtle);
       margin-top: 2rem;
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.8rem;
     }
 
     footer a {
@@ -622,573 +708,498 @@
       text-decoration: none;
     }
 
-    .phi-symbol {
-      color: var(--gold-primary);
-      font-weight: 700;
+    footer a:hover {
+      text-decoration: underline;
     }
 
-    /* Leaderboard */
-    .leaderboard-list {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .leaderboard-entry {
-      display: flex;
-      align-items: center;
-      padding: 0.5rem 0.75rem;
+    /* ═══════════════════════════════════════════════════════════
+       UTILITIES
+       ═══════════════════════════════════════════════════════════ */
+    .loading-skeleton {
+      background: linear-gradient(90deg, var(--bg-dark) 25%, var(--bg-card-hover) 50%, var(--bg-dark) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
       border-radius: 4px;
-      font-size: 0.8rem;
-      gap: 1rem;
     }
 
-    .leaderboard-entry:nth-child(odd) {
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
       background: var(--bg-dark);
     }
 
-    .leaderboard-rank {
-      width: 2rem;
-      color: var(--text-muted);
-      font-weight: 600;
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-subtle);
+      border-radius: 3px;
     }
 
-    .leaderboard-rank.top3 { color: var(--gold-primary); }
-
-    .leaderboard-wallet {
-      flex: 1;
-      color: var(--text-secondary);
-      font-size: 0.75rem;
-    }
-
-    .leaderboard-burned { color: var(--fire-orange); }
-    .leaderboard-percent { color: var(--text-muted); font-size: 0.75rem; }
-
-    /* Prices */
-    .price-ticker {
-      display: flex;
-      gap: 2rem;
-      justify-content: center;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .price-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-    }
-
-    .price-value {
-      color: var(--text-primary);
-      font-weight: 600;
-    }
-
-    .price-change.up { color: var(--eco-green); }
-    .price-change.down { color: var(--fire-red); }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .container { padding: 1rem; }
-      .logo { font-size: 2.5rem; }
-      .golden-section, .flywheel-section, .burn-progress, .wallet-section, .api-section {
-        padding: 1.5rem;
-      }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo">GASdf</div>
-      <p class="tagline">
-        Gasless Transactions for Solana <span class="version-badge" id="version">v1.7.0</span>
-      </p>
-      <p style="color: var(--text-secondary); font-size: 1.1rem; margin-top: 1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-        Pay fees with <strong style="color: var(--gold-primary)">any token</strong>. No SOL needed.<br>
-        <span style="color: var(--fire-orange)">76.4% of fees burned forever.</span>
-      </p>
-    </header>
+  <!-- ═══════════════════════════════════════════════════════════
+       HERO - The Hook
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span>Live on Mainnet</span>
+    </div>
 
-    <nav>
-      <a href="#stats" class="active">Dashboard</a>
-      <a href="https://alonisthe.dev/burns" target="_blank">Burns</a>
-      <a href="https://alonisthe.dev/ecosystem" target="_blank">Ecosystem</a>
-      <a href="https://dexscreener.com/solana/asdf" target="_blank">Chart</a>
-    </nav>
-
-    <!-- Price Ticker -->
-    <div class="price-ticker">
-      <div class="price-item">
-        <span>SOL</span>
-        <span class="price-value" id="solPrice">$--</span>
-      </div>
-      <div class="price-item">
-        <span>ASDF</span>
-        <span class="price-value" id="asdfPrice">$--</span>
-      </div>
-      <div class="price-item">
-        <span>Network</span>
-        <span class="price-value" id="network">--</span>
+    <div class="hero-burn-counter">
+      <div class="burn-amount" id="burnAmount">0</div>
+      <div class="burn-label">
+        <span class="fire">🔥</span>
+        <span>$ASDF burned forever</span>
       </div>
     </div>
 
-    <!-- Main Stats -->
-    <div class="stats-grid" id="stats">
-      <div class="stat-card burn">
-        <div class="stat-label"><span class="live-dot"></span>Total Burned</div>
-        <div class="stat-value fire" id="totalBurned">--</div>
-        <div class="stat-sub" id="burnedUsd">--</div>
-      </div>
-      <div class="stat-card golden">
-        <div class="stat-label">Treasury (1/φ³)</div>
-        <div class="stat-value gold" id="treasury">--</div>
-        <div class="stat-sub">23.6% of fees</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Transactions</div>
-        <div class="stat-value" id="txCount">--</div>
-        <div class="stat-sub" id="txRate">--</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Status</div>
-        <div class="stat-value green" id="status">--</div>
-        <div class="stat-sub" id="uptime">--</div>
-      </div>
-    </div>
-
-    <!-- Pure Golden Economics -->
-    <div class="golden-section">
-      <h2>Pure Golden Economics (φ)</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-        All ratios derive from the Golden Ratio φ = 1.618033988749...
-      </p>
-
-      <div class="formula-box">
-        <div class="formula">
-          ecosystemBurn = (<span class="num">1</span>/<span class="phi">φ²</span>) × (<span class="num">1</span> - <span class="phi">φ</span>^(-b/<span class="num">30</span>))
-        </div>
-      </div>
-
-      <div class="golden-split">
-        <div class="split-bar">
-          <div class="split-segment ecosystem" id="ecoSegment" style="width: 0%;"></div>
-          <div class="split-segment asdf" id="asdfSegment" style="width: 76.4%;"></div>
-          <div class="split-segment treasury" style="width: 23.6%;"></div>
-        </div>
-        <div class="split-legend">
-          <div class="legend-item">
-            <div class="legend-dot ecosystem"></div>
-            <span>Ecosystem <span id="ecoLegend">0%</span></span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot asdf"></div>
-            <span>ASDF Burn <span id="asdfLegend">76.4%</span></span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot treasury"></div>
-            <span>Treasury 1/φ³ = 23.6%</span>
-          </div>
-        </div>
-      </div>
-
-      <table class="burn-table">
-        <thead>
-          <tr>
-            <th>Token Burn</th>
-            <th>Ecosystem</th>
-            <th>ASDF</th>
-            <th>Treasury</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>0%</td><td class="eco-pct">0.0%</td><td class="asdf-pct">76.4%</td><td class="treasury-pct">23.6%</td></tr>
-          <tr><td>20%</td><td class="eco-pct">10.5%</td><td class="asdf-pct">65.9%</td><td class="treasury-pct">23.6%</td></tr>
-          <tr><td>50%</td><td class="eco-pct">21.1%</td><td class="asdf-pct">55.3%</td><td class="treasury-pct">23.6%</td></tr>
-          <tr><td>80%</td><td class="eco-pct">27.6%</td><td class="asdf-pct">48.8%</td><td class="treasury-pct">23.6%</td></tr>
-          <tr><td>100%</td><td class="eco-pct">30.5%</td><td class="asdf-pct">45.9%</td><td class="treasury-pct">23.6%</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Dual-Burn Flywheel -->
-    <div class="flywheel-section">
-      <h2>🔥 Dual-Burn Flywheel</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-        Tokens that burn their supply earn ecosystem burn bonuses
-      </p>
-
-      <div class="flywheel-visual">
-        <div class="flywheel-step">
-          <div class="icon">🔥</div>
-          <div class="label">Token Burns</div>
-        </div>
-        <div class="flywheel-arrow">→</div>
-        <div class="flywheel-step">
-          <div class="icon">📈</div>
-          <div class="label">Higher Bonus</div>
-        </div>
-        <div class="flywheel-arrow">→</div>
-        <div class="flywheel-step">
-          <div class="icon">💎</div>
-          <div class="label">Direct Burns</div>
-        </div>
-        <div class="flywheel-arrow">→</div>
-        <div class="flywheel-step">
-          <div class="icon">🌀</div>
-          <div class="label">Incentive</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Burn Progress -->
-    <div class="burn-progress">
-      <h2>🔥 Burn Progress</h2>
-      <div class="progress-bar-container">
-        <div class="progress-bar-fill" id="burnProgress" style="width: 0%;"></div>
-      </div>
-      <div class="progress-stats">
-        <span><span id="burnedAmount">0</span> ASDF burned</span>
-        <span id="burnPercent">0%</span>
-      </div>
-    </div>
-
-    <!-- Wallet Tracker -->
-    <div class="wallet-section">
-      <h2>Your Contribution</h2>
-      <div class="wallet-input-group">
-        <input type="text" class="wallet-input" id="walletInput" placeholder="Enter your Solana wallet address...">
-        <button class="btn-primary" id="lookupBtn" onclick="lookupWallet()">Track</button>
-      </div>
-
-      <div id="walletStats" style="display: none;">
-        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
-          <div class="stat-card">
-            <div class="stat-label">Your Burn</div>
-            <div class="stat-value fire" id="walletBurned">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Transactions</div>
-            <div class="stat-value" id="walletTxCount">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Rank</div>
-            <div class="stat-value gold" id="walletRank">-</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Contribution</div>
-            <div class="stat-value" id="walletPercent">0%</div>
-          </div>
-        </div>
-      </div>
-
-      <h3 style="color: var(--text-secondary); font-size: 0.9rem; margin: 1.5rem 0 1rem;">Top Contributors</h3>
-      <div class="leaderboard-list" id="leaderboardList">
-        <div style="color: var(--text-muted); text-align: center; padding: 1rem;">Loading...</div>
-      </div>
-    </div>
-
-    <!-- Developer Section -->
-    <div class="api-section" style="border-color: var(--eco-green); background: linear-gradient(135deg, var(--bg-card), rgba(0, 255, 136, 0.03));">
-      <h2 style="color: var(--eco-green);">Integrate in 5 Minutes</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-        Add gasless transactions to your dApp with a few lines of code.
-      </p>
-
-      <div class="formula-box" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-        <code style="color: var(--eco-green); font-size: 1rem;">npm install gasdf-sdk</code>
-        <button class="btn-primary" style="background: var(--eco-green); font-size: 0.8rem; padding: 0.5rem 1rem;" onclick="navigator.clipboard.writeText('npm install gasdf-sdk'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 1500);">Copy</button>
-      </div>
-
-      <div class="formula-box" style="margin-top: 1rem;">
-        <pre style="color: var(--text-secondary); font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap;"><span style="color: var(--gold-primary)">import</span> { GASdf } <span style="color: var(--gold-primary)">from</span> <span style="color: var(--eco-green)">'gasdf-sdk'</span>;
-
-<span style="color: var(--text-muted)">// Get a quote</span>
-<span style="color: var(--gold-primary)">const</span> quote = <span style="color: var(--gold-primary)">await</span> GASdf.getQuote({
-  transaction: myTransaction,
-  paymentToken: <span style="color: var(--eco-green)">'USDC'</span>
-});
-
-<span style="color: var(--text-muted)">// Submit gasless</span>
-<span style="color: var(--gold-primary)">const</span> sig = <span style="color: var(--gold-primary)">await</span> GASdf.submitGasless(signedTx, quote);</pre>
-      </div>
-
-      <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
-        <a href="https://github.com/zeyxx/GASdf/tree/main/packages/sdk" target="_blank" class="btn-primary" style="text-decoration: none; background: var(--bg-dark); border: 1px solid var(--eco-green); color: var(--eco-green);">View SDK Docs</a>
-        <a href="https://github.com/zeyxx/GASdf" target="_blank" class="btn-primary" style="text-decoration: none; background: var(--bg-dark); border: 1px solid var(--text-muted); color: var(--text-secondary);">GitHub</a>
-      </div>
-    </div>
-
-    <!-- API Endpoints -->
-    <div class="api-section">
-      <h2>API Reference</h2>
-
-      <div class="endpoint">
-        <span class="endpoint-method post">POST</span>
-        <span class="endpoint-path">/v1/quote</span>
-        <div class="endpoint-desc">Get a fee quote for your transaction</div>
-      </div>
-
-      <div class="endpoint">
-        <span class="endpoint-method post">POST</span>
-        <span class="endpoint-path">/v1/submit</span>
-        <div class="endpoint-desc">Submit your signed transaction for gasless execution</div>
-      </div>
-
-      <div class="endpoint">
-        <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/v1/tokens</span>
-        <div class="endpoint-desc">List supported payment tokens with K-scores</div>
-      </div>
-
-      <div class="endpoint">
-        <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/v1/stats</span>
-        <div class="endpoint-desc">Get burn statistics and treasury data</div>
-      </div>
-
-      <div class="endpoint">
-        <span class="endpoint-method get">GET</span>
-        <span class="endpoint-path">/v1/health</span>
-        <div class="endpoint-desc">Health check with version and component status</div>
-      </div>
-    </div>
-  </div>
-
-  <footer>
-    <p>
-      Powered by <span class="phi-symbol">φ</span> Golden Ratio Economics
-      · <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
-      · Part of the <a href="https://alonisthe.dev" target="_blank">$ASDF Ecosystem</a>
+    <h1 class="hero-tagline">
+      Pay fees with <strong>any token</strong>
+    </h1>
+    <p class="hero-sub">
+      No SOL needed. 76.4% of every fee is burned. Deflationary by design.
     </p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value" id="txCount">0</div>
+        <div class="hero-stat-label">Transactions</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value" id="tokensAccepted">50+</div>
+        <div class="hero-stat-label">Tokens Accepted</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value" id="treasurySOL">0</div>
+        <div class="hero-stat-label">Treasury SOL</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TOKEN CATEGORIES - Social Proof
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="tokens-section">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title"><span class="phi">φ</span> Ecosystem Tokens</h2>
+          <p class="section-subtitle">Live from HolDex · Sorted by K-Score</p>
+        </div>
+      </div>
+
+      <div class="token-categories">
+        <!-- TRENDING -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon trending">🔥</div>
+            <span class="category-title trending">Trending</span>
+            <span class="category-badge">24h Volume</span>
+          </div>
+          <div class="token-list" id="trendingTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- TRUSTED -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon trusted">💎</div>
+            <span class="category-title trusted">Trusted</span>
+            <span class="category-badge">K-Score 80+</span>
+          </div>
+          <div class="token-list" id="trustedTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- NEW -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon new">🌱</div>
+            <span class="category-title new">Emerging</span>
+            <span class="category-badge">New Listings</span>
+          </div>
+          <div class="token-list" id="newTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="golden-section">
+    <div class="container">
+      <div class="golden-card">
+        <div class="golden-grid">
+          <div class="golden-visual">
+            <div class="golden-bars">
+              <div class="golden-bar">
+                <span class="bar-label">$ASDF Burn</span>
+                <div class="bar-track">
+                  <div class="bar-fill burn" id="burnBar" style="width: 76.4%;">
+                    <span class="bar-value">76.4%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="golden-bar">
+                <span class="bar-label">Treasury</span>
+                <div class="bar-track">
+                  <div class="bar-fill treasury" id="treasuryBar" style="width: 23.6%;">
+                    <span class="bar-value">23.6%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="golden-bar">
+                <span class="bar-label">Eco Bonus</span>
+                <div class="bar-track">
+                  <div class="bar-fill ecosystem" id="ecoBar" style="width: 0%;">
+                    <span class="bar-value" id="ecoValue">0%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="golden-info">
+            <h2><span class="phi-symbol">φ</span> Golden Economics</h2>
+            <p>
+              Every ratio derives from φ = 1.618... The treasury takes exactly 1/φ³ (23.6%).
+              The rest burns $ASDF forever. Tokens that burn their own supply unlock ecosystem bonuses up to 1/φ² (38.2%).
+            </p>
+            <div class="golden-formula">
+              burn = (<span class="num">1</span> - <span class="num">1</span>/<span class="phi">φ³</span>) × fee = <span class="num">76.4%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CTA SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-card">
+        <h2 class="cta-title">Integrate in <span>5 minutes</span></h2>
+        <p class="cta-subtitle">Add gasless transactions to your dApp</p>
+
+        <div class="cta-code">
+          <code>npm install gasdf-sdk</code>
+          <button onclick="navigator.clipboard.writeText('npm install gasdf-sdk'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 1500);">Copy</button>
+        </div>
+
+        <div class="cta-links">
+          <a href="https://github.com/zeyxx/GASdf/tree/main/packages/sdk" class="cta-link primary" target="_blank">
+            View Documentation
+          </a>
+          <a href="https://github.com/zeyxx/GASdf" class="cta-link secondary" target="_blank">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       API SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="api-section">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">API Reference</h2>
+          <p class="section-subtitle">RESTful endpoints · No API key required</p>
+        </div>
+      </div>
+
+      <div class="api-grid">
+        <div class="api-endpoint">
+          <span class="api-method post">POST</span>
+          <span class="api-path">/v1/quote</span>
+          <p class="api-desc">Get a fee quote for your transaction</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method post">POST</span>
+          <span class="api-path">/v1/submit</span>
+          <p class="api-desc">Submit signed transaction for gasless execution</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method get">GET</span>
+          <span class="api-path">/v1/tokens</span>
+          <p class="api-desc">List supported payment tokens</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method get">GET</span>
+          <span class="api-path">/v1/stats</span>
+          <p class="api-desc">Burn statistics and treasury data</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ -->
+  <footer>
+    <div class="container">
+      <p>
+        Powered by <span style="color: var(--gold-primary)">φ</span> Golden Ratio Economics
+        · <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
+        · Part of the <a href="https://alonisthe.dev" target="_blank">$ASDF Ecosystem</a>
+      </p>
+    </div>
   </footer>
 
   <script>
-    // Golden Ratio constants
+    // ═══════════════════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════════════════
     const PHI = 1.618033988749;
-    const PHI_SQUARED = PHI * PHI;
-    const PHI_CUBED = PHI * PHI * PHI;
-    const TREASURY_RATIO = 1 / PHI_CUBED;
-    const MAX_ECO = 1 / PHI_SQUARED;
+    const HOLDEX_API = 'https://asdev-backend.onrender.com/api';
+    const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+    const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
 
-    // Calculate ecosystem burn bonus (φ-curve)
-    function calculateEcosystemBonus(burnedPercent) {
-      if (burnedPercent <= 0) return { eco: 0, asdf: 1 - TREASURY_RATIO, treasury: TREASURY_RATIO };
-      const multiplier = 1 - Math.pow(PHI, -burnedPercent / 30);
-      const eco = MAX_ECO * multiplier;
-      const asdf = (1 - TREASURY_RATIO) - eco;
-      return { eco, asdf, treasury: TREASURY_RATIO };
+    // ═══════════════════════════════════════════════════════════
+    // ANIMATED COUNTER
+    // ═══════════════════════════════════════════════════════════
+    function animateCounter(element, target, duration = 2000, decimals = 0, suffix = '') {
+      const start = parseFloat(element.textContent.replace(/[^0-9.-]/g, '')) || 0;
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Easing function (ease-out cubic)
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * eased;
+
+        if (decimals === 0) {
+          element.textContent = Math.floor(current).toLocaleString() + suffix;
+        } else {
+          element.textContent = current.toFixed(decimals) + suffix;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+
+      requestAnimationFrame(update);
     }
 
-    // Update split visualization
-    function updateSplitVisualization(burnedPercent = 0) {
-      const split = calculateEcosystemBonus(burnedPercent);
-      document.getElementById('ecoSegment').style.width = (split.eco * 100) + '%';
-      document.getElementById('asdfSegment').style.width = (split.asdf * 100) + '%';
-      document.getElementById('ecoLegend').textContent = (split.eco * 100).toFixed(1) + '%';
-      document.getElementById('asdfLegend').textContent = (split.asdf * 100).toFixed(1) + '%';
-    }
-
-    // Fetch stats
+    // ═══════════════════════════════════════════════════════════
+    // FETCH GASDF STATS
+    // ═══════════════════════════════════════════════════════════
     async function fetchStats() {
       try {
         const res = await fetch('/v1/stats');
         const data = await res.json();
 
-        document.getElementById('totalBurned').textContent = data.burnedFormatted || '0 $ASDF';
-        document.getElementById('txCount').textContent = (data.totalTransactions || 0).toLocaleString();
+        // Update transaction count
+        if (data.totalTransactions) {
+          animateCounter(document.getElementById('txCount'), data.totalTransactions, 1500, 0);
+        }
 
-        if (data.treasury) {
-          document.getElementById('treasury').textContent = data.treasury.onChain?.solFormatted || '0 SOL';
+        // Update treasury
+        if (data.treasury?.onChain?.sol) {
+          const sol = data.treasury.onChain.sol;
+          animateCounter(document.getElementById('treasurySOL'), sol, 1500, 2, ' SOL');
         }
       } catch (err) {
         console.error('Failed to fetch stats:', err);
       }
     }
 
-    // Fetch $ASDF token data from HolDex for dual-burn flywheel
-    async function fetchAsdfData() {
+    // ═══════════════════════════════════════════════════════════
+    // FETCH $ASDF DATA FOR BURN COUNTER
+    // ═══════════════════════════════════════════════════════════
+    async function fetchAsdfBurnData() {
       try {
-        const res = await fetch('https://asdev-backend.onrender.com/api/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
+        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
         const data = await res.json();
 
         if (data.success && data.token) {
           const token = data.token;
-
-          // Update price ticker
-          const priceUsd = token.priceUsd || token.priceusd || 0;
-          document.getElementById('asdfPrice').textContent = '$' + priceUsd.toFixed(6);
-
-          // Calculate burned percent
-          const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
           const currentSupply = parseInt(token.supply) || INITIAL_SUPPLY;
+          const burnedTokens = (INITIAL_SUPPLY - currentSupply) / 1e6;
+
+          // Animate the big burn counter
+          animateCounter(
+            document.getElementById('burnAmount'),
+            burnedTokens,
+            2500,
+            0,
+            ' $ASDF'
+          );
+
+          // Calculate ecosystem bonus based on burn %
           const burnedPercent = ((INITIAL_SUPPLY - currentSupply) / INITIAL_SUPPLY) * 100;
-          const burnedAmount = (INITIAL_SUPPLY - currentSupply) / 1e6; // In tokens
-
-          // Update burn progress bar
-          document.getElementById('burnProgress').style.width = Math.min(burnedPercent, 100) + '%';
-          document.getElementById('burnedAmount').textContent = burnedAmount.toLocaleString('en-US', { maximumFractionDigits: 0 });
-          document.getElementById('burnPercent').textContent = burnedPercent.toFixed(2) + '%';
-
-          // Update golden split visualization with real data
-          updateSplitVisualization(burnedPercent);
-
-          // Update burned USD value
-          const burnedUsd = burnedAmount * priceUsd;
-          document.getElementById('burnedUsd').textContent = '$' + burnedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 });
-
-          console.log('ASDF Data:', { burnedPercent: burnedPercent.toFixed(2) + '%', price: priceUsd });
+          updateGoldenBars(burnedPercent);
         }
       } catch (err) {
         console.error('Failed to fetch ASDF data:', err);
       }
     }
 
-    // Fetch SOL price from a public API
-    async function fetchSolPrice() {
+    // ═══════════════════════════════════════════════════════════
+    // UPDATE GOLDEN RATIO BARS
+    // ═══════════════════════════════════════════════════════════
+    function updateGoldenBars(burnedPercent) {
+      const maxEco = 1 / (PHI * PHI); // ~38.2%
+      const treasury = 1 / (PHI * PHI * PHI); // ~23.6%
+
+      // Ecosystem bonus grows with token burn rate
+      const multiplier = 1 - Math.pow(PHI, -burnedPercent / 30);
+      const eco = maxEco * multiplier;
+      const burn = (1 - treasury) - eco;
+
+      // Update bars
+      document.getElementById('burnBar').style.width = (burn * 100) + '%';
+      document.getElementById('burnBar').querySelector('.bar-value').textContent = (burn * 100).toFixed(1) + '%';
+
+      document.getElementById('ecoBar').style.width = (eco * 100) + '%';
+      document.getElementById('ecoValue').textContent = (eco * 100).toFixed(1) + '%';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH HOLDEX TOKENS BY CATEGORY
+    // ═══════════════════════════════════════════════════════════
+    async function fetchHoldexTokens() {
       try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const res = await fetch(`${HOLDEX_API}/tokens?limit=50`);
         const data = await res.json();
-        if (data.solana?.usd) {
-          document.getElementById('solPrice').textContent = '$' + data.solana.usd.toFixed(2);
-        }
+
+        if (!data.success || !data.tokens) return;
+
+        const tokens = data.tokens;
+
+        // Sort for categories
+        const trending = [...tokens]
+          .filter(t => t.volume24h > 0)
+          .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+          .slice(0, 6);
+
+        const trusted = [...tokens]
+          .filter(t => (t.kScore || 0) >= 80)
+          .sort((a, b) => (b.kScore || 0) - (a.kScore || 0))
+          .slice(0, 6);
+
+        const newest = [...tokens]
+          .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+          .slice(0, 6);
+
+        // Render
+        renderTokenList('trendingTokens', trending, 'volume');
+        renderTokenList('trustedTokens', trusted, 'kscore');
+        renderTokenList('newTokens', newest, 'time');
+
+        // Update tokens accepted count
+        document.getElementById('tokensAccepted').textContent = tokens.length + '+';
+
       } catch (err) {
-        // Fallback - try Jupiter
-        try {
-          const res = await fetch('https://price.jup.ag/v4/price?ids=SOL');
-          const data = await res.json();
-          if (data.data?.SOL?.price) {
-            document.getElementById('solPrice').textContent = '$' + data.data.SOL.price.toFixed(2);
-          }
-        } catch {
-          console.error('Failed to fetch SOL price');
-        }
+        console.error('Failed to fetch HolDex tokens:', err);
+        document.getElementById('trendingTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+        document.getElementById('trustedTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+        document.getElementById('newTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
       }
     }
 
-    // Fetch health
-    async function fetchHealth() {
-      try {
-        const res = await fetch('/v1/health');
-        const data = await res.json();
+    // ═══════════════════════════════════════════════════════════
+    // RENDER TOKEN LIST
+    // ═══════════════════════════════════════════════════════════
+    function renderTokenList(containerId, tokens, metric) {
+      const container = document.getElementById(containerId);
 
-        const statusEl = document.getElementById('status');
-        const versionEl = document.getElementById('version');
-        const networkEl = document.getElementById('network');
-        const uptimeEl = document.getElementById('uptime');
-
-        versionEl.textContent = 'v' + (data.version || '1.6.0');
-        networkEl.textContent = data.network || 'mainnet';
-        uptimeEl.textContent = data.uptime ? Math.floor(data.uptime / 60) + 'm' : '--';
-
-        if (data.status === 'ok' || data.status === 'healthy') {
-          statusEl.textContent = 'Online';
-          statusEl.style.color = 'var(--eco-green)';
-        } else if (data.status === 'degraded') {
-          statusEl.textContent = 'Degraded';
-          statusEl.style.color = 'var(--fire-yellow)';
-        } else {
-          statusEl.textContent = 'Offline';
-          statusEl.style.color = 'var(--fire-red)';
-        }
-      } catch (err) {
-        document.getElementById('status').textContent = 'Offline';
-        document.getElementById('status').style.color = 'var(--fire-red)';
-      }
-    }
-
-    // Fetch leaderboard
-    async function fetchLeaderboard() {
-      try {
-        const res = await fetch('/v1/stats/leaderboard?limit=10');
-        const data = await res.json();
-
-        const listEl = document.getElementById('leaderboardList');
-
-        if (data.leaderboard && data.leaderboard.length > 0) {
-          listEl.innerHTML = data.leaderboard.map(entry => `
-            <div class="leaderboard-entry">
-              <span class="leaderboard-rank ${entry.rank <= 3 ? 'top3' : ''}">#${entry.rank}</span>
-              <span class="leaderboard-wallet">${entry.walletShort}</span>
-              <span class="leaderboard-burned">${entry.burnedFormatted}</span>
-              <span class="leaderboard-percent">${entry.contributionPercent}%</span>
-            </div>
-          `).join('');
-        } else {
-          listEl.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No contributors yet. Be the first!</div>';
-        }
-      } catch (err) {
-        document.getElementById('leaderboardList').innerHTML =
-          '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">Failed to load</div>';
-      }
-    }
-
-    // Wallet lookup
-    async function lookupWallet() {
-      const input = document.getElementById('walletInput');
-      const btn = document.getElementById('lookupBtn');
-      const statsDiv = document.getElementById('walletStats');
-      const wallet = input.value.trim();
-
-      if (!wallet || wallet.length < 32 || wallet.length > 44) {
-        alert('Please enter a valid Solana wallet address');
+      if (!tokens || tokens.length === 0) {
+        container.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">No tokens found</p>';
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = 'Loading...';
+      container.innerHTML = tokens.map(token => {
+        const change = token.change24h || 0;
+        const changeClass = change >= 0 ? 'up' : 'down';
+        const changeText = change >= 0 ? '+' + change.toFixed(1) + '%' : change.toFixed(1) + '%';
 
-      try {
-        const res = await fetch(`/v1/stats/wallet/${wallet}`);
-        const data = await res.json();
+        const kScore = token.kScore || 0;
+        const kScoreClass = kScore >= 80 ? 'high' : kScore >= 50 ? 'medium' : '';
 
-        if (res.ok) {
-          document.getElementById('walletBurned').textContent = data.burnedFormatted;
-          document.getElementById('walletTxCount').textContent = data.txCount?.toLocaleString() || '0';
-          document.getElementById('walletRank').textContent = data.rank ? `#${data.rank}` : '-';
-          document.getElementById('walletPercent').textContent = `${data.contributionPercent || 0}%`;
-          statsDiv.style.display = 'block';
-          localStorage.setItem('gasdf_wallet', wallet);
+        let metricHtml = '';
+        if (metric === 'volume') {
+          const vol = token.volume24h || 0;
+          metricHtml = `<div class="token-price">$${formatNumber(vol)}</div>`;
+        } else if (metric === 'kscore') {
+          metricHtml = `<span class="token-kscore ${kScoreClass}">K:${kScore}</span>`;
         } else {
-          alert(data.error || 'Wallet not found');
+          metricHtml = `<div class="token-change ${changeClass}">${changeText}</div>`;
         }
-      } catch (err) {
-        alert('Failed to lookup wallet');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Track';
-      }
+
+        const logoUrl = token.image || '';
+        const logoHtml = logoUrl
+          ? `<img src="${logoUrl}" alt="${token.ticker}" onerror="this.parentElement.innerHTML='${(token.ticker || '?')[0]}'">`
+          : (token.ticker || '?')[0];
+
+        return `
+          <div class="token-item" onclick="window.open('https://dexscreener.com/solana/${token.mint}', '_blank')">
+            <div class="token-logo">${logoHtml}</div>
+            <div class="token-info">
+              <div class="token-name">${token.name || token.ticker || 'Unknown'}</div>
+              <div class="token-ticker">$${token.ticker || '???'}</div>
+            </div>
+            <div class="token-metrics">
+              ${metricHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
-    // Load saved wallet
-    function loadSavedWallet() {
-      const saved = localStorage.getItem('gasdf_wallet');
-      if (saved) {
-        document.getElementById('walletInput').value = saved;
-        lookupWallet();
-      }
+    // ═══════════════════════════════════════════════════════════
+    // FORMAT NUMBER (1000 -> 1K, 1000000 -> 1M)
+    // ═══════════════════════════════════════════════════════════
+    function formatNumber(num) {
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+      return num.toFixed(0);
     }
 
-    // Enter key listener
-    document.getElementById('walletInput').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') lookupWallet();
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchStats();
+      fetchAsdfBurnData();
+      fetchHoldexTokens();
+
+      // Refresh periodically
+      setInterval(fetchStats, 30000);
+      setInterval(fetchAsdfBurnData, 60000);
+      setInterval(fetchHoldexTokens, 60000);
     });
-
-    // Initial load
-    fetchStats();
-    fetchHealth();
-    fetchLeaderboard();
-    fetchAsdfData();
-    fetchSolPrice();
-    loadSavedWallet();
-
-    // Refresh intervals
-    setInterval(fetchStats, 30000);
-    setInterval(fetchHealth, 30000);
-    setInterval(fetchLeaderboard, 60000);
-    setInterval(fetchAsdfData, 60000);
-    setInterval(fetchSolPrice, 120000);
   </script>
 </body>
 </html>
