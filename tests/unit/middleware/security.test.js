@@ -147,7 +147,7 @@ describe('Security Middleware', () => {
       );
     });
 
-    it('should fail open on Redis error', async () => {
+    it('should fail open on Redis error in dev/test mode', async () => {
       redis.incrWalletRateLimit.mockRejectedValue(new Error('Redis connection failed'));
 
       const req = {
@@ -159,6 +159,7 @@ describe('Security Middleware', () => {
 
       await walletQuoteLimiter(req, res, next);
 
+      // In dev/test (IS_PROD=false), should fail open (call next)
       expect(next).toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalled();
       expect(logger.error).toHaveBeenCalledWith(

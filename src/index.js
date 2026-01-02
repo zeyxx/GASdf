@@ -25,7 +25,8 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(securityHeaders);
 app.use(cors({
-  origin: config.IS_DEV ? '*' : process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  // SECURITY: In production, require explicit ALLOWED_ORIGINS - never default to '*'
+  origin: config.IS_DEV ? '*' : (process.env.ALLOWED_ORIGINS?.split(',') || []),
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'x-request-id'],
 }));

@@ -14,8 +14,18 @@ const router = express.Router();
 // =============================================================================
 
 function adminAuth(req, res, next) {
-  const apiKey = req.headers['x-admin-key'] || req.query.key;
+  // SECURITY: Only accept API key from header, never from query params
+  // Query params are logged in server logs, browser history, and referrer headers
+  const apiKey = req.headers['x-admin-key'];
   const expectedKey = process.env.ADMIN_API_KEY;
+
+  // Warn if someone tries to use query param (legacy/attack detection)
+  if (req.query.key) {
+    logger.warn('ADMIN', 'API key in query param rejected (security risk)', {
+      ip: req.ip,
+      path: req.path,
+    });
+  }
 
   if (!expectedKey) {
     logger.warn('ADMIN', 'Admin endpoint accessed but ADMIN_API_KEY not configured');

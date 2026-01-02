@@ -107,12 +107,24 @@ function createWalletLimiter(type, limit) {
 
       next();
     } catch (error) {
-      // On Redis error, log but allow request (fail open for availability)
-      // IP-based rate limiting still provides protection
+      // SECURITY: In production, fail closed to prevent abuse during Redis outages
+      // In development, fail open for convenience
       logger.error('SECURITY', 'Wallet rate limit check failed', {
         error: error.message,
         wallet: wallet.slice(0, 8) + '...',
+        failedClosed: config.IS_PROD,
       });
+
+      if (config.IS_PROD) {
+        // Fail closed in production - reject request if we can't verify rate limits
+        return res.status(503).json({
+          error: 'Rate limit service temporarily unavailable',
+          code: 'RATE_LIMIT_UNAVAILABLE',
+          retryAfter: 5,
+        });
+      }
+
+      // In dev/test, allow request through (IP limits still apply)
       next();
     }
   };
