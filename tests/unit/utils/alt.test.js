@@ -175,7 +175,7 @@ describe('ALT Utility', () => {
     });
 
     it('should contain Jupiter program', () => {
-      expect(alt.CORE_ADDRESSES.JUPITER_PROGRAM.toBase58()).toBe('JUP6LkbZbjS1jKKwapdHNB8FrXxuJzxwxcNrHnH2to91');
+      expect(alt.CORE_ADDRESSES.JUPITER_PROGRAM.toBase58()).toBe('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4');
     });
 
     it('should contain WSOL mint', () => {

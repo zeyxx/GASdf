@@ -29,8 +29,8 @@ const CORE_ADDRESSES = {
   ASSOCIATED_TOKEN_PROGRAM: new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
   RENT_SYSVAR: new PublicKey('SysvarRent111111111111111111111111111111111'),
 
-  // Jupiter
-  JUPITER_PROGRAM: new PublicKey('JUP6LkbZbjS1jKKwapdHNB8FrXxuJzxwxcNrHnH2to91'),
+  // Jupiter V6
+  JUPITER_PROGRAM: new PublicKey('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'),
 
   // Common tokens
   WSOL_MINT: new PublicKey('So11111111111111111111111111111111111111112'),
