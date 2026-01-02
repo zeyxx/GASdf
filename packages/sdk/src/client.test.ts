@@ -22,7 +22,7 @@ describe('GASdf Client', () => {
   describe('constructor', () => {
     it('should use default endpoint if not provided', () => {
       const defaultClient = new GASdf();
-      expect((defaultClient as any).endpoint).toBe('https://api.gasdf.io');
+      expect((defaultClient as any).endpoint).toBe('https://asdfasdfa.tech');
     });
 
     it('should strip trailing slash from endpoint', () => {

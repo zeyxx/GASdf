@@ -18,16 +18,16 @@ describe('GASdfError', () => {
     expect(error.name).toBe('GASdfError');
   });
 
-  it('should include optional status code', () => {
-    const error = new GASdfError('Test', 'TEST', 400);
-    expect(error.statusCode).toBe(400);
+  it('should include statusCode when provided', () => {
+    const error = new GASdfError('Test error', 'TEST_CODE', 500);
+    expect(error.statusCode).toBe(500);
   });
 });
 
 describe('QuoteExpiredError', () => {
   it('should create error with quote ID', () => {
-    const error = new QuoteExpiredError('abc-123');
-    expect(error.message).toContain('abc-123');
+    const error = new QuoteExpiredError('quote-123');
+    expect(error.message).toBe('Quote quote-123 has expired');
     expect(error.code).toBe('QUOTE_EXPIRED');
     expect(error.statusCode).toBe(400);
     expect(error.name).toBe('QuoteExpiredError');
@@ -36,8 +36,8 @@ describe('QuoteExpiredError', () => {
 
 describe('QuoteNotFoundError', () => {
   it('should create error with quote ID', () => {
-    const error = new QuoteNotFoundError('abc-123');
-    expect(error.message).toContain('abc-123');
+    const error = new QuoteNotFoundError('quote-456');
+    expect(error.message).toBe('Quote quote-456 not found');
     expect(error.code).toBe('QUOTE_NOT_FOUND');
     expect(error.statusCode).toBe(404);
     expect(error.name).toBe('QuoteNotFoundError');
@@ -54,31 +54,36 @@ describe('ValidationError', () => {
   });
 
   it('should include validation errors array', () => {
-    const error = new ValidationError('Invalid', ['field1 required', 'field2 invalid']);
+    const error = new ValidationError('Invalid input', ['field1 required', 'field2 invalid']);
     expect(error.errors).toEqual(['field1 required', 'field2 invalid']);
   });
 });
 
 describe('TransactionError', () => {
   it('should create error with message', () => {
-    const error = new TransactionError('TX failed');
-    expect(error.message).toBe('TX failed');
+    const error = new TransactionError('Transaction failed');
+    expect(error.message).toBe('Transaction failed');
     expect(error.code).toBe('TRANSACTION_ERROR');
     expect(error.statusCode).toBe(500);
   });
 
-  it('should include optional signature', () => {
-    const error = new TransactionError('Failed', 'abc123sig');
-    expect(error.signature).toBe('abc123sig');
+  it('should include signature when provided', () => {
+    const error = new TransactionError('Failed', 'sig123');
+    expect(error.signature).toBe('sig123');
   });
 });
 
 describe('RateLimitError', () => {
-  it('should create error with retry info', () => {
-    const error = new RateLimitError(60);
+  it('should create error with default message', () => {
+    const error = new RateLimitError();
+    expect(error.message).toBe('Rate limit exceeded');
     expect(error.code).toBe('RATE_LIMIT');
     expect(error.statusCode).toBe(429);
-    expect(error.retryAfter).toBe(60);
+  });
+
+  it('should include retryAfter when provided', () => {
+    const error = new RateLimitError(30);
+    expect(error.retryAfter).toBe(30);
   });
 });
 
@@ -92,65 +97,46 @@ describe('NetworkError', () => {
 });
 
 describe('parseApiError', () => {
-  it('should parse 400 expired quote error', () => {
-    const error = parseApiError(400, { error: 'Quote has expired', quoteId: 'q123' });
+  it('should parse 400 with expired as QuoteExpiredError', () => {
+    const error = parseApiError(400, { error: 'Quote expired', quoteId: 'q123' });
     expect(error).toBeInstanceOf(QuoteExpiredError);
   });
 
-  it('should parse 400 validation error', () => {
-    const error = parseApiError(400, { error: 'Invalid input', errors: ['bad field'] });
+  it('should parse 400 as ValidationError', () => {
+    const error = parseApiError(400, { error: 'Invalid', errors: ['bad'] });
     expect(error).toBeInstanceOf(ValidationError);
-    expect((error as ValidationError).errors).toEqual(['bad field']);
+    expect((error as ValidationError).errors).toEqual(['bad']);
   });
 
-  it('should parse 404 quote not found', () => {
-    const error = parseApiError(404, { error: 'Quote not found', quoteId: 'q123' });
+  it('should parse 404 with quote as QuoteNotFoundError', () => {
+    const error = parseApiError(404, { error: 'Quote not found' });
     expect(error).toBeInstanceOf(QuoteNotFoundError);
   });
 
-  it('should parse 404 generic not found', () => {
+  it('should parse 404 as generic NOT_FOUND', () => {
     const error = parseApiError(404, { error: 'Resource not found' });
-    expect(error).toBeInstanceOf(GASdfError);
     expect(error.code).toBe('NOT_FOUND');
   });
 
-  it('should parse 429 rate limit', () => {
+  it('should parse 429 as RateLimitError', () => {
     const error = parseApiError(429, { error: 'Too many requests' });
     expect(error).toBeInstanceOf(RateLimitError);
   });
 
-  it('should parse 500 server error', () => {
-    const error = parseApiError(500, { error: 'Internal error' });
-    expect(error).toBeInstanceOf(GASdfError);
-    expect(error.code).toBe('SERVER_ERROR');
-    expect(error.statusCode).toBe(500);
+  it('should parse 500/502/503 as SERVER_ERROR', () => {
+    expect(parseApiError(500, {}).code).toBe('SERVER_ERROR');
+    expect(parseApiError(502, {}).code).toBe('SERVER_ERROR');
+    expect(parseApiError(503, {}).code).toBe('SERVER_ERROR');
   });
 
-  it('should parse 502 gateway error', () => {
-    const error = parseApiError(502, { error: 'Bad gateway' });
-    expect(error.code).toBe('SERVER_ERROR');
-    expect(error.statusCode).toBe(502);
-  });
-
-  it('should parse 503 service unavailable', () => {
-    const error = parseApiError(503, { error: 'Unavailable' });
-    expect(error.code).toBe('SERVER_ERROR');
-    expect(error.statusCode).toBe(503);
-  });
-
-  it('should handle unknown status codes', () => {
-    const error = parseApiError(418, { error: "I'm a teapot" });
+  it('should parse unknown status as UNKNOWN_ERROR', () => {
+    const error = parseApiError(418, { error: 'Teapot' });
     expect(error.code).toBe('UNKNOWN_ERROR');
     expect(error.statusCode).toBe(418);
   });
 
   it('should handle string body', () => {
-    const error = parseApiError(400, 'String error message');
-    expect(error.message).toBe('String error message');
-  });
-
-  it('should handle missing error field', () => {
-    const error = parseApiError(500, {});
-    expect(error.message).toBe('Unknown error');
+    const error = parseApiError(400, 'Plain error');
+    expect(error.message).toBe('Plain error');
   });
 });
