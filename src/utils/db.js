@@ -30,12 +30,23 @@ async function initialize() {
   }
 
   try {
+    // Determine SSL config based on URL and environment
+    // Render external connections require SSL
+    const useSSL = config.DATABASE_URL.includes('render.com') ||
+                   config.DATABASE_URL.includes('sslmode=require');
+
     pool = new Pool({
       connectionString: config.DATABASE_URL,
-      ssl: config.IS_PROD || config.IS_STAGING ? { rejectUnauthorized: false } : false,
+      // Render uses self-signed certs, so we need rejectUnauthorized: false
+      ssl: useSSL ? { rejectUnauthorized: false } : false,
       max: 10, // Max connections in pool
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 15000, // Increased for cross-region
+    });
+
+    logger.info('DB', 'Connecting to PostgreSQL...', {
+      ssl: useSSL,
+      host: config.DATABASE_URL.includes('render.com') ? 'render' : 'other'
     });
 
     // Test connection
