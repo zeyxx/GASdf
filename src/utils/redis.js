@@ -2,6 +2,9 @@ const { createClient } = require('redis');
 const config = require('./config');
 const logger = require('./logger');
 
+// Key prefix to avoid collisions when sharing Redis with other services (e.g., HolDex)
+const KEY_PREFIX = 'gasdf:';
+
 let client = null;
 let useMemory = false;
 let connectionState = 'disconnected'; // disconnected, connecting, connected, error
@@ -234,7 +237,7 @@ async function withRedis(operation, fallbackOperation) {
 async function setQuote(quoteId, data, ttlSeconds = config.QUOTE_TTL_SECONDS) {
   return withRedis(
     async (redis) => {
-      await redis.setEx(`quote:${quoteId}`, ttlSeconds, JSON.stringify(data));
+      await redis.setEx(`${KEY_PREFIX}quote:${quoteId}`, ttlSeconds, JSON.stringify(data));
     },
     () => {
       memoryStore.set(`quote:${quoteId}`, JSON.stringify(data), ttlSeconds);
@@ -245,7 +248,7 @@ async function setQuote(quoteId, data, ttlSeconds = config.QUOTE_TTL_SECONDS) {
 async function getQuote(quoteId) {
   return withRedis(
     async (redis) => {
-      const data = await redis.get(`quote:${quoteId}`);
+      const data = await redis.get(`${KEY_PREFIX}quote:${quoteId}`);
       return data ? JSON.parse(data) : null;
     },
     () => {
@@ -258,7 +261,7 @@ async function getQuote(quoteId) {
 async function deleteQuote(quoteId) {
   return withRedis(
     async (redis) => {
-      await redis.del(`quote:${quoteId}`);
+      await redis.del(`${KEY_PREFIX}quote:${quoteId}`);
     },
     () => {
       memoryStore.del(`quote:${quoteId}`);
@@ -269,7 +272,7 @@ async function deleteQuote(quoteId) {
 async function incrBurnTotal(amount) {
   return withRedis(
     async (redis) => {
-      return redis.incrByFloat('stats:burn_total', amount);
+      return redis.incrByFloat(`${KEY_PREFIX}stats:burn_total`, amount);
     },
     () => {
       const current = parseFloat(memoryStore.get('stats:burn_total')) || 0;
@@ -282,7 +285,7 @@ async function incrBurnTotal(amount) {
 async function incrTxCount() {
   return withRedis(
     async (redis) => {
-      return redis.incr('stats:tx_count');
+      return redis.incr(`${KEY_PREFIX}stats:tx_count`);
     },
     () => {
       const current = parseInt(memoryStore.get('stats:tx_count')) || 0;
@@ -296,8 +299,8 @@ async function getStats() {
   return withRedis(
     async (redis) => {
       const [burnTotal, txCount] = await Promise.all([
-        redis.get('stats:burn_total'),
-        redis.get('stats:tx_count'),
+        redis.get(`${KEY_PREFIX}stats:burn_total`),
+        redis.get(`${KEY_PREFIX}stats:tx_count`),
       ]);
       return {
         burnTotal: parseFloat(burnTotal) || 0,
@@ -314,7 +317,7 @@ async function getStats() {
 async function addPendingSwap(amount) {
   return withRedis(
     async (redis) => {
-      return redis.incrByFloat('pending:swap_amount', amount);
+      return redis.incrByFloat(`${KEY_PREFIX}pending:swap_amount`, amount);
     },
     () => {
       const current = parseFloat(memoryStore.get('pending:swap_amount')) || 0;
@@ -327,7 +330,7 @@ async function addPendingSwap(amount) {
 async function getPendingSwapAmount() {
   return withRedis(
     async (redis) => {
-      const amount = await redis.get('pending:swap_amount');
+      const amount = await redis.get(`${KEY_PREFIX}pending:swap_amount`);
       return parseFloat(amount) || 0;
     },
     () => parseFloat(memoryStore.get('pending:swap_amount')) || 0
@@ -337,7 +340,7 @@ async function getPendingSwapAmount() {
 async function resetPendingSwap() {
   return withRedis(
     async (redis) => {
-      return redis.set('pending:swap_amount', '0');
+      return redis.set(`${KEY_PREFIX}pending:swap_amount`, '0');
     },
     () => {
       memoryStore.set('pending:swap_amount', '0');
@@ -352,7 +355,7 @@ async function resetPendingSwap() {
 async function incrTreasuryTotal(amount) {
   return withRedis(
     async (redis) => {
-      return redis.incrByFloat('stats:treasury_total', amount);
+      return redis.incrByFloat(`${KEY_PREFIX}stats:treasury_total`, amount);
     },
     () => {
       const current = parseFloat(memoryStore.get('stats:treasury_total')) || 0;
@@ -365,7 +368,7 @@ async function incrTreasuryTotal(amount) {
 async function getTreasuryBalance() {
   return withRedis(
     async (redis) => {
-      const amount = await redis.get('stats:treasury_total');
+      const amount = await redis.get(`${KEY_PREFIX}stats:treasury_total`);
       return parseFloat(amount) || 0;
     },
     () => parseFloat(memoryStore.get('stats:treasury_total')) || 0
@@ -381,8 +384,8 @@ async function recordTreasuryEvent(event) {
   return withRedis(
     async (redis) => {
       // Keep last 100 treasury events
-      await redis.lPush('treasury:history', JSON.stringify(entry));
-      await redis.lTrim('treasury:history', 0, 99);
+      await redis.lPush(`${KEY_PREFIX}treasury:history`, JSON.stringify(entry));
+      await redis.lTrim(`${KEY_PREFIX}treasury:history`, 0, 99);
     },
     () => {
       // In-memory: just log
@@ -393,7 +396,7 @@ async function recordTreasuryEvent(event) {
 async function getTreasuryHistory(limit = 20) {
   return withRedis(
     async (redis) => {
-      const history = await redis.lRange('treasury:history', 0, limit - 1);
+      const history = await redis.lRange(`${KEY_PREFIX}treasury:history`, 0, limit - 1);
       return history.map(h => JSON.parse(h));
     },
     () => []
@@ -426,7 +429,7 @@ const TX_HASH_TTL_SECONDS = 90;
 async function hasTransactionHash(txHash) {
   return withRedis(
     async (redis) => {
-      const exists = await redis.exists(`txhash:${txHash}`);
+      const exists = await redis.exists(`${KEY_PREFIX}txhash:${txHash}`);
       return exists === 1;
     },
     () => {
@@ -442,7 +445,7 @@ async function hasTransactionHash(txHash) {
 async function markTransactionHash(txHash) {
   return withRedis(
     async (redis) => {
-      await redis.setEx(`txhash:${txHash}`, TX_HASH_TTL_SECONDS, '1');
+      await redis.setEx(`${KEY_PREFIX}txhash:${txHash}`, TX_HASH_TTL_SECONDS, '1');
     },
     () => {
       memoryStore.set(`txhash:${txHash}`, '1', TX_HASH_TTL_SECONDS);
@@ -459,7 +462,7 @@ async function markTransactionHash(txHash) {
  * The atomic SET NX ensures no race condition between check and mark.
  */
 async function claimTransactionSlot(txHash) {
-  const key = `txhash:${txHash}`;
+  const key = `${KEY_PREFIX}txhash:${txHash}`;
 
   return withRedis(
     async (redis) => {
@@ -488,7 +491,7 @@ async function claimTransactionSlot(txHash) {
  * Only call this if you claimed the slot and need to allow retry
  */
 async function releaseTransactionSlot(txHash) {
-  const key = `txhash:${txHash}`;
+  const key = `${KEY_PREFIX}txhash:${txHash}`;
 
   return withRedis(
     async (redis) => {
@@ -511,7 +514,7 @@ const WALLET_RATE_WINDOW_SECONDS = 60; // 1 minute window
  * Returns current count after increment
  */
 async function incrWalletRateLimit(wallet, type = 'quote') {
-  const key = `ratelimit:wallet:${type}:${wallet}`;
+  const key = `${KEY_PREFIX}ratelimit:wallet:${type}:${wallet}`;
 
   return withRedis(
     async (redis) => {
@@ -533,7 +536,7 @@ async function incrWalletRateLimit(wallet, type = 'quote') {
  * Get current wallet rate limit count
  */
 async function getWalletRateLimit(wallet, type = 'quote') {
-  const key = `ratelimit:wallet:${type}:${wallet}`;
+  const key = `${KEY_PREFIX}ratelimit:wallet:${type}:${wallet}`;
 
   return withRedis(
     async (redis) => {
@@ -550,7 +553,7 @@ async function getWalletRateLimit(wallet, type = 'quote') {
 // Audit Logging
 // =============================================================================
 
-const AUDIT_KEY = 'audit:log';
+const AUDIT_KEY = `${KEY_PREFIX}audit:log`;
 const AUDIT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days retention
 const MAX_AUDIT_ENTRIES = 10000;
 
@@ -615,11 +618,11 @@ async function incrWalletBurn(wallet, amount) {
     async (redis) => {
       const multi = redis.multi();
       // Increment wallet's total burn
-      multi.incrByFloat(`burn:wallet:${wallet}`, amount);
+      multi.incrByFloat(`${KEY_PREFIX}burn:wallet:${wallet}`, amount);
       // Increment wallet's tx count
-      multi.incr(`burn:wallet:txcount:${wallet}`);
+      multi.incr(`${KEY_PREFIX}burn:wallet:txcount:${wallet}`);
       // Add to sorted set for leaderboard (score = total burned)
-      multi.zIncrBy('burn:leaderboard', amount, wallet);
+      multi.zIncrBy(`${KEY_PREFIX}burn:leaderboard`, amount, wallet);
       const results = await multi.exec();
       return {
         totalBurned: results[0],
@@ -643,9 +646,9 @@ async function getWalletBurnStats(wallet) {
   return withRedis(
     async (redis) => {
       const [totalBurned, txCount, rank] = await Promise.all([
-        redis.get(`burn:wallet:${wallet}`),
-        redis.get(`burn:wallet:txcount:${wallet}`),
-        redis.zRevRank('burn:leaderboard', wallet),
+        redis.get(`${KEY_PREFIX}burn:wallet:${wallet}`),
+        redis.get(`${KEY_PREFIX}burn:wallet:txcount:${wallet}`),
+        redis.zRevRank(`${KEY_PREFIX}burn:leaderboard`, wallet),
       ]);
       return {
         wallet,
@@ -670,7 +673,7 @@ async function getBurnLeaderboard(limit = 50) {
   return withRedis(
     async (redis) => {
       // Get top wallets with scores
-      const results = await redis.zRangeWithScores('burn:leaderboard', 0, limit - 1, { REV: true });
+      const results = await redis.zRangeWithScores(`${KEY_PREFIX}burn:leaderboard`, 0, limit - 1, { REV: true });
       return results.map((entry, index) => ({
         rank: index + 1,
         wallet: entry.value,
@@ -687,7 +690,7 @@ async function getBurnLeaderboard(limit = 50) {
 async function getBurnerCount() {
   return withRedis(
     async (redis) => {
-      return redis.zCard('burn:leaderboard');
+      return redis.zCard(`${KEY_PREFIX}burn:leaderboard`);
     },
     () => 0
   );
@@ -717,13 +720,13 @@ async function recordBurnProof(proof) {
     async (redis) => {
       const multi = redis.multi();
       // Store proof by burn signature for lookup
-      multi.set(`burn:proof:${proof.burnSignature}`, JSON.stringify(entry));
+      multi.set(`${KEY_PREFIX}burn:proof:${proof.burnSignature}`, JSON.stringify(entry));
       // Add to chronological list (newest first)
-      multi.lPush('burn:proofs', JSON.stringify(entry));
+      multi.lPush(`${KEY_PREFIX}burn:proofs`, JSON.stringify(entry));
       // Keep last 1000 proofs
-      multi.lTrim('burn:proofs', 0, 999);
+      multi.lTrim(`${KEY_PREFIX}burn:proofs`, 0, 999);
       // Track total verified burns
-      multi.incr('burn:proof:count');
+      multi.incr(`${KEY_PREFIX}burn:proof:count`);
       await multi.exec();
       return entry;
     },
@@ -746,8 +749,8 @@ async function getBurnProofs(limit = 50) {
   return withRedis(
     async (redis) => {
       const [proofs, totalCount] = await Promise.all([
-        redis.lRange('burn:proofs', 0, limit - 1),
-        redis.get('burn:proof:count'),
+        redis.lRange(`${KEY_PREFIX}burn:proofs`, 0, limit - 1),
+        redis.get(`${KEY_PREFIX}burn:proof:count`),
       ]);
       return {
         proofs: proofs.map(p => JSON.parse(p)),
@@ -770,7 +773,7 @@ async function getBurnProofs(limit = 50) {
 async function getBurnProofBySignature(signature) {
   return withRedis(
     async (redis) => {
-      const proof = await redis.get(`burn:proof:${signature}`);
+      const proof = await redis.get(`${KEY_PREFIX}burn:proof:${signature}`);
       return proof ? JSON.parse(proof) : null;
     },
     () => {
@@ -790,7 +793,7 @@ const ANOMALY_WINDOW_SECONDS = 300; // 5 minutes
  * Track wallet activity for anomaly detection
  */
 async function trackWalletActivity(wallet, activityType) {
-  const key = `anomaly:wallet:${activityType}:${wallet}`;
+  const key = `${KEY_PREFIX}anomaly:wallet:${activityType}:${wallet}`;
 
   return withRedis(
     async (redis) => {
@@ -812,7 +815,7 @@ async function trackWalletActivity(wallet, activityType) {
  * Get wallet activity count
  */
 async function getWalletActivity(wallet, activityType) {
-  const key = `anomaly:wallet:${activityType}:${wallet}`;
+  const key = `${KEY_PREFIX}anomaly:wallet:${activityType}:${wallet}`;
 
   return withRedis(
     async (redis) => {
@@ -827,7 +830,7 @@ async function getWalletActivity(wallet, activityType) {
  * Track IP activity for anomaly detection
  */
 async function trackIpActivity(ip, activityType) {
-  const key = `anomaly:ip:${activityType}:${ip}`;
+  const key = `${KEY_PREFIX}anomaly:ip:${activityType}:${ip}`;
 
   return withRedis(
     async (redis) => {
@@ -859,7 +862,7 @@ const memoryLocks = new Map();
  * @returns {Promise<string|null>} - Lock token if acquired, null if lock held by another
  */
 async function acquireLock(lockName, ttlSeconds = 30) {
-  const key = `lock:${lockName}`;
+  const key = `${KEY_PREFIX}lock:${lockName}`;
   const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   return withRedis(
@@ -893,7 +896,7 @@ async function acquireLock(lockName, ttlSeconds = 30) {
  * @returns {Promise<boolean>} - True if released, false if lock not held or wrong token
  */
 async function releaseLock(lockName, token) {
-  const key = `lock:${lockName}`;
+  const key = `${KEY_PREFIX}lock:${lockName}`;
 
   return withRedis(
     async (redis) => {
@@ -926,7 +929,7 @@ async function releaseLock(lockName, token) {
  * @returns {Promise<boolean>} - True if lock is held
  */
 async function isLockHeld(lockName) {
-  const key = `lock:${lockName}`;
+  const key = `${KEY_PREFIX}lock:${lockName}`;
 
   return withRedis(
     async (redis) => {
@@ -986,8 +989,8 @@ const VELOCITY_BUCKET_SECONDS = 60; // 1 minute buckets for granularity
 async function recordTransactionVelocity(costLamports) {
   const now = Date.now();
   const bucket = Math.floor(now / (VELOCITY_BUCKET_SECONDS * 1000));
-  const keyCount = `velocity:count:${bucket}`;
-  const keyCost = `velocity:cost:${bucket}`;
+  const keyCount = `${KEY_PREFIX}velocity:count:${bucket}`;
+  const keyCost = `${KEY_PREFIX}velocity:cost:${bucket}`;
 
   return withRedis(
     async (redis) => {
@@ -1024,8 +1027,8 @@ async function getVelocityMetrics() {
       const costKeys = [];
       for (let i = 0; i < bucketsToCheck; i++) {
         const bucket = currentBucket - i;
-        countKeys.push(`velocity:count:${bucket}`);
-        costKeys.push(`velocity:cost:${bucket}`);
+        countKeys.push(`${KEY_PREFIX}velocity:count:${bucket}`);
+        costKeys.push(`${KEY_PREFIX}velocity:cost:${bucket}`);
       }
 
       // Batch fetch all values
@@ -1124,7 +1127,7 @@ async function calculateVelocityBasedBuffer(bufferHours = 2, minBufferLamports =
 // Jupiter Quote Caching (reduces API calls by ~80%)
 // =============================================================================
 const JUPITER_CACHE_TTL = 10; // seconds - prices change quickly
-const JUPITER_CACHE_PREFIX = 'jup:quote:';
+const JUPITER_CACHE_PREFIX = `${KEY_PREFIX}jup:quote:`;
 
 /**
  * Get amount bucket for cache key (avoids infinite cache entries)
