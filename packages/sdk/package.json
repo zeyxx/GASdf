@@ -1,5 +1,5 @@
 {
-  "name": "@gasdf/sdk",
+  "name": "gasdf-sdk",
   "version": "1.0.0",
   "description": "GASdf SDK - Add gasless transactions to your Solana app",
   "main": "dist/index.js",
