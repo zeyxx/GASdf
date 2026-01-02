@@ -7,15 +7,19 @@ const logger = require('../utils/logger');
 
 // =============================================================================
 // Jupiter v6 API Configuration
-// lite-api deprecated January 31, 2026 - use api.jup.ag with API key
+// lite-api DEPRECATED January 31, 2026 - API key now required
 // Get API key at: https://portal.jup.ag
 // Free tier: 60 requests/minute, Paid tiers available
 // =============================================================================
 const JUPITER_V6_API = 'https://api.jup.ag/swap/v1';
-const JUPITER_LITE_API = 'https://lite-api.jup.ag/swap/v1'; // Deprecated fallback
 
-// Use v6 API if key configured, otherwise fall back to lite-api
-const JUPITER_API = config.JUPITER_API_KEY ? JUPITER_V6_API : JUPITER_LITE_API;
+// SECURITY: No fallback to deprecated lite-api - require proper API key
+const JUPITER_API = JUPITER_V6_API;
+
+// Validate API key is configured (config.js enforces this in production)
+if (!config.JUPITER_API_KEY && !config.IS_DEV) {
+  logger.error('JUPITER', 'JUPITER_API_KEY not configured - quotes will fail');
+}
 
 /**
  * Get headers for Jupiter API requests
@@ -287,7 +291,7 @@ module.exports = {
   // Export for health checks / monitoring
   getApiInfo: () => ({
     endpoint: JUPITER_API,
-    usingV6: !!config.JUPITER_API_KEY,
+    usingV6: true, // Always v6 now (lite-api deprecated Jan 31, 2026)
     hasApiKey: !!config.JUPITER_API_KEY,
     cache: {
       hits: cacheHits,

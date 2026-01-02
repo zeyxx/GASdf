@@ -35,7 +35,7 @@ const CORE_ADDRESSES = [
   new PublicKey('SysvarRent111111111111111111111111111111111'), // Rent Sysvar
 
   // Jupiter
-  new PublicKey('JUP6LkbZbjS1jKKwapdHNB8FrXxuJzxwxcNrHnH2to91'), // Jupiter V6
+  new PublicKey('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'), // Jupiter V6
 
   // Common tokens
   new PublicKey('So11111111111111111111111111111111111111112'), // WSOL

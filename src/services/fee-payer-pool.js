@@ -3,6 +3,7 @@ const bs58 = require('bs58').default;
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const rpc = require('../utils/rpc');
+const redis = require('../utils/redis');
 
 // =============================================================================
 // Constants
@@ -567,19 +568,23 @@ class FeePayerPool {
   }
 
   /**
-   * Reserve balance for a quote (with mutex protection)
+   * Reserve balance for a quote (with distributed lock protection)
    * Returns the assigned fee payer pubkey, or null if circuit breaker is open
+   *
+   * MULTI-INSTANCE SAFE: Uses Redis distributed lock to prevent race conditions
+   * across multiple service instances (e.g., Render replicas)
    */
   async reserveBalance(quoteId, amountLamports) {
     this.initialize();
 
     // ==========================================================================
-    // RACE CONDITION FIX: Acquire lock before checking/modifying state
+    // RACE CONDITION FIX: Use Redis distributed lock for multi-instance safety
+    // Lock name is per-pool to prevent all reservations from blocking each other
+    // Lock TTL is short (5s) to prevent deadlocks while allowing for retries
     // ==========================================================================
-    const releaseLock = await this._acquireReservationLock();
-
-    try {
-      this.cleanupExpiredReservations();
+    const lockResult = await redis.withLock('fee-payer-reservation', async () => {
+      // Cleanup expired reservations inside lock
+      await this._cleanupExpiredReservationsDistributed();
 
       // Check circuit breaker
       if (this.isCircuitOpen()) {
@@ -596,21 +601,21 @@ class FeePayerPool {
         // Skip unhealthy payers
         if (!this.isPayerHealthy(pubkey)) continue;
 
-        // Check reservation count limit
-        const reservationCount = this.getReservationCount(pubkey);
+        // Check reservation count limit (from Redis in multi-instance mode)
+        const reservationCount = await this._getReservationCountDistributed(pubkey);
         if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
           logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
           continue;
         }
 
-        // Check available balance
-        const availableBalance = this.getAvailableBalance(pubkey);
+        // Check available balance (from Redis in multi-instance mode)
+        const availableBalance = await this._getAvailableBalanceDistributed(pubkey);
         if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
           logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... insufficient available balance`);
           continue;
         }
 
-        // Create reservation
+        // Create reservation in Redis (shared across instances)
         const reservation = {
           pubkey,
           amount: amountLamports,
@@ -618,8 +623,10 @@ class FeePayerPool {
           createdAt: Date.now(),
         };
 
-        this.reservations.set(quoteId, reservation);
+        await this._setReservationDistributed(quoteId, reservation);
 
+        // Also keep in-memory for fast lookups
+        this.reservations.set(quoteId, reservation);
         if (!this.reservationsByPayer.has(pubkey)) {
           this.reservationsByPayer.set(pubkey, new Set());
         }
@@ -628,7 +635,7 @@ class FeePayerPool {
         // Move to next payer for round-robin
         this.currentIndex = (index + 1) % this.payers.length;
 
-        logger.debug('FEE_PAYER_POOL', 'Reserved balance', {
+        logger.debug('FEE_PAYER_POOL', 'Reserved balance (distributed)', {
           quoteId,
           pubkey: pubkey.slice(0, 8),
           amount: amountLamports,
@@ -649,22 +656,118 @@ class FeePayerPool {
       });
 
       return null;
-    } finally {
-      // Always release lock
-      releaseLock();
+    }, 5); // 5 second lock TTL
+
+    // Handle lock acquisition failure
+    if (!lockResult.success) {
+      if (lockResult.error === 'LOCK_HELD') {
+        // Another instance is processing - this is expected under high load
+        logger.warn('FEE_PAYER_POOL', 'Reservation lock contention', { quoteId });
+      } else {
+        logger.error('FEE_PAYER_POOL', 'Reservation failed', {
+          quoteId,
+          error: lockResult.message,
+        });
+      }
+      return null;
+    }
+
+    return lockResult.result;
+  }
+
+  /**
+   * Store reservation in Redis for multi-instance access
+   */
+  async _setReservationDistributed(quoteId, reservation) {
+    const client = await redis.getClient();
+    if (client) {
+      const key = `reservation:${quoteId}`;
+      const payerKey = `reservations:payer:${reservation.pubkey}`;
+      const ttlSeconds = Math.ceil(RESERVATION_TTL_MS / 1000);
+
+      await client.setEx(key, ttlSeconds, JSON.stringify(reservation));
+      await client.sAdd(payerKey, quoteId);
+      await client.expire(payerKey, ttlSeconds + 10); // Slightly longer TTL for set
     }
   }
 
   /**
-   * Release a reservation (quote used or expired)
+   * Get reservation count from Redis (for distributed consistency)
    */
-  releaseReservation(quoteId) {
+  async _getReservationCountDistributed(pubkey) {
+    const client = await redis.getClient();
+    if (client) {
+      const key = `reservations:payer:${pubkey}`;
+      return await client.sCard(key);
+    }
+    // Fallback to in-memory
+    return this.getReservationCount(pubkey);
+  }
+
+  /**
+   * Get available balance using distributed reservation totals
+   */
+  async _getAvailableBalanceDistributed(pubkey) {
+    const actualBalance = this.balances.get(pubkey) || 0;
+    const reservedAmount = await this._getReservedAmountDistributed(pubkey);
+    return Math.max(0, actualBalance - reservedAmount);
+  }
+
+  /**
+   * Get total reserved amount from Redis
+   */
+  async _getReservedAmountDistributed(pubkey) {
+    const client = await redis.getClient();
+    if (client) {
+      const setKey = `reservations:payer:${pubkey}`;
+      const quoteIds = await client.sMembers(setKey);
+
+      let total = 0;
+      for (const quoteId of quoteIds) {
+        const reservationData = await client.get(`reservation:${quoteId}`);
+        if (reservationData) {
+          const reservation = JSON.parse(reservationData);
+          total += reservation.amount;
+        }
+      }
+      return total;
+    }
+    // Fallback to in-memory
+    return this.getReservedAmount(pubkey);
+  }
+
+  /**
+   * Cleanup expired reservations from Redis
+   */
+  async _cleanupExpiredReservationsDistributed() {
+    // Redis handles expiration automatically via TTL
+    // Just cleanup in-memory cache
+    this.cleanupExpiredReservations();
+  }
+
+  /**
+   * Release a reservation (quote used or expired)
+   * Also cleans up from Redis for multi-instance consistency
+   */
+  async releaseReservation(quoteId) {
     const reservation = this.reservations.get(quoteId);
-    if (!reservation) return false;
+    if (!reservation) {
+      // Try to get from Redis if not in memory
+      const client = await redis.getClient();
+      if (client) {
+        const data = await client.get(`reservation:${quoteId}`);
+        if (data) {
+          const parsed = JSON.parse(data);
+          await this._releaseReservationDistributed(quoteId, parsed.pubkey);
+          return true;
+        }
+      }
+      return false;
+    }
 
     const { pubkey } = reservation;
 
-    // Remove from maps
+    // Remove from in-memory maps
     this.reservations.delete(quoteId);
 
     const payerReservations = this.reservationsByPayer.get(pubkey);
@@ -675,12 +778,26 @@ class FeePayerPool {
       }
     }
 
+    // Remove from Redis
+    await this._releaseReservationDistributed(quoteId, pubkey);
+
     logger.debug('FEE_PAYER_POOL', 'Released reservation', {
       quoteId,
       pubkey: pubkey.slice(0, 8),
     });
 
     return true;
+  }
+
+  /**
+   * Release reservation from Redis
+   */
+  async _releaseReservationDistributed(quoteId, pubkey) {
+    const client = await redis.getClient();
+    if (client) {
+      await client.del(`reservation:${quoteId}`);
+      await client.sRem(`reservations:payer:${pubkey}`, quoteId);
+    }
   }
 
   /**

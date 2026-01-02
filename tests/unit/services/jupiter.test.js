@@ -498,16 +498,15 @@ describe('Jupiter Service', () => {
   });
 
   describe('getApiInfo()', () => {
-    it('should return API info with lite-api when no key configured', () => {
+    it('should return API info with v6 API (lite-api deprecated)', () => {
       const info = jupiter.getApiInfo();
 
       expect(info).toHaveProperty('endpoint');
       expect(info).toHaveProperty('usingV6');
       expect(info).toHaveProperty('hasApiKey');
-      // No API key in test config
-      expect(info.usingV6).toBe(false);
-      expect(info.hasApiKey).toBe(false);
-      expect(info.endpoint).toContain('lite-api.jup.ag');
+      // Always uses v6 API now (lite-api deprecated Jan 31, 2026)
+      expect(info.usingV6).toBe(true);
+      expect(info.endpoint).toContain('api.jup.ag');
     });
   });
 

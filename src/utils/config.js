@@ -238,10 +238,12 @@ function validateConfig() {
     warnings.push('Using public RPC in production - consider using Helius or private RPC');
   }
 
-  // Warn if Jupiter API key not configured (lite-api deprecated Jan 31, 2026)
+  // Jupiter API key required in production (lite-api deprecated Jan 31, 2026)
   if (!config.JUPITER_API_KEY) {
     if (IS_PROD) {
-      warnings.push('JUPITER_API_KEY not set - using deprecated lite-api (get key at portal.jup.ag)');
+      errors.push('JUPITER_API_KEY required - lite-api deprecated Jan 31, 2026 (get key at portal.jup.ag)');
+    } else {
+      warnings.push('JUPITER_API_KEY not set - lite-api deprecated, get key at portal.jup.ag');
     }
   }
 

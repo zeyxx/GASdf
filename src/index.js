@@ -52,9 +52,26 @@ app.get('/metrics', (req, res) => {
     return res.status(404).json({ error: 'Metrics disabled' });
   }
 
-  // Optional: require API key for metrics
-  const apiKey = req.headers['x-metrics-key'] || req.query.key;
-  if (process.env.METRICS_API_KEY && apiKey !== process.env.METRICS_API_KEY) {
+  // SECURITY: Only accept API key from header, never from query params
+  const apiKey = req.headers['x-metrics-key'];
+  const expectedKey = process.env.METRICS_API_KEY;
+
+  // Warn if someone tries to use query param (legacy/attack detection)
+  if (req.query.key) {
+    logger.warn('METRICS', 'API key in query param rejected (security risk)', {
+      ip: req.ip,
+    });
+  }
+
+  // Production: require METRICS_API_KEY
+  if (config.IS_PROD && !expectedKey) {
+    logger.error('METRICS', 'METRICS_API_KEY not configured in production');
+    return res.status(503).json({ error: 'Metrics not configured' });
+  }
+
+  // Validate API key if configured
+  if (expectedKey && apiKey !== expectedKey) {
+    logger.warn('METRICS', 'Unauthorized metrics access attempt', { ip: req.ip });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -62,8 +79,23 @@ app.get('/metrics', (req, res) => {
   res.send(collectMetrics());
 });
 
-// Alerts endpoint
+// Alerts endpoint (requires same auth as metrics - operational data)
 app.get('/alerts', (req, res) => {
+  // SECURITY: Only accept API key from header
+  const apiKey = req.headers['x-metrics-key'];
+  const expectedKey = process.env.METRICS_API_KEY;
+
+  // Production: require METRICS_API_KEY
+  if (config.IS_PROD && !expectedKey) {
+    return res.status(503).json({ error: 'Alerts not configured' });
+  }
+
+  // Validate API key if configured
+  if (expectedKey && apiKey !== expectedKey) {
+    logger.warn('ALERTS', 'Unauthorized alerts access attempt', { ip: req.ip });
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   res.json({
     enabled: alertingService.isEnabled(),
     active: alertingService.getActiveAlerts(),
