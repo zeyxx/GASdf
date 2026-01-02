@@ -5,6 +5,12 @@ const { Connection } = require('@solana/web3.js');
 const config = require('./config');
 const logger = require('./logger');
 const { CircuitBreaker } = require('./circuit-breaker');
+const { withTimeout } = require('./fetch-timeout');
+
+// RPC operation timeouts (prevents hanging on slow/unresponsive RPC)
+const RPC_SIMULATION_TIMEOUT = 30_000;  // 30 seconds for simulation
+const RPC_SEND_TIMEOUT = 15_000;        // 15 seconds for send
+const RPC_QUERY_TIMEOUT = 10_000;       // 10 seconds for queries
 
 // =============================================================================
 // Rate Limit Tracking (Proactive backoff before 429)
@@ -758,13 +764,18 @@ async function isBlockhashValid(blockhash) {
 
 async function simulateTransaction(signedTx) {
   try {
-    const result = await pool.executeWithFailover(
-      async (conn) => {
-        return conn.simulateTransaction(signedTx, {
-          sigVerify: true,
-          commitment: 'confirmed',
-        });
-      },
+    // Wrap simulation with timeout to prevent hanging on slow/unresponsive RPC
+    const result = await withTimeout(
+      pool.executeWithFailover(
+        async (conn) => {
+          return conn.simulateTransaction(signedTx, {
+            sigVerify: true,
+            commitment: 'confirmed',
+          });
+        },
+        'simulateTransaction'
+      ),
+      RPC_SIMULATION_TIMEOUT,
       'simulateTransaction'
     );
 
@@ -785,7 +796,7 @@ async function simulateTransaction(signedTx) {
   } catch (error) {
     return {
       success: false,
-      error: error.message,
+      error: error.code === 'TIMEOUT' ? 'Simulation timeout' : error.message,
       logs: [],
     };
   }
@@ -815,18 +826,23 @@ async function simulateWithBalanceCheck(signedTx, feePayerPubkey, expectedMaxSol
     const feePayerPool = require('../services/fee-payer-pool');
     const preBalance = feePayerPool.pool.balances.get(feePayerPubkey) || 0;
 
-    // Simulate the transaction - returns post-tx account state in 'accounts'
-    const result = await pool.executeWithFailover(
-      async (c) => {
-        return c.simulateTransaction(signedTx, {
-          sigVerify: true,
-          commitment: 'confirmed',
-          accounts: {
-            encoding: 'base64',
-            addresses: [feePayerPubkey],
-          },
-        });
-      },
+    // Simulate the transaction with timeout protection
+    // Prevents hanging on slow/unresponsive RPC endpoints
+    const result = await withTimeout(
+      pool.executeWithFailover(
+        async (c) => {
+          return c.simulateTransaction(signedTx, {
+            sigVerify: true,
+            commitment: 'confirmed',
+            accounts: {
+              encoding: 'base64',
+              addresses: [feePayerPubkey],
+            },
+          });
+        },
+        'simulateWithBalanceCheck'
+      ),
+      RPC_SIMULATION_TIMEOUT,
       'simulateWithBalanceCheck'
     );
 
@@ -895,7 +911,7 @@ async function simulateWithBalanceCheck(signedTx, feePayerPubkey, expectedMaxSol
   } catch (error) {
     return {
       success: false,
-      error: error.message,
+      error: error.code === 'TIMEOUT' ? 'Simulation timeout' : error.message,
       logs: [],
     };
   }

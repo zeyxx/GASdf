@@ -2,6 +2,11 @@ const config = require('../utils/config');
 const logger = require('../utils/logger');
 const { fetchWithTimeout, WEBHOOK_TIMEOUT } = require('../utils/fetch-timeout');
 
+// Webhook retry configuration
+const WEBHOOK_MAX_RETRIES = 3;
+const WEBHOOK_INITIAL_DELAY_MS = 1000;  // 1 second
+const WEBHOOK_MAX_DELAY_MS = 10000;     // 10 seconds
+
 // =============================================================================
 // Alert Definitions
 // =============================================================================
@@ -203,41 +208,77 @@ class AlertingService {
   }
 
   /**
-   * Send webhook notification
+   * Send webhook notification with retry logic
+   * Uses exponential backoff: 1s, 2s, 4s (capped at 10s)
    */
   async sendWebhook(alert) {
     if (!this.webhookUrl) return;
 
-    try {
-      // Detect webhook type and format accordingly
-      const payload = this.formatWebhookPayload(alert);
+    const payload = this.formatWebhookPayload(alert);
+    let lastError = null;
 
-      // ==========================================================================
-      // TIMEOUT PROTECTION: Prevents hanging on slow/unresponsive webhook endpoints
-      // ==========================================================================
-      const response = await fetchWithTimeout(
-        this.webhookUrl,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        },
-        WEBHOOK_TIMEOUT
-      );
+    for (let attempt = 1; attempt <= WEBHOOK_MAX_RETRIES; attempt++) {
+      try {
+        // ==========================================================================
+        // TIMEOUT PROTECTION: Prevents hanging on slow/unresponsive webhook endpoints
+        // ==========================================================================
+        const response = await fetchWithTimeout(
+          this.webhookUrl,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          },
+          WEBHOOK_TIMEOUT
+        );
 
-      if (!response.ok) {
-        logger.warn('ALERTING', 'Webhook request failed', {
-          status: response.status,
-          alertId: alert.id,
-        });
+        if (response.ok) {
+          if (attempt > 1) {
+            logger.info('ALERTING', 'Webhook succeeded after retry', {
+              alertId: alert.id,
+              attempt,
+            });
+          }
+          return; // Success
+        }
+
+        // Non-retryable status codes
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          logger.warn('ALERTING', 'Webhook request failed (non-retryable)', {
+            status: response.status,
+            alertId: alert.id,
+          });
+          return; // Don't retry 4xx errors (except 429)
+        }
+
+        lastError = new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        lastError = error;
       }
-    } catch (error) {
-      logger.error('ALERTING', 'Failed to send webhook', {
-        error: error.message,
-        code: error.code,
-        alertId: alert.id,
-      });
+
+      // Log retry attempt
+      if (attempt < WEBHOOK_MAX_RETRIES) {
+        const delay = Math.min(
+          WEBHOOK_INITIAL_DELAY_MS * Math.pow(2, attempt - 1),
+          WEBHOOK_MAX_DELAY_MS
+        );
+        logger.debug('ALERTING', 'Webhook failed, retrying...', {
+          alertId: alert.id,
+          attempt,
+          nextRetryMs: delay,
+          error: lastError?.message,
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
+
+    // All retries exhausted
+    logger.error('ALERTING', 'Failed to send webhook after retries', {
+      error: lastError?.message,
+      code: lastError?.code,
+      alertId: alert.id,
+      attempts: WEBHOOK_MAX_RETRIES,
+    });
   }
 
   /**
