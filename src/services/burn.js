@@ -110,6 +110,15 @@ async function getTokenValueUsd(mint, amount, decimals) {
   if (amount <= 0) return 0;
 
   try {
+    // For $ASDF, always return high value (we burn it directly, no swap needed)
+    // This ensures $ASDF is always eligible for burning regardless of liquidity
+    if (mint === config.ASDF_MINT) {
+      // Estimate value based on SOL price (rough approximation)
+      // We don't need exact value - $ASDF is always burnable
+      const uiAmount = amount / Math.pow(10, decimals);
+      return Math.max(uiAmount * 0.001, MIN_VALUE_USD + 0.01); // Ensure always above threshold
+    }
+
     // For USDC/USDT, value is direct (1:1 with USD)
     if (mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
         mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') {  // USDT
