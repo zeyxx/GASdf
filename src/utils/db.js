@@ -49,20 +49,13 @@ async function initialize() {
 
   try {
     // Determine SSL config based on URL and environment
-    // Render external connections require SSL
-    const isRender = config.DATABASE_URL.includes('render.com');
-    const hasSSLMode = config.DATABASE_URL.includes('sslmode=');
-
-    // For Render, strip sslmode from URL and configure SSL separately
-    // This avoids conflicts between URL params and Pool config
-    let connectionString = config.DATABASE_URL;
-    if (hasSSLMode) {
-      connectionString = connectionString.replace(/[?&]sslmode=[^&]+/, '');
-    }
+    // Render external connections require SSL with self-signed certs
+    const isRender = config.DATABASE_URL.includes('render.com') ||
+                     config.DATABASE_URL.includes('postgres.render.com');
 
     pool = new Pool({
-      connectionString,
-      // Render external requires SSL with self-signed certs
+      connectionString: config.DATABASE_URL,
+      // Render uses self-signed certs, must not verify
       ssl: isRender ? { rejectUnauthorized: false } : false,
       max: 5, // Reduced for free tier
       idleTimeoutMillis: 30000,
@@ -70,8 +63,9 @@ async function initialize() {
     });
 
     logger.info('DB', 'Connecting to PostgreSQL...', {
-      ssl: isRender,
-      host: isRender ? 'render-external' : 'other'
+      ssl: isRender ? 'rejectUnauthorized:false' : 'disabled',
+      host: isRender ? 'render-external' : 'other',
+      timeout: 20000,
     });
 
     // Test connection
