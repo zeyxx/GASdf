@@ -130,6 +130,32 @@
 
     .hero-burn-counter {
       animation: fadeInUp 0.6s ease 0.1s both;
+      cursor: pointer;
+      padding: 1rem 2rem;
+      border-radius: 16px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .hero-burn-counter:hover {
+      background: rgba(255, 107, 53, 0.05);
+    }
+
+    .hero-burn-counter::after {
+      content: 'Click to verify on Solscan';
+      position: absolute;
+      bottom: -1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .hero-burn-counter:hover::after {
+      opacity: 1;
     }
 
     .burn-amount {
@@ -190,6 +216,15 @@
 
     .hero-stat {
       text-align: center;
+      cursor: pointer;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .hero-stat:hover {
+      background: rgba(255, 215, 0, 0.05);
     }
 
     .hero-stat-value {
@@ -204,6 +239,67 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
       margin-top: 0.25rem;
+    }
+
+    .hero-stat .verify-icon {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .hero-stat:hover .verify-icon {
+      opacity: 1;
+    }
+
+    /* Verification tooltip */
+    .verify-tooltip {
+      position: fixed;
+      background: var(--bg-card);
+      border: 1px solid var(--gold-muted);
+      border-radius: 12px;
+      padding: 1rem;
+      max-width: 320px;
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .verify-tooltip h4 {
+      color: var(--gold-primary);
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .verify-tooltip p {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .verify-tooltip a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--cat-trusted);
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+
+    .verify-tooltip a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes fadeInUp {
@@ -773,17 +869,20 @@
     </p>
 
     <div class="hero-stats">
-      <div class="hero-stat">
-        <div class="hero-stat-value" id="txCount">0</div>
+      <div class="hero-stat" data-verify="tx">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="txCount">-</div>
         <div class="hero-stat-label">Transactions</div>
       </div>
-      <div class="hero-stat">
-        <div class="hero-stat-value" id="tokensAccepted">50+</div>
-        <div class="hero-stat-label">Tokens Accepted</div>
+      <div class="hero-stat" data-verify="tokens">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="tokensAccepted">-</div>
+        <div class="hero-stat-label">Tokens Listed</div>
       </div>
-      <div class="hero-stat">
-        <div class="hero-stat-value" id="treasurySOL">0</div>
-        <div class="hero-stat-label">Treasury SOL</div>
+      <div class="hero-stat" data-verify="treasury">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="treasurySOL">-</div>
+        <div class="hero-stat-label">Treasury</div>
       </div>
     </div>
   </section>
@@ -981,19 +1080,113 @@
     const HOLDEX_API = 'https://asdev-backend.onrender.com/api';
     const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
     const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
+    const FEE_PAYER = '9F5NUrZYjP5MRmqLBc8vd3rsmXiYQdqAMNF7VdKqM68w';
+
+    // ═══════════════════════════════════════════════════════════
+    // VERIFICATION SOURCES - Every number is verifiable
+    // ═══════════════════════════════════════════════════════════
+    const VERIFY_SOURCES = {
+      tx: {
+        title: 'Transaction Count',
+        description: 'Total gasless transactions processed by GASdf API.',
+        apiUrl: '/v1/stats',
+        source: 'GASdf API',
+        verify: () => window.open('/v1/stats', '_blank')
+      },
+      tokens: {
+        title: 'Tokens Listed',
+        description: 'Live count from HolDex API. Each token is verified and scored.',
+        apiUrl: 'https://asdev-backend.onrender.com/api/tokens',
+        source: 'HolDex API',
+        verify: () => window.open('https://asdev-backend.onrender.com/api/tokens', '_blank')
+      },
+      treasury: {
+        title: 'Treasury Balance',
+        description: 'On-chain SOL balance of the fee payer wallet.',
+        apiUrl: `https://solscan.io/account/${FEE_PAYER}`,
+        source: 'Solscan',
+        verify: () => window.open(`https://solscan.io/account/${FEE_PAYER}`, '_blank')
+      },
+      burn: {
+        title: 'Total Burned',
+        description: 'Calculated from on-chain supply. Initial: 1B, Current supply from chain.',
+        apiUrl: `https://solscan.io/token/${ASDF_MINT}`,
+        source: 'Solscan',
+        verify: () => window.open(`https://solscan.io/token/${ASDF_MINT}`, '_blank')
+      }
+    };
+
+    let activeTooltip = null;
+
+    // ═══════════════════════════════════════════════════════════
+    // VERIFICATION TOOLTIP SYSTEM
+    // ═══════════════════════════════════════════════════════════
+    function showVerifyTooltip(element, verifyKey) {
+      // Remove existing tooltip
+      if (activeTooltip) {
+        activeTooltip.remove();
+        activeTooltip = null;
+      }
+
+      const source = VERIFY_SOURCES[verifyKey];
+      if (!source) return;
+
+      const rect = element.getBoundingClientRect();
+      const tooltip = document.createElement('div');
+      tooltip.className = 'verify-tooltip';
+      tooltip.innerHTML = `
+        <h4>⟁ ${source.title}</h4>
+        <p>${source.description}</p>
+        <a href="#" onclick="VERIFY_SOURCES['${verifyKey}'].verify(); return false;">
+          Verify on ${source.source} →
+        </a>
+      `;
+
+      document.body.appendChild(tooltip);
+      activeTooltip = tooltip;
+
+      // Position tooltip
+      const tooltipRect = tooltip.getBoundingClientRect();
+      let top = rect.bottom + 10;
+      let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+
+      // Keep within viewport
+      if (left < 10) left = 10;
+      if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+      }
+      if (top + tooltipRect.height > window.innerHeight - 10) {
+        top = rect.top - tooltipRect.height - 10;
+      }
+
+      tooltip.style.top = top + 'px';
+      tooltip.style.left = left + 'px';
+
+      // Close on click outside
+      setTimeout(() => {
+        document.addEventListener('click', closeTooltipOnClickOutside);
+      }, 10);
+    }
+
+    function closeTooltipOnClickOutside(e) {
+      if (activeTooltip && !activeTooltip.contains(e.target) && !e.target.closest('.hero-stat')) {
+        activeTooltip.remove();
+        activeTooltip = null;
+        document.removeEventListener('click', closeTooltipOnClickOutside);
+      }
+    }
 
     // ═══════════════════════════════════════════════════════════
     // ANIMATED COUNTER
     // ═══════════════════════════════════════════════════════════
     function animateCounter(element, target, duration = 2000, decimals = 0, suffix = '') {
-      const start = parseFloat(element.textContent.replace(/[^0-9.-]/g, '')) || 0;
+      const startText = element.textContent;
+      const start = startText === '-' ? 0 : (parseFloat(startText.replace(/[^0-9.-]/g, '')) || 0);
       const startTime = performance.now();
 
       function update(currentTime) {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-
-        // Easing function (ease-out cubic)
         const eased = 1 - Math.pow(1 - progress, 3);
         const current = start + (target - start) * eased;
 
@@ -1020,9 +1213,8 @@
         const data = await res.json();
 
         // Update transaction count
-        if (data.totalTransactions) {
-          animateCounter(document.getElementById('txCount'), data.totalTransactions, 1500, 0);
-        }
+        const txCount = data.totalTransactions || 0;
+        animateCounter(document.getElementById('txCount'), txCount, 1500, 0);
 
         // Update treasury
         if (data.treasury?.onChain?.sol) {
@@ -1031,6 +1223,7 @@
         }
       } catch (err) {
         console.error('Failed to fetch stats:', err);
+        document.getElementById('txCount').textContent = '0';
       }
     }
 
@@ -1069,18 +1262,14 @@
     // UPDATE GOLDEN RATIO BARS
     // ═══════════════════════════════════════════════════════════
     function updateGoldenBars(burnedPercent) {
-      const maxEco = 1 / (PHI * PHI); // ~38.2%
-      const treasury = 1 / (PHI * PHI * PHI); // ~23.6%
-
-      // Ecosystem bonus grows with token burn rate
+      const maxEco = 1 / (PHI * PHI);
+      const treasury = 1 / (PHI * PHI * PHI);
       const multiplier = 1 - Math.pow(PHI, -burnedPercent / 30);
       const eco = maxEco * multiplier;
       const burn = (1 - treasury) - eco;
 
-      // Update bars
       document.getElementById('burnBar').style.width = (burn * 100) + '%';
       document.getElementById('burnBar').querySelector('.bar-value').textContent = (burn * 100).toFixed(1) + '%';
-
       document.getElementById('ecoBar').style.width = (eco * 100) + '%';
       document.getElementById('ecoValue').textContent = (eco * 100).toFixed(1) + '%';
     }
@@ -1090,12 +1279,15 @@
     // ═══════════════════════════════════════════════════════════
     async function fetchHoldexTokens() {
       try {
-        const res = await fetch(`${HOLDEX_API}/tokens?limit=50`);
+        const res = await fetch(`${HOLDEX_API}/tokens?limit=100`);
         const data = await res.json();
 
         if (!data.success || !data.tokens) return;
 
         const tokens = data.tokens;
+
+        // Update tokens count - EXACT number, no "+"
+        document.getElementById('tokensAccepted').textContent = tokens.length;
 
         // Sort for categories
         const trending = [...tokens]
@@ -1112,19 +1304,16 @@
           .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
           .slice(0, 6);
 
-        // Render
         renderTokenList('trendingTokens', trending, 'volume');
         renderTokenList('trustedTokens', trusted, 'kscore');
         renderTokenList('newTokens', newest, 'time');
 
-        // Update tokens accepted count
-        document.getElementById('tokensAccepted').textContent = tokens.length + '+';
-
       } catch (err) {
         console.error('Failed to fetch HolDex tokens:', err);
-        document.getElementById('trendingTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
-        document.getElementById('trustedTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
-        document.getElementById('newTokens').innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+        document.getElementById('tokensAccepted').textContent = '0';
+        ['trendingTokens', 'trustedTokens', 'newTokens'].forEach(id => {
+          document.getElementById(id).innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+        });
       }
     }
 
@@ -1149,8 +1338,7 @@
 
         let metricHtml = '';
         if (metric === 'volume') {
-          const vol = token.volume24h || 0;
-          metricHtml = `<div class="token-price">$${formatNumber(vol)}</div>`;
+          metricHtml = `<div class="token-price">$${formatNumber(token.volume24h || 0)}</div>`;
         } else if (metric === 'kscore') {
           metricHtml = `<span class="token-kscore ${kScoreClass}">K:${kScore}</span>`;
         } else {
@@ -1178,7 +1366,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    // FORMAT NUMBER (1000 -> 1K, 1000000 -> 1M)
+    // FORMAT NUMBER
     // ═══════════════════════════════════════════════════════════
     function formatNumber(num) {
       if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
@@ -1191,11 +1379,25 @@
     // INIT
     // ═══════════════════════════════════════════════════════════
     document.addEventListener('DOMContentLoaded', () => {
+      // Setup verification click handlers
+      document.querySelectorAll('.hero-stat[data-verify]').forEach(stat => {
+        stat.addEventListener('click', (e) => {
+          const verifyKey = stat.dataset.verify;
+          showVerifyTooltip(stat, verifyKey);
+        });
+      });
+
+      // Make burn counter clickable too
+      document.querySelector('.hero-burn-counter')?.addEventListener('click', () => {
+        VERIFY_SOURCES.burn.verify();
+      });
+
+      // Fetch data
       fetchStats();
       fetchAsdfBurnData();
       fetchHoldexTokens();
 
-      // Refresh periodically
+      // Refresh
       setInterval(fetchStats, 30000);
       setInterval(fetchAsdfBurnData, 60000);
       setInterval(fetchHoldexTokens, 60000);
