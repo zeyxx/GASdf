@@ -1216,10 +1216,12 @@
         const txCount = data.totalTransactions || 0;
         animateCounter(document.getElementById('txCount'), txCount, 1500, 0);
 
-        // Update treasury
-        if (data.treasury?.onChain?.sol) {
-          const sol = data.treasury.onChain.sol;
-          animateCounter(document.getElementById('treasurySOL'), sol, 1500, 2, ' SOL');
+        // Update treasury - use solFormatted or convert from lamports
+        if (data.treasury?.onChain) {
+          const treasury = data.treasury.onChain;
+          // sol is in lamports, divide by 1e9 to get SOL
+          const solAmount = treasury.sol / 1e9;
+          animateCounter(document.getElementById('treasurySOL'), solAmount, 1500, 4, ' SOL');
         }
       } catch (err) {
         console.error('Failed to fetch stats:', err);
