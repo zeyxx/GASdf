@@ -76,7 +76,7 @@ function parseApiError(status, body) {
 }
 
 // src/client.ts
-var DEFAULT_ENDPOINT = "https://api.gasdf.io";
+var DEFAULT_ENDPOINT = "https://asdfasdfa.tech";
 var DEFAULT_TIMEOUT = 3e4;
 var GASdf = class {
   constructor(config = {}) {
@@ -244,18 +244,30 @@ var GASdf = class {
   extractUserPubkey(transaction) {
     if (transaction instanceof VersionedTransaction) {
       const keys = transaction.message.staticAccountKeys;
-      return keys.length > 1 ? keys[1].toBase58() : keys[0].toBase58();
+      const numSigners = transaction.message.header.numRequiredSignatures;
+      const feePayer2 = keys[0].toBase58();
+      for (let i = 1; i < numSigners && i < keys.length; i++) {
+        const sig = transaction.signatures[i];
+        if (sig && sig.length === 64 && !sig.every((b) => b === 0)) {
+          return keys[i].toBase58();
+        }
+      }
+      return feePayer2;
     }
+    const feePayer = transaction.feePayer?.toBase58();
     const signatures = transaction.signatures.filter(
-      (sig) => sig.signature !== null
+      (sig) => sig.signature !== null && sig.publicKey.toBase58() !== feePayer
     );
-    if (signatures.length === 0) {
-      throw new GASdfError(
-        "Transaction must be signed by user",
-        "UNSIGNED_TRANSACTION"
-      );
+    if (signatures.length > 0) {
+      return signatures[0].publicKey.toBase58();
     }
-    return signatures[0].publicKey.toBase58();
+    if (transaction.signatures.length > 0 && transaction.signatures[0].signature !== null) {
+      return transaction.signatures[0].publicKey.toBase58();
+    }
+    throw new GASdfError(
+      "Transaction must be signed by user",
+      "UNSIGNED_TRANSACTION"
+    );
   }
 };
 

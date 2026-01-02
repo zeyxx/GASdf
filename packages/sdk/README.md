@@ -51,9 +51,9 @@ Create a new GASdf client.
 
 ```typescript
 const gasdf = new GASdf({
-  endpoint: 'https://api.gasdf.io', // optional, default
-  apiKey: 'your-api-key',           // optional, for higher rate limits
-  timeout: 30000,                    // optional, request timeout in ms
+  endpoint: 'https://asdfasdfa.tech', // optional, default
+  apiKey: 'your-api-key',             // optional, for higher rate limits
+  timeout: 30000,                      // optional, request timeout in ms
 });
 ```
 

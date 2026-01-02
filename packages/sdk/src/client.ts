@@ -22,7 +22,7 @@ import {
   QuoteExpiredError,
 } from './errors';
 
-const DEFAULT_ENDPOINT = 'https://api.gasdf.io';
+const DEFAULT_ENDPOINT = 'https://asdfasdfa.tech';
 const DEFAULT_TIMEOUT = 30000;
 
 /**
@@ -263,25 +263,42 @@ export class GASdf {
 
   private extractUserPubkey(transaction: SupportedTransaction): string {
     if (transaction instanceof VersionedTransaction) {
-      // For versioned tx, find first non-fee-payer signer
+      // For versioned tx, find first signer that's not the fee payer
       const keys = transaction.message.staticAccountKeys;
-      // Account at index 1 is typically the user if fee payer is at 0
-      return keys.length > 1 ? keys[1].toBase58() : keys[0].toBase58();
+      const numSigners = transaction.message.header.numRequiredSignatures;
+      const feePayer = keys[0].toBase58();
+
+      // Find first non-fee-payer signer
+      for (let i = 1; i < numSigners && i < keys.length; i++) {
+        const sig = transaction.signatures[i];
+        // Check if this position has a signature (not all zeros)
+        if (sig && sig.length === 64 && !sig.every((b) => b === 0)) {
+          return keys[i].toBase58();
+        }
+      }
+
+      // Fallback: return fee payer if it's the only signer
+      return feePayer;
     }
 
     // For legacy tx, find first signature that isn't fee payer
+    const feePayer = transaction.feePayer?.toBase58();
     const signatures = transaction.signatures.filter(
-      (sig) => sig.signature !== null,
+      (sig) => sig.signature !== null && sig.publicKey.toBase58() !== feePayer,
     );
 
-    if (signatures.length === 0) {
-      throw new GASdfError(
-        'Transaction must be signed by user',
-        'UNSIGNED_TRANSACTION',
-      );
+    if (signatures.length > 0) {
+      return signatures[0].publicKey.toBase58();
     }
 
-    // Return first signer (user should sign first)
-    return signatures[0].publicKey.toBase58();
+    // Fallback: return fee payer if it's the only signer
+    if (transaction.signatures.length > 0 && transaction.signatures[0].signature !== null) {
+      return transaction.signatures[0].publicKey.toBase58();
+    }
+
+    throw new GASdfError(
+      'Transaction must be signed by user',
+      'UNSIGNED_TRANSACTION',
+    );
   }
 }
