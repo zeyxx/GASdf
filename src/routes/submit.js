@@ -2,6 +2,7 @@ const express = require('express');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
+const db = require('../utils/db');
 const rpc = require('../utils/rpc');
 const { signTransaction, markPayerUnhealthy } = require('../services/signer');
 const { releaseReservation, getReservation } = require('../services/fee-payer-pool');
@@ -420,6 +421,21 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       ip: clientIp,
     });
 
+    // Record transaction in PostgreSQL for persistent audit trail
+    db.recordTransaction({
+      quoteId,
+      signature: result.signature,
+      userWallet: userPubkey,
+      paymentToken: quote.paymentToken?.mint || quote.paymentToken?.symbol || 'SOL',
+      feeAmount: quote.feeAmountLamports,
+      feeSolEquivalent: quote.feeAmountLamports,
+      status: 'submitted',
+      ipAddress: clientIp,
+    }).catch(err => {
+      // Non-blocking: don't fail the request if DB recording fails
+      logger.warn('SUBMIT', 'Failed to record transaction in PostgreSQL', { error: err.message });
+    });
+
     // Verify transaction landed in background (don't block response)
     // Uses getSignatureStatus which doesn't require blockhash (avoids "block height exceeded")
     rpc.checkSignatureStatus(result.signature, 3, 2000).then((status) => {
@@ -429,11 +445,33 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
           slot: status.slot,
           confirmationStatus: status.confirmationStatus,
         });
+        // Update PostgreSQL status to confirmed
+        db.recordTransaction({
+          quoteId,
+          signature: result.signature,
+          userWallet: userPubkey,
+          paymentToken: quote.paymentToken?.mint || quote.paymentToken?.symbol || 'SOL',
+          feeAmount: quote.feeAmountLamports,
+          feeSolEquivalent: quote.feeAmountLamports,
+          status: 'confirmed',
+          ipAddress: clientIp,
+        }).catch(() => {}); // Silent fail for background update
       } else if (status.err) {
         logger.warn('SUBMIT', 'Transaction failed on-chain', {
           signature: result.signature,
           error: status.err,
         });
+        // Update PostgreSQL status to failed
+        db.recordTransaction({
+          quoteId,
+          signature: result.signature,
+          userWallet: userPubkey,
+          paymentToken: quote.paymentToken?.mint || quote.paymentToken?.symbol || 'SOL',
+          feeAmount: quote.feeAmountLamports,
+          feeSolEquivalent: quote.feeAmountLamports,
+          status: 'failed',
+          ipAddress: clientIp,
+        }).catch(() => {}); // Silent fail for background update
       } else {
         logger.debug('SUBMIT', 'Transaction status unknown (may still be processing)', {
           signature: result.signature,

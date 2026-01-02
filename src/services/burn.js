@@ -11,6 +11,7 @@ const {
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
+const db = require('../utils/db');
 const rpc = require('../utils/rpc');
 const { pool: feePayerPool } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
@@ -528,6 +529,14 @@ async function executeBurnWithLock(tokenBalances) {
             type: b.type,
           })),
           network: config.NETWORK,
+        });
+
+        // Record burn in PostgreSQL for persistent audit trail
+        await db.recordBurn({
+          signature: batchResult.signature,
+          amountBurned: totalAsdfBurned,
+          method: 'batch',
+          treasuryAmount: results.totalAsdfRetained || 0,
         });
       }
     } catch (error) {
