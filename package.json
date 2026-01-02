@@ -18,6 +18,8 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@pythnetwork/client": "^2.22.1",
+    "@pythnetwork/pyth-solana-receiver": "^0.13.0",
     "@solana/spl-token": "^0.4.8",
     "@solana/web3.js": "^1.95.0",
     "bs58": "^6.0.0",

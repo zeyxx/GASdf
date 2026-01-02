@@ -137,6 +137,10 @@ const config = {
   ORACLE_URL: process.env.ORACLE_URL,
   ORACLE_API_KEY: process.env.ORACLE_API_KEY,
 
+  // Jupiter API (required for production after Jan 31, 2026)
+  // Get API key from https://portal.jup.ag
+  JUPITER_API_KEY: process.env.JUPITER_API_KEY,
+
   // HolDex - Community verification service ($ASDF ecosystem)
   HOLDEX_URL: process.env.HOLDEX_URL,
 
@@ -232,6 +236,13 @@ function validateConfig() {
   // Warn if using public RPC in production
   if (IS_PROD && !config.HELIUS_API_KEY && !process.env.RPC_URL) {
     warnings.push('Using public RPC in production - consider using Helius or private RPC');
+  }
+
+  // Warn if Jupiter API key not configured (lite-api deprecated Jan 31, 2026)
+  if (!config.JUPITER_API_KEY) {
+    if (IS_PROD) {
+      warnings.push('JUPITER_API_KEY not set - using deprecated lite-api (get key at portal.jup.ag)');
+    }
   }
 
   // -------------------------------------------------------------------------
