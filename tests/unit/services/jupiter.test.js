@@ -76,8 +76,8 @@ describe('Jupiter Service', () => {
 
       expect(result).toEqual(mockQuote);
       expect(fetchWithTimeout).toHaveBeenCalledWith(
-        expect.stringContaining('lite-api.jup.ag/swap/v1/quote'),
-        {},
+        expect.stringContaining('/quote'),
+        expect.objectContaining({ headers: expect.any(Object) }),
         15000
       );
     });
@@ -176,7 +176,7 @@ describe('Jupiter Service', () => {
         expect.stringContaining('/swap'),
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             quoteResponse: mockQuoteResponse,
             userPublicKey: 'userPubkey123',
@@ -226,6 +226,7 @@ describe('Jupiter Service', () => {
         priceImpactPct: 0,
         symbol: 'SOL',
         decimals: 9,
+        source: 'native',
       });
     });
 
@@ -343,6 +344,18 @@ describe('Jupiter Service', () => {
         fetchWithTimeout: jest.fn(),
         JUPITER_TIMEOUT: 15000,
       }));
+
+      // Mock Pyth to return null (no feed) so we hit Jupiter/fallback
+      jest.mock('../../../src/services/pyth', () => ({
+        getFeeInToken: jest.fn().mockResolvedValue(null),
+      }));
+
+      jest.mock('../../../src/utils/logger', () => ({
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      }));
     });
 
     it('should use fallback rates for USDC on devnet when Jupiter fails', async () => {
@@ -356,7 +369,7 @@ describe('Jupiter Service', () => {
         1000000000 // 1 SOL
       );
 
-      expect(result.simulated).toBe(true);
+      expect(result.source).toBe('fallback');
       expect(result.symbol).toBe('USDC');
       expect(result.decimals).toBe(6);
       // 1 SOL * $200 = 200 USDC = 200000000 (with 6 decimals)
@@ -374,7 +387,7 @@ describe('Jupiter Service', () => {
         1000000000 // 1 SOL
       );
 
-      expect(result.simulated).toBe(true);
+      expect(result.source).toBe('fallback');
       expect(result.symbol).toBe('USDT');
       expect(result.inputAmount).toBe(200000000);
     });
@@ -390,7 +403,7 @@ describe('Jupiter Service', () => {
         1000000000 // 1 SOL
       );
 
-      expect(result.simulated).toBe(true);
+      expect(result.source).toBe('fallback');
       expect(result.symbol).toBe('UNKNOWN');
       // 1:1 rate adjusted for decimals (6 decimals for unknown)
       expect(result.inputAmount).toBe(1000000);
@@ -481,6 +494,20 @@ describe('Jupiter Service', () => {
 
       const calledUrl = fetchWithTimeout.mock.calls[0][0];
       expect(calledUrl).toContain('amount=5000000');
+    });
+  });
+
+  describe('getApiInfo()', () => {
+    it('should return API info with lite-api when no key configured', () => {
+      const info = jupiter.getApiInfo();
+
+      expect(info).toHaveProperty('endpoint');
+      expect(info).toHaveProperty('usingV6');
+      expect(info).toHaveProperty('hasApiKey');
+      // No API key in test config
+      expect(info.usingV6).toBe(false);
+      expect(info.hasApiKey).toBe(false);
+      expect(info.endpoint).toContain('lite-api.jup.ag');
     });
   });
 

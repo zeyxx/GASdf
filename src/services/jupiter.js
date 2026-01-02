@@ -2,10 +2,35 @@ const config = require('../utils/config');
 const { jupiterBreaker } = require('../utils/circuit-breaker');
 const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
 const { fetchWithTimeout, JUPITER_TIMEOUT } = require('../utils/fetch-timeout');
+const redis = require('../utils/redis');
+const logger = require('../utils/logger');
 
-// Using lite-api until January 31, 2026 (no API key required)
-// TODO: Migrate to api.jup.ag with API key before deprecation
-const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
+// =============================================================================
+// Jupiter v6 API Configuration
+// lite-api deprecated January 31, 2026 - use api.jup.ag with API key
+// Get API key at: https://portal.jup.ag
+// Free tier: 60 requests/minute, Paid tiers available
+// =============================================================================
+const JUPITER_V6_API = 'https://api.jup.ag/swap/v1';
+const JUPITER_LITE_API = 'https://lite-api.jup.ag/swap/v1'; // Deprecated fallback
+
+// Use v6 API if key configured, otherwise fall back to lite-api
+const JUPITER_API = config.JUPITER_API_KEY ? JUPITER_V6_API : JUPITER_LITE_API;
+
+/**
+ * Get headers for Jupiter API requests
+ * Includes API key for v6 API if configured
+ */
+function getJupiterHeaders(contentType = false) {
+  const headers = {};
+  if (config.JUPITER_API_KEY) {
+    headers['x-api-key'] = config.JUPITER_API_KEY;
+  }
+  if (contentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
+}
 
 // Common token info (avoid extra API calls)
 const TOKEN_INFO = {
@@ -17,7 +42,21 @@ const TOKEN_INFO = {
   '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump': { symbol: '$ASDF', decimals: 6 },
 };
 
+// Cache hit/miss counters for monitoring
+let cacheHits = 0;
+let cacheMisses = 0;
+
 async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
+  // ==========================================================================
+  // CACHE CHECK: Reduce Jupiter API calls by ~80%
+  // ==========================================================================
+  const cached = await redis.getCachedJupiterQuote(inputMint, outputMint, amount);
+  if (cached) {
+    cacheHits++;
+    return cached;
+  }
+  cacheMisses++;
+
   return jupiterBreaker.execute(async () => {
     const params = new URLSearchParams({
       inputMint,
@@ -31,7 +70,7 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
     // ==========================================================================
     const response = await fetchWithTimeout(
       `${JUPITER_API}/quote?${params}`,
-      {},
+      { headers: getJupiterHeaders() },
       JUPITER_TIMEOUT
     );
 
@@ -39,7 +78,12 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
       throw new Error(`Jupiter quote failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const quote = await response.json();
+
+    // Cache the result for future requests
+    await redis.cacheJupiterQuote(inputMint, outputMint, amount, quote);
+
+    return quote;
   });
 }
 
@@ -52,7 +96,7 @@ async function getSwapTransaction(quoteResponse, userPublicKey) {
       `${JUPITER_API}/swap`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getJupiterHeaders(true), // Include Content-Type
         body: JSON.stringify({
           quoteResponse,
           userPublicKey,
@@ -71,6 +115,7 @@ async function getSwapTransaction(quoteResponse, userPublicKey) {
 }
 
 // Get how much of inputToken equals the SOL fee amount
+// Priority: Pyth (on-chain) → Jupiter (off-chain API) → Fallback
 async function getFeeInToken(inputMint, solAmountLamports) {
   const tokenInfo = TOKEN_INFO[inputMint] || { symbol: 'UNKNOWN', decimals: 6 };
 
@@ -82,9 +127,38 @@ async function getFeeInToken(inputMint, solAmountLamports) {
       priceImpactPct: 0,
       symbol: 'SOL',
       decimals: 9,
+      source: 'native',
     };
   }
 
+  // ==========================================================================
+  // PYTH FIRST: On-chain oracle (trustless, no rate limits)
+  // ==========================================================================
+  try {
+    const pyth = require('./pyth');
+    const pythResult = await pyth.getFeeInToken(inputMint, solAmountLamports);
+
+    if (pythResult) {
+      logger.debug('JUPITER', 'Using Pyth price', {
+        mint: inputMint.slice(0, 8),
+        source: 'pyth',
+      });
+      return {
+        ...pythResult,
+        symbol: tokenInfo.symbol || pythResult.symbol,
+        decimals: tokenInfo.decimals || pythResult.decimals,
+      };
+    }
+  } catch (pythError) {
+    logger.debug('JUPITER', 'Pyth fallback to Jupiter', {
+      mint: inputMint.slice(0, 8),
+      error: pythError.message,
+    });
+  }
+
+  // ==========================================================================
+  // JUPITER FALLBACK: Off-chain API (for tokens without Pyth feed)
+  // ==========================================================================
   try {
     // Get quote: how much input token for X SOL
     const quote = await getQuote(
@@ -94,9 +168,7 @@ async function getFeeInToken(inputMint, solAmountLamports) {
       100
     );
 
-    // ==========================================================================
-    // NUMERIC PRECISION: Safe proportional calculation with zero-division check
-    // ==========================================================================
+    // Numeric precision: Safe proportional calculation with zero-division check
     const inAmount = parseInt(quote.inAmount) || 0;
     const outAmount = parseInt(quote.outAmount) || 0;
 
@@ -125,10 +197,12 @@ async function getFeeInToken(inputMint, solAmountLamports) {
       symbol: tokenInfo.symbol,
       decimals: tokenInfo.decimals,
       route: quote,
+      source: 'jupiter',
     };
   } catch (error) {
-    // Fallback for devnet or when Jupiter is unavailable
-    // Use approximate rates for known stablecoins
+    // ==========================================================================
+    // FINAL FALLBACK: Fixed rates (dev only)
+    // ==========================================================================
     if (config.IS_DEV) {
       let inputAmount;
       if (tokenInfo.symbol === 'USDC' || tokenInfo.symbol === 'USDT') {
@@ -145,7 +219,7 @@ async function getFeeInToken(inputMint, solAmountLamports) {
         priceImpactPct: 0,
         symbol: tokenInfo.symbol,
         decimals: tokenInfo.decimals,
-        simulated: true,
+        source: 'fallback',
       };
     }
     throw error;
@@ -210,4 +284,18 @@ module.exports = {
   getTokenToSolQuote,
   getTokenToAsdfQuote,
   TOKEN_INFO,
+  // Export for health checks / monitoring
+  getApiInfo: () => ({
+    endpoint: JUPITER_API,
+    usingV6: !!config.JUPITER_API_KEY,
+    hasApiKey: !!config.JUPITER_API_KEY,
+    cache: {
+      hits: cacheHits,
+      misses: cacheMisses,
+      hitRate: cacheHits + cacheMisses > 0
+        ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(1) + '%'
+        : 'N/A',
+      ...redis.getJupiterCacheStats(),
+    },
+  }),
 };

@@ -5,6 +5,8 @@ const rpc = require('../utils/rpc');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
 const holdex = require('../services/holdex');
+const jupiter = require('../services/jupiter');
+const pyth = require('../services/pyth');
 const { withTimeout, HEALTH_CHECK_TIMEOUT } = require('../utils/fetch-timeout');
 
 const router = express.Router();
@@ -34,11 +36,15 @@ router.get('/', async (req, res) => {
     withTimeout(checkRedis(), HEALTH_CHECK_TIMEOUT, 'Redis health check'),
     withTimeout(checkRpc(), HEALTH_CHECK_TIMEOUT, 'RPC health check'),
     withTimeout(checkFeePayer(), HEALTH_CHECK_TIMEOUT, 'Fee payer health check'),
+    withTimeout(checkVelocity(), HEALTH_CHECK_TIMEOUT, 'Velocity metrics'),
   ]);
 
   health.checks.redis = checks[0].status === 'fulfilled' ? checks[0].value : { status: 'error', error: checks[0].reason?.message };
   health.checks.rpc = checks[1].status === 'fulfilled' ? checks[1].value : { status: 'error', error: checks[1].reason?.message };
   health.checks.feePayer = checks[2].status === 'fulfilled' ? checks[2].value : { status: 'error', error: checks[2].reason?.message };
+
+  // Velocity metrics (behavioral proof for treasury refill)
+  health.velocity = checks[3].status === 'fulfilled' ? checks[3].value : { error: checks[3].reason?.message };
 
   // Add circuit breaker status
   health.circuitBreakers = getCircuitBreakerStatus();
@@ -48,6 +54,12 @@ router.get('/', async (req, res) => {
 
   // Add HolDex status (K-score oracle)
   health.holdex = holdex.getStatus();
+
+  // Add Pyth oracle status (on-chain pricing)
+  health.pyth = pyth.getStatus();
+
+  // Add Jupiter API status (swap execution + fallback pricing)
+  health.jupiter = jupiter.getApiInfo();
 
   // Add RPC pool health
   health.rpcPool = rpc.getRpcHealth();
@@ -197,6 +209,28 @@ async function checkRpc() {
     return { status: 'ok', slot, network: config.NETWORK, pool: poolHealth.status };
   } catch (error) {
     return { status: 'error', error: error.message };
+  }
+}
+
+/**
+ * Check velocity metrics (behavioral proof for treasury refill)
+ */
+async function checkVelocity() {
+  try {
+    const bufferCalc = await redis.calculateVelocityBasedBuffer();
+    const velocity = bufferCalc.velocity;
+
+    return {
+      txPerHour: velocity.txPerHour,
+      avgCostLamports: velocity.avgCost,
+      hoursOfData: velocity.hoursOfData,
+      txCount: velocity.txCount,
+      requiredBufferSol: (bufferCalc.required / 1_000_000_000).toFixed(4),
+      targetBufferSol: (bufferCalc.target / 1_000_000_000).toFixed(4),
+      explanation: bufferCalc.explanation,
+    };
+  } catch (error) {
+    return { error: error.message };
   }
 }
 
