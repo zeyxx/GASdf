@@ -25,7 +25,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "solana",
@@ -49,8 +50,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@solana/web3.js": "^1.87.0",
     "@solana/wallet-adapter-react": "^0.15.0",
+    "@solana/web3.js": "^1.87.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
@@ -66,6 +67,7 @@
     "@solana/web3.js": "^1.95.8",
     "@types/node": "^20.10.0",
     "@types/react": "^19.2.7",
+    "@vitest/coverage-v8": "^1.6.1",
     "tsup": "^8.0.1",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
