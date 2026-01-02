@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const alt = require('../utils/alt');
+const db = require('../utils/db');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
 const holdex = require('../services/holdex');
@@ -48,8 +49,11 @@ router.get('/', async (req, res) => {
   // Velocity metrics (behavioral proof for treasury refill)
   health.velocity = checks[3].status === 'fulfilled' ? checks[3].value : { error: checks[3].reason?.message };
 
-  // Add circuit breaker status
-  health.circuitBreakers = getCircuitBreakerStatus();
+  // Add circuit breaker status (includes PostgreSQL circuit)
+  health.circuitBreakers = {
+    ...getCircuitBreakerStatus(),
+    postgresql: db.getCircuitStatus(),
+  };
 
   // Add oracle health
   health.oracle = oracle.getOracleHealth();
@@ -79,7 +83,9 @@ router.get('/', async (req, res) => {
   const hasWarning = Object.values(health.checks).some(c => c.status === 'warning');
 
   // Check if any circuit breaker is open
-  const hasOpenCircuitBreaker = Object.values(health.circuitBreakers).some(cb => cb.state === 'open');
+  const hasOpenCircuitBreaker = Object.values(health.circuitBreakers).some(
+    cb => cb.state === 'open' || (cb.state === undefined && cb.isConnected === false)
+  );
 
   if (hasError || hasCriticalWarning) {
     health.status = 'unhealthy';

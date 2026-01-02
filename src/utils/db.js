@@ -14,9 +14,27 @@
 const { Pool } = require('pg');
 const config = require('./config');
 const logger = require('./logger');
+const { CircuitBreaker } = require('./circuit-breaker');
 
 let pool = null;
 let isInitialized = false;
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY = 1000;
+
+// Circuit breaker for DB operations
+const dbCircuit = new CircuitBreaker({
+  name: 'postgresql',
+  failureThreshold: 3,
+  resetTimeout: 30000,         // Try to recover after 30s
+  halfOpenMaxRequests: 2,      // Allow 2 test requests in half-open
+  isFailure: (error) => {
+    // Don't count constraint violations or data errors as circuit failures
+    const code = error.code || '';
+    return !code.startsWith('23'); // 23xxx = constraint violations
+  },
+});
 
 /**
  * Initialize PostgreSQL connection pool
@@ -185,6 +203,141 @@ function isConnected() {
 }
 
 /**
+ * Check if error is transient and retryable
+ */
+function isTransientError(error) {
+  const transientCodes = [
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'EPIPE',
+    'EAI_AGAIN',
+    '57P01',  // admin_shutdown
+    '57P02',  // crash_shutdown
+    '57P03',  // cannot_connect_now
+    '08000',  // connection_exception
+    '08003',  // connection_does_not_exist
+    '08006',  // connection_failure
+    '40001',  // serialization_failure
+    '40P01',  // deadlock_detected
+  ];
+
+  return transientCodes.includes(error.code) ||
+         error.message?.includes('Connection terminated') ||
+         error.message?.includes('timeout') ||
+         error.message?.includes('ECONNRESET');
+}
+
+/**
+ * Sleep helper for backoff
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Execute query with retry and circuit breaker protection
+ * @param {Function} queryFn - Async function that executes the query
+ * @param {Object} options - Options for retry behavior
+ * @returns {Promise<any>} Query result or fallback
+ */
+async function withDb(queryFn, options = {}) {
+  const {
+    retries = 2,
+    fallback = null,
+    operation = 'query',
+  } = options;
+
+  // Check circuit breaker state
+  if (!dbCircuit.canExecute()) {
+    logger.debug('DB', `Circuit open, skipping ${operation}`);
+    return fallback;
+  }
+
+  // No pool available
+  if (!pool) {
+    return fallback;
+  }
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await queryFn(pool);
+      dbCircuit.onSuccess();
+      reconnectAttempts = 0; // Reset on success
+      return result;
+    } catch (error) {
+
+      // Check if retryable
+      if (isTransientError(error) && attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        logger.warn('DB', `Transient error, retry ${attempt + 1}/${retries}`, {
+          operation,
+          error: error.message,
+          delay,
+        });
+        await sleep(delay);
+        continue;
+      }
+
+      // Non-retryable or exhausted retries
+      dbCircuit.onFailure(error);
+      logger.error('DB', `${operation} failed`, { error: error.message });
+
+      // Trigger reconnection for connection errors
+      if (isTransientError(error) && error.message?.includes('Connection')) {
+        scheduleReconnect();
+      }
+
+      break;
+    }
+  }
+
+  return fallback;
+}
+
+/**
+ * Schedule a reconnection attempt with exponential backoff
+ */
+function scheduleReconnect() {
+  if (reconnectTimer || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      logger.error('DB', 'Max reconnection attempts reached');
+    }
+    return;
+  }
+
+  const delay = RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts);
+  reconnectAttempts++;
+
+  logger.info('DB', `Scheduling reconnection in ${delay}ms (attempt ${reconnectAttempts})`);
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+
+    try {
+      // Close existing pool if any
+      if (pool) {
+        await pool.end().catch(() => {});
+        pool = null;
+        isInitialized = false;
+      }
+
+      // Re-initialize
+      await initialize();
+
+      if (pool) {
+        logger.info('DB', 'Reconnection successful');
+        reconnectAttempts = 0;
+        dbCircuit.reset();
+      } else {
+        scheduleReconnect();
+      }
+    } catch (error) {
+      logger.error('DB', 'Reconnection failed', { error: error.message });
+      scheduleReconnect();
+    }
+  }, delay);
+}
+
+/**
  * Health check
  */
 async function ping() {
@@ -205,17 +358,14 @@ async function ping() {
  * Record a burn in the database
  */
 async function recordBurn(burn) {
-  if (!pool) return null;
-
-  const query = `
-    INSERT INTO burns (signature, swap_signature, amount_burned, sol_equivalent, treasury_amount, method, wallet)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    ON CONFLICT (signature) DO NOTHING
-    RETURNING *
-  `;
-
-  try {
-    const result = await pool.query(query, [
+  return withDb(async (p) => {
+    const query = `
+      INSERT INTO burns (signature, swap_signature, amount_burned, sol_equivalent, treasury_amount, method, wallet)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (signature) DO NOTHING
+      RETURNING *
+    `;
+    const result = await p.query(query, [
       burn.signature,
       burn.swapSignature || null,
       burn.amountBurned,
@@ -225,79 +375,59 @@ async function recordBurn(burn) {
       burn.wallet || null,
     ]);
     return result.rows[0] || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to record burn', { error: error.message });
-    return null;
-  }
+  }, { operation: 'recordBurn', retries: 3 }); // Burns are critical, more retries
 }
 
 /**
  * Get burn history with pagination
  */
 async function getBurnHistory(limit = 50, offset = 0) {
-  if (!pool) return { burns: [], total: 0 };
-
-  try {
+  return withDb(async (p) => {
     const [burns, countResult] = await Promise.all([
-      pool.query(
+      p.query(
         'SELECT * FROM burns ORDER BY created_at DESC LIMIT $1 OFFSET $2',
         [limit, offset]
       ),
-      pool.query('SELECT COUNT(*) FROM burns'),
+      p.query('SELECT COUNT(*) FROM burns'),
     ]);
-
     return {
       burns: burns.rows,
       total: parseInt(countResult.rows[0].count),
     };
-  } catch (error) {
-    logger.error('DB', 'Failed to get burn history', { error: error.message });
-    return { burns: [], total: 0 };
-  }
+  }, { operation: 'getBurnHistory', fallback: { burns: [], total: 0 } });
 }
 
 /**
  * Get burn statistics
  */
 async function getBurnStats() {
-  if (!pool) return null;
-
-  const query = `
-    SELECT
-      COUNT(*) as total_burns,
-      COALESCE(SUM(amount_burned), 0) as total_amount,
-      COALESCE(SUM(sol_equivalent), 0) as total_sol,
-      COALESCE(SUM(treasury_amount), 0) as total_treasury,
-      COUNT(DISTINCT wallet) as unique_wallets,
-      MAX(created_at) as last_burn
-    FROM burns
-  `;
-
-  try {
-    const result = await pool.query(query);
+  return withDb(async (p) => {
+    const query = `
+      SELECT
+        COUNT(*) as total_burns,
+        COALESCE(SUM(amount_burned), 0) as total_amount,
+        COALESCE(SUM(sol_equivalent), 0) as total_sol,
+        COALESCE(SUM(treasury_amount), 0) as total_treasury,
+        COUNT(DISTINCT wallet) as unique_wallets,
+        MAX(created_at) as last_burn
+      FROM burns
+    `;
+    const result = await p.query(query);
     return result.rows[0];
-  } catch (error) {
-    logger.error('DB', 'Failed to get burn stats', { error: error.message });
-    return null;
-  }
+  }, { operation: 'getBurnStats' });
 }
 
 /**
  * Get burns by wallet
  */
 async function getBurnsByWallet(wallet, limit = 50) {
-  if (!pool) return [];
-
-  try {
-    const result = await pool.query(
+  return withDb(async (p) => {
+    const result = await p.query(
       'SELECT * FROM burns WHERE wallet = $1 ORDER BY created_at DESC LIMIT $2',
       [wallet, limit]
     );
     return result.rows;
-  } catch (error) {
-    logger.error('DB', 'Failed to get burns by wallet', { error: error.message });
-    return [];
-  }
+  }, { operation: 'getBurnsByWallet', fallback: [] });
 }
 
 // =============================================================================
@@ -308,20 +438,17 @@ async function getBurnsByWallet(wallet, limit = 50) {
  * Record a transaction
  */
 async function recordTransaction(tx) {
-  if (!pool) return null;
-
-  const query = `
-    INSERT INTO transactions (quote_id, signature, user_wallet, payment_token, fee_amount, fee_sol_equivalent, status, ip_address)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (quote_id) DO UPDATE SET
-      signature = EXCLUDED.signature,
-      status = EXCLUDED.status,
-      completed_at = CASE WHEN EXCLUDED.status IN ('confirmed', 'failed') THEN NOW() ELSE transactions.completed_at END
-    RETURNING *
-  `;
-
-  try {
-    const result = await pool.query(query, [
+  return withDb(async (p) => {
+    const query = `
+      INSERT INTO transactions (quote_id, signature, user_wallet, payment_token, fee_amount, fee_sol_equivalent, status, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (quote_id) DO UPDATE SET
+        signature = EXCLUDED.signature,
+        status = EXCLUDED.status,
+        completed_at = CASE WHEN EXCLUDED.status IN ('confirmed', 'failed') THEN NOW() ELSE transactions.completed_at END
+      RETURNING *
+    `;
+    const result = await p.query(query, [
       tx.quoteId,
       tx.signature || null,
       tx.userWallet,
@@ -332,44 +459,33 @@ async function recordTransaction(tx) {
       tx.ipAddress || null,
     ]);
     return result.rows[0] || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to record transaction', { error: error.message });
-    return null;
-  }
+  }, { operation: 'recordTransaction', retries: 3 }); // Transactions are critical
 }
 
 /**
  * Update transaction status
  */
 async function updateTransactionStatus(quoteId, status, signature = null, errorMessage = null) {
-  if (!pool) return null;
-
-  const query = `
-    UPDATE transactions
-    SET status = $2,
-        signature = COALESCE($3, signature),
-        error_message = $4,
-        completed_at = CASE WHEN $2 IN ('confirmed', 'failed') THEN NOW() ELSE completed_at END
-    WHERE quote_id = $1
-    RETURNING *
-  `;
-
-  try {
-    const result = await pool.query(query, [quoteId, status, signature, errorMessage]);
+  return withDb(async (p) => {
+    const query = `
+      UPDATE transactions
+      SET status = $2,
+          signature = COALESCE($3, signature),
+          error_message = $4,
+          completed_at = CASE WHEN $2 IN ('confirmed', 'failed') THEN NOW() ELSE completed_at END
+      WHERE quote_id = $1
+      RETURNING *
+    `;
+    const result = await p.query(query, [quoteId, status, signature, errorMessage]);
     return result.rows[0] || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to update transaction', { error: error.message });
-    return null;
-  }
+  }, { operation: 'updateTransactionStatus', retries: 3 });
 }
 
 /**
  * Get transaction history
  */
 async function getTransactionHistory(limit = 50, offset = 0, status = null) {
-  if (!pool) return { transactions: [], total: 0 };
-
-  try {
+  return withDb(async (p) => {
     let query = 'SELECT * FROM transactions';
     let countQuery = 'SELECT COUNT(*) FROM transactions';
     const params = [];
@@ -384,18 +500,15 @@ async function getTransactionHistory(limit = 50, offset = 0, status = null) {
     params.push(limit, offset);
 
     const [txs, countResult] = await Promise.all([
-      pool.query(query, params),
-      pool.query(countQuery, status ? [status] : []),
+      p.query(query, params),
+      p.query(countQuery, status ? [status] : []),
     ]);
 
     return {
       transactions: txs.rows,
       total: parseInt(countResult.rows[0].count),
     };
-  } catch (error) {
-    logger.error('DB', 'Failed to get transactions', { error: error.message });
-    return { transactions: [], total: 0 };
-  }
+  }, { operation: 'getTransactionHistory', fallback: { transactions: [], total: 0 } });
 }
 
 // =============================================================================
@@ -406,24 +519,21 @@ async function getTransactionHistory(limit = 50, offset = 0, status = null) {
  * Update token statistics
  */
 async function updateTokenStats(mint, stats) {
-  if (!pool) return null;
-
-  const query = `
-    INSERT INTO token_stats (mint, symbol, name, total_fees_collected, total_transactions, last_used, k_score)
-    VALUES ($1, $2, $3, $4, 1, NOW(), $5)
-    ON CONFLICT (mint) DO UPDATE SET
-      symbol = COALESCE(EXCLUDED.symbol, token_stats.symbol),
-      name = COALESCE(EXCLUDED.name, token_stats.name),
-      total_fees_collected = token_stats.total_fees_collected + EXCLUDED.total_fees_collected,
-      total_transactions = token_stats.total_transactions + 1,
-      last_used = NOW(),
-      k_score = COALESCE(EXCLUDED.k_score, token_stats.k_score),
-      updated_at = NOW()
-    RETURNING *
-  `;
-
-  try {
-    const result = await pool.query(query, [
+  return withDb(async (p) => {
+    const query = `
+      INSERT INTO token_stats (mint, symbol, name, total_fees_collected, total_transactions, last_used, k_score)
+      VALUES ($1, $2, $3, $4, 1, NOW(), $5)
+      ON CONFLICT (mint) DO UPDATE SET
+        symbol = COALESCE(EXCLUDED.symbol, token_stats.symbol),
+        name = COALESCE(EXCLUDED.name, token_stats.name),
+        total_fees_collected = token_stats.total_fees_collected + EXCLUDED.total_fees_collected,
+        total_transactions = token_stats.total_transactions + 1,
+        last_used = NOW(),
+        k_score = COALESCE(EXCLUDED.k_score, token_stats.k_score),
+        updated_at = NOW()
+      RETURNING *
+    `;
+    const result = await p.query(query, [
       mint,
       stats.symbol || null,
       stats.name || null,
@@ -431,28 +541,20 @@ async function updateTokenStats(mint, stats) {
       stats.kScore || 'UNKNOWN',
     ]);
     return result.rows[0] || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to update token stats', { error: error.message });
-    return null;
-  }
+  }, { operation: 'updateTokenStats' });
 }
 
 /**
  * Get token leaderboard
  */
 async function getTokenLeaderboard(limit = 20) {
-  if (!pool) return [];
-
-  try {
-    const result = await pool.query(
+  return withDb(async (p) => {
+    const result = await p.query(
       'SELECT * FROM token_stats ORDER BY total_transactions DESC LIMIT $1',
       [limit]
     );
     return result.rows;
-  } catch (error) {
-    logger.error('DB', 'Failed to get token leaderboard', { error: error.message });
-    return [];
-  }
+  }, { operation: 'getTokenLeaderboard', fallback: [] });
 }
 
 // =============================================================================
@@ -463,16 +565,13 @@ async function getTokenLeaderboard(limit = 20) {
  * Add audit log entry
  */
 async function addAuditLog(event) {
-  if (!pool) return null;
-
-  const query = `
-    INSERT INTO audit_log (event_type, event_data, wallet, ip_address, severity)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id
-  `;
-
-  try {
-    const result = await pool.query(query, [
+  return withDb(async (p) => {
+    const query = `
+      INSERT INTO audit_log (event_type, event_data, wallet, ip_address, severity)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `;
+    const result = await p.query(query, [
       event.type,
       JSON.stringify(event.data || {}),
       event.wallet || null,
@@ -480,19 +579,14 @@ async function addAuditLog(event) {
       event.severity || 'INFO',
     ]);
     return result.rows[0]?.id || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to add audit log', { error: error.message });
-    return null;
-  }
+  }, { operation: 'addAuditLog' }); // Audit logs are nice-to-have, no extra retries
 }
 
 /**
  * Get audit logs
  */
 async function getAuditLogs(limit = 100, offset = 0, eventType = null) {
-  if (!pool) return { logs: [], total: 0 };
-
-  try {
+  return withDb(async (p) => {
     let query = 'SELECT * FROM audit_log';
     let countQuery = 'SELECT COUNT(*) FROM audit_log';
     const params = [];
@@ -507,18 +601,15 @@ async function getAuditLogs(limit = 100, offset = 0, eventType = null) {
     params.push(limit, offset);
 
     const [logs, countResult] = await Promise.all([
-      pool.query(query, params),
-      pool.query(countQuery, eventType ? [eventType] : []),
+      p.query(query, params),
+      p.query(countQuery, eventType ? [eventType] : []),
     ]);
 
     return {
       logs: logs.rows,
       total: parseInt(countResult.rows[0].count),
     };
-  } catch (error) {
-    logger.error('DB', 'Failed to get audit logs', { error: error.message });
-    return { logs: [], total: 0 };
-  }
+  }, { operation: 'getAuditLogs', fallback: { logs: [], total: 0 } });
 }
 
 // =============================================================================
@@ -529,24 +620,21 @@ async function getAuditLogs(limit = 100, offset = 0, eventType = null) {
  * Update or create daily stats
  */
 async function updateDailyStats(stats) {
-  if (!pool) return null;
-
   const today = new Date().toISOString().split('T')[0];
 
-  const query = `
-    INSERT INTO daily_stats (date, total_burns, total_transactions, unique_wallets, total_fees_sol, treasury_balance)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (date) DO UPDATE SET
-      total_burns = daily_stats.total_burns + EXCLUDED.total_burns,
-      total_transactions = daily_stats.total_transactions + EXCLUDED.total_transactions,
-      unique_wallets = GREATEST(daily_stats.unique_wallets, EXCLUDED.unique_wallets),
-      total_fees_sol = daily_stats.total_fees_sol + EXCLUDED.total_fees_sol,
-      treasury_balance = EXCLUDED.treasury_balance
-    RETURNING *
-  `;
-
-  try {
-    const result = await pool.query(query, [
+  return withDb(async (p) => {
+    const query = `
+      INSERT INTO daily_stats (date, total_burns, total_transactions, unique_wallets, total_fees_sol, treasury_balance)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (date) DO UPDATE SET
+        total_burns = daily_stats.total_burns + EXCLUDED.total_burns,
+        total_transactions = daily_stats.total_transactions + EXCLUDED.total_transactions,
+        unique_wallets = GREATEST(daily_stats.unique_wallets, EXCLUDED.unique_wallets),
+        total_fees_sol = daily_stats.total_fees_sol + EXCLUDED.total_fees_sol,
+        treasury_balance = EXCLUDED.treasury_balance
+      RETURNING *
+    `;
+    const result = await p.query(query, [
       today,
       stats.burns || 0,
       stats.transactions || 0,
@@ -555,28 +643,20 @@ async function updateDailyStats(stats) {
       stats.treasuryBalance || 0,
     ]);
     return result.rows[0] || null;
-  } catch (error) {
-    logger.error('DB', 'Failed to update daily stats', { error: error.message });
-    return null;
-  }
+  }, { operation: 'updateDailyStats' });
 }
 
 /**
  * Get daily stats for chart
  */
 async function getDailyStatsHistory(days = 30) {
-  if (!pool) return [];
-
-  try {
-    const result = await pool.query(
+  return withDb(async (p) => {
+    const result = await p.query(
       'SELECT * FROM daily_stats ORDER BY date DESC LIMIT $1',
       [days]
     );
     return result.rows.reverse(); // Oldest first for charts
-  } catch (error) {
-    logger.error('DB', 'Failed to get daily stats', { error: error.message });
-    return [];
-  }
+  }, { operation: 'getDailyStatsHistory', fallback: [] });
 }
 
 // =============================================================================
@@ -587,12 +667,10 @@ async function getDailyStatsHistory(days = 30) {
  * Get comprehensive analytics
  */
 async function getAnalytics() {
-  if (!pool) return null;
-
-  try {
+  return withDb(async (p) => {
     const [burns, txs, tokens, dailyStats] = await Promise.all([
       getBurnStats(),
-      pool.query(`
+      p.query(`
         SELECT
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
@@ -600,8 +678,8 @@ async function getAnalytics() {
           COUNT(*) FILTER (WHERE status = 'pending') as pending
         FROM transactions
       `),
-      pool.query('SELECT COUNT(*) FROM token_stats'),
-      pool.query('SELECT * FROM daily_stats ORDER BY date DESC LIMIT 7'),
+      p.query('SELECT COUNT(*) FROM token_stats'),
+      p.query('SELECT * FROM daily_stats ORDER BY date DESC LIMIT 7'),
     ]);
 
     return {
@@ -610,10 +688,19 @@ async function getAnalytics() {
       uniqueTokens: parseInt(tokens.rows[0].count),
       weeklyStats: dailyStats.rows,
     };
-  } catch (error) {
-    logger.error('DB', 'Failed to get analytics', { error: error.message });
-    return null;
-  }
+  }, { operation: 'getAnalytics' });
+}
+
+/**
+ * Get circuit breaker status for health checks
+ */
+function getCircuitStatus() {
+  return {
+    ...dbCircuit.getStatus(),
+    stats: dbCircuit.getStats(),
+    reconnectAttempts,
+    isConnected: isConnected(),
+  };
 }
 
 /**
@@ -626,6 +713,12 @@ async function disconnect() {
     pool = null;
     isInitialized = false;
   }
+
+  // Clear reconnect timer
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
 }
 
 module.exports = {
@@ -634,6 +727,7 @@ module.exports = {
   isConnected,
   ping,
   disconnect,
+  getCircuitStatus,
   // Burns
   recordBurn,
   getBurnHistory,
