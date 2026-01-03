@@ -20,6 +20,9 @@
 - [x] alerting.js tests improved (30% → 58% coverage)
 - [x] burn.js tests improved (57% → 62% coverage)
 - [x] k6 load test script
+- [x] fee-payer-pool.js tests (29% → 46% coverage)
+- [x] anomaly-detector.js tests (25% → 46% coverage)
+- [x] 1141 tests passing
 
 ## Next Steps
 
