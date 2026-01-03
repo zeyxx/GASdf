@@ -831,11 +831,11 @@
           <span class="icon">📊</span>
           <span>Overview</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#burnHistoryChart" class="nav-item" onclick="document.getElementById('burnHistoryChart').scrollIntoView({behavior:'smooth'})">
           <span class="icon">🔥</span>
           <span>Burn History</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#tokenDistribution" class="nav-item" onclick="document.getElementById('tokenDistribution').scrollIntoView({behavior:'smooth'})">
           <span class="icon">💎</span>
           <span>Token Usage</span>
         </a>
@@ -1195,67 +1195,94 @@
       }
     }
 
-    function generateBurnHistoryChart() {
+    async function generateBurnHistoryChart() {
       const container = document.getElementById('burnHistoryChart');
       const labels = document.getElementById('chartLabels');
 
-      // Generate 30 days of mock data
-      const days = [];
-      const values = [];
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        values.push(Math.random() * 50000 + 10000);
+      try {
+        // Fetch real burn data from API
+        const response = await fetch(`${CONFIG.apiBase}/v1/stats/burns?limit=30`);
+        const data = await response.json();
+        const burns = data.burns || [];
+
+        if (burns.length === 0) {
+          container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">No burns yet</div>';
+          labels.innerHTML = '';
+          return;
+        }
+
+        // Group burns by day
+        const burnsByDay = {};
+        burns.forEach(burn => {
+          const date = new Date(burn.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          burnsByDay[date] = (burnsByDay[date] || 0) + (burn.amountBurned / 1e6);
+        });
+
+        const days = Object.keys(burnsByDay);
+        const values = Object.values(burnsByDay);
+        const max = Math.max(...values, 1);
+
+        container.innerHTML = values.map((v, i) => {
+          const height = (v / max * 100);
+          return `<div class="chart-bar" style="height: ${height}%;" data-value="${formatNumber(v)} $ASDF"></div>`;
+        }).join('');
+
+        // Show labels
+        if (days.length >= 3) {
+          labels.innerHTML = `
+            <span class="chart-label">${days[0]}</span>
+            <span class="chart-label">${days[Math.floor(days.length/2)]}</span>
+            <span class="chart-label">${days[days.length-1]}</span>
+          `;
+        } else {
+          labels.innerHTML = days.map(d => `<span class="chart-label">${d}</span>`).join('');
+        }
+      } catch (error) {
+        console.error('Failed to load burn history:', error);
+        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Failed to load</div>';
       }
-
-      const max = Math.max(...values);
-
-      container.innerHTML = values.map((v, i) => {
-        const height = (v / max * 100);
-        return `<div class="chart-bar" style="height: ${height}%;" data-value="${formatNumber(v)} $ASDF"></div>`;
-      }).join('');
-
-      // Show only first, middle, and last label
-      labels.innerHTML = `
-        <span class="chart-label">${days[0]}</span>
-        <span class="chart-label">${days[14]}</span>
-        <span class="chart-label">${days[29]}</span>
-      `;
     }
 
-    function generateMockTransactions() {
+    async function generateMockTransactions() {
       const container = document.getElementById('txTable');
-      const tokens = ['USDC', 'SOL', 'BONK', 'JUP', 'ASDF'];
-      const statuses = ['success', 'success', 'success', 'pending'];
 
-      const txs = [];
-      for (let i = 0; i < 5; i++) {
-        const hash = Array.from({ length: 8 }, () =>
-          Math.random().toString(36).charAt(2)
-        ).join('');
-        const token = tokens[Math.floor(Math.random() * tokens.length)];
-        const fee = (Math.random() * 0.01).toFixed(6);
-        const status = statuses[Math.floor(Math.random() * statuses.length)];
-        const mins = Math.floor(Math.random() * 60);
+      try {
+        // Fetch real burn transactions from API
+        const response = await fetch(`${CONFIG.apiBase}/v1/stats/burns?limit=5`);
+        const data = await response.json();
+        const burns = data.burns || [];
 
-        txs.push(`
-          <tr>
-            <td class="mono hash" onclick="window.open('https://solscan.io/tx/${hash}...', '_blank')">${hash}...</td>
-            <td>
-              <div class="token-cell">
-                <div class="icon">${token[0]}</div>
-                <span>${token}</span>
-              </div>
-            </td>
-            <td class="mono">${fee} SOL</td>
-            <td><span class="status ${status}">● ${status}</span></td>
-            <td class="time">${mins}m ago</td>
-          </tr>
-        `);
+        if (burns.length === 0) {
+          container.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No transactions yet</td></tr>';
+          return;
+        }
+
+        const txs = burns.map(burn => {
+          const sig = burn.burnSignature || '';
+          const shortSig = sig.slice(0, 8);
+          const amount = burn.amountFormatted || `${(burn.amountBurned / 1e6).toFixed(2)} $ASDF`;
+
+          return `
+            <tr>
+              <td class="mono hash" onclick="window.open('${burn.explorerUrl || 'https://solscan.io/tx/' + sig}', '_blank')">${shortSig}...</td>
+              <td>
+                <div class="token-cell">
+                  <div class="icon">A</div>
+                  <span>$ASDF</span>
+                </div>
+              </td>
+              <td class="mono">${amount}</td>
+              <td><span class="status success">● burned</span></td>
+              <td class="time">${burn.age || 'recently'}</td>
+            </tr>
+          `;
+        });
+
+        container.innerHTML = txs.join('');
+      } catch (error) {
+        console.error('Failed to load transactions:', error);
+        container.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Failed to load</td></tr>';
       }
-
-      container.innerHTML = txs.join('');
     }
 
     // ═══════════════════════════════════════════════════════════
