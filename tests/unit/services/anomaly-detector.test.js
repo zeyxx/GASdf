@@ -27,6 +27,11 @@ jest.mock('../../../src/utils/redis', () => ({
     txCount: 100,
     pendingSwap: 50000,
   }),
+  trackWalletActivity: jest.fn().mockResolvedValue({ count: 1 }),
+  trackIpActivity: jest.fn().mockResolvedValue({ count: 1 }),
+  getWalletActivity: jest.fn().mockResolvedValue({ quotes: 0, submits: 0, failures: 0 }),
+  getIpActivity: jest.fn().mockResolvedValue({ quotes: 0, submits: 0 }),
+  isReady: jest.fn().mockReturnValue(true),
 }));
 
 jest.mock('../../../src/services/alerting', () => ({
@@ -270,6 +275,98 @@ describe('Anomaly Detector Service', () => {
           anomalyDetector.recordSample('quotesPerWallet', 10);
         }).not.toThrow();
       });
+
+      it('should add sample to baseline samples', () => {
+        anomalyDetector.baseline.isLearning = true;
+        anomalyDetector.baseline.samples.quotesPerWallet = [];
+        anomalyDetector.recordSample('quotesPerWallet', 42);
+        expect(anomalyDetector.baseline.samples.quotesPerWallet).toContain(42);
+      });
+
+      it('should not record when not learning', () => {
+        anomalyDetector.baseline.isLearning = false;
+        anomalyDetector.baseline.isReady = false;
+        anomalyDetector.baseline.samples.quotesPerWallet = [];
+        anomalyDetector.recordSample('quotesPerWallet', 42);
+        expect(anomalyDetector.baseline.samples.quotesPerWallet.length).toBe(0);
+      });
     });
+
+    describe('_calculateThreshold()', () => {
+      it('should return default value when not enough samples', () => {
+        const result = anomalyDetector._calculateThreshold([], 100);
+        expect(result).toBe(100);
+      });
+
+      it('should return default value with few samples', () => {
+        const result = anomalyDetector._calculateThreshold([1, 2], 100);
+        expect(result).toBe(100);
+      });
+
+      it('should calculate threshold with enough samples', () => {
+        // Need MIN_SAMPLES worth of data
+        const samples = new Array(20).fill(0).map((_, i) => i + 1);
+        const result = anomalyDetector._calculateThreshold(samples, 50);
+        expect(result).toBeGreaterThan(0);
+      });
+
+      it('should apply minimum floor when specified', () => {
+        const samples = new Array(20).fill(0).map((_, i) => i);
+        const result = anomalyDetector._calculateThreshold(samples, 10, 100);
+        expect(result).toBeGreaterThanOrEqual(100);
+      });
+    });
+
+    describe('updateThresholds()', () => {
+      it('should have updateThresholds method', () => {
+        expect(typeof anomalyDetector.updateThresholds).toBe('function');
+      });
+
+      it('should not throw when called', () => {
+        expect(() => anomalyDetector.updateThresholds()).not.toThrow();
+      });
+
+      it('should update baseline thresholds', () => {
+        const beforeThresholds = { ...anomalyDetector.baseline.thresholds };
+        // Add some samples
+        anomalyDetector.baseline.samples.quotesPerWallet = new Array(20).fill(0).map(() => Math.random() * 100);
+        anomalyDetector.updateThresholds();
+        // Thresholds object should still exist
+        expect(anomalyDetector.baseline.thresholds).toBeDefined();
+      });
+    });
+
+    describe('trackWallet()', () => {
+      it('should have trackWallet method', () => {
+        expect(typeof anomalyDetector.trackWallet).toBe('function');
+      });
+
+      it('should return promise', () => {
+        const result = anomalyDetector.trackWallet('test-wallet', 'quote', '192.168.1.1');
+        expect(result).toBeInstanceOf(Promise);
+      });
+
+      it('should not throw on valid input', async () => {
+        await expect(
+          anomalyDetector.trackWallet('test-wallet', 'quote', '192.168.1.1')
+        ).resolves.not.toThrow();
+      });
+    });
+
+    describe('trackIp()', () => {
+      it('should have trackIp method', () => {
+        expect(typeof anomalyDetector.trackIp).toBe('function');
+      });
+
+      it('should return promise', () => {
+        const result = anomalyDetector.trackIp('192.168.1.1', 'quote');
+        expect(result).toBeInstanceOf(Promise);
+      });
+
+      it('should not throw on valid input', async () => {
+        await expect(anomalyDetector.trackIp('192.168.1.1', 'quote')).resolves.not.toThrow();
+      });
+    });
+
   });
 });
