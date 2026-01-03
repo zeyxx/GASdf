@@ -159,7 +159,7 @@ router.get('/transactions', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const offset = parseInt(req.query.offset) || 0;
 
-    const result = await db.getTransactionHistory({ limit, offset });
+    const result = await db.getTransactionHistory(limit, offset);
 
     if (!result) {
       return res.status(503).json({
