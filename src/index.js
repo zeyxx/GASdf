@@ -9,6 +9,7 @@ const { securityHeaders, globalLimiter } = require('./middleware/security');
 const { startBurnWorker } = require('./services/burn');
 const { collect: collectMetrics, metricsMiddleware } = require('./utils/metrics');
 const { startMonitoring: startAlertMonitoring, stopMonitoring: stopAlertMonitoring, alertingService } = require('./services/alerting');
+const dataSync = require('./services/data-sync');
 
 // Routes
 const quoteRouter = require('./routes/quote');
@@ -254,6 +255,18 @@ async function start() {
     await db.initialize();
     const dbConnected = db.isConnected();
 
+    // Start data sync service (Redis ↔ PostgreSQL)
+    if (dbConnected) {
+      logger.info('BOOT', 'Starting data sync service...');
+      dataSync.start();
+
+      // Set up memory → Redis sync on reconnection
+      redis.setOnReconnectCallback(dataSync.syncMemoryToRedis);
+
+      // Restore stats from PostgreSQL if Redis was wiped
+      await dataSync.restoreStatsFromPostgres();
+    }
+
     // Start HTTP server
     server = app.listen(config.PORT, () => {
       console.log(`
@@ -317,6 +330,15 @@ async function shutdown(signal) {
 
   // Stop alert monitoring
   stopAlertMonitoring();
+
+  // Force sync data before shutdown
+  try {
+    await dataSync.forceSync();
+    dataSync.stop();
+    logger.info('SHUTDOWN', 'Data sync stopped');
+  } catch (err) {
+    logger.warn('SHUTDOWN', 'Data sync error', { error: err.message });
+  }
 
   // Give active requests time to complete
   await new Promise((resolve) => setTimeout(resolve, 5000));

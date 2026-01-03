@@ -7,7 +7,9 @@ const KEY_PREFIX = 'gasdf:';
 
 let client = null;
 let useMemory = false;
+let wasUsingMemory = false; // Track if we were in memory fallback mode
 let connectionState = 'disconnected'; // disconnected, connecting, connected, error
+let onReconnectCallback = null; // Callback for when Redis reconnects after memory fallback
 
 // In-memory fallback for local development ONLY
 // Includes periodic cleanup to prevent memory leaks
@@ -107,6 +109,7 @@ async function initializeClient() {
       } else if (!useMemory) {
         // Development: fallback to memory
         logger.warn('REDIS', 'Redis unavailable, using in-memory store');
+        wasUsingMemory = true;
         useMemory = true;
       }
     });
@@ -116,9 +119,23 @@ async function initializeClient() {
       logger.info('REDIS', 'Redis connecting...');
     });
 
-    client.on('ready', () => {
+    client.on('ready', async () => {
       connectionState = 'connected';
-      useMemory = false; // Switch back to Redis if we were using memory
+
+      // Check if we were using memory fallback and need to sync
+      if (wasUsingMemory && onReconnectCallback) {
+        logger.info('REDIS', 'Redis reconnected after memory fallback, syncing data...');
+        try {
+          const memoryData = getMemoryStatsData();
+          await onReconnectCallback(memoryData);
+          logger.info('REDIS', 'Memory data synced to Redis');
+        } catch (err) {
+          logger.error('REDIS', 'Failed to sync memory data on reconnect', { error: err.message });
+        }
+      }
+
+      useMemory = false; // Switch back to Redis
+      wasUsingMemory = false;
       logger.info('REDIS', 'Redis connected and ready');
     });
 
@@ -149,6 +166,7 @@ async function initializeClient() {
 
     // Development only: fallback to in-memory
     logger.warn('REDIS', 'Redis unavailable, using in-memory store (dev only)');
+    wasUsingMemory = true;
     useMemory = true;
     return null;
   }
@@ -186,6 +204,65 @@ function getConnectionState() {
     isMemoryFallback: useMemory,
     isHealthy: isConnected(),
   };
+}
+
+/**
+ * Set callback to be called when Redis reconnects after memory fallback
+ * Used by data-sync service to sync accumulated memory data
+ *
+ * @param {Function} callback - Async function(memoryData) to call on reconnection
+ */
+function setOnReconnectCallback(callback) {
+  onReconnectCallback = callback;
+}
+
+/**
+ * Get stats data accumulated in memory during fallback mode
+ * Returns object with key-value pairs of stats that need syncing
+ */
+function getMemoryStatsData() {
+  const statsData = {};
+
+  // Extract stats keys from memory store
+  for (const [key, item] of memoryStore.data) {
+    // Only sync stats, pending amounts, and wallet burns
+    // Skip quotes, rate limits, etc. as they're ephemeral
+    if (
+      key.startsWith('stats:') ||
+      key.startsWith('pending:') ||
+      key.startsWith('burn:wallet:')
+    ) {
+      // Check if not expired
+      if (!item.expiry || Date.now() <= item.expiry) {
+        statsData[key] = item.value;
+      }
+    }
+  }
+
+  return statsData;
+}
+
+/**
+ * Clear memory store (used after successful sync)
+ */
+function clearMemoryStats() {
+  const keysToDelete = [];
+
+  for (const [key] of memoryStore.data) {
+    if (
+      key.startsWith('stats:') ||
+      key.startsWith('pending:') ||
+      key.startsWith('burn:wallet:')
+    ) {
+      keysToDelete.push(key);
+    }
+  }
+
+  for (const key of keysToDelete) {
+    memoryStore.data.delete(key);
+  }
+
+  logger.debug('REDIS', `Cleared ${keysToDelete.length} synced keys from memory`);
 }
 
 /**
@@ -1237,6 +1314,10 @@ module.exports = {
   getConnectionState,
   ping,
   disconnect,
+  // Data sync helpers
+  setOnReconnectCallback,
+  getMemoryStatsData,
+  clearMemoryStats,
   setQuote,
   getQuote,
   deleteQuote,
