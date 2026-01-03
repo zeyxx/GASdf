@@ -1,0 +1,19 @@
+# Docker Compose for Grafana Agent
+# Scrapes GASdf metrics and pushes to Grafana Cloud
+
+services:
+  grafana-agent:
+    image: grafana/agent:v0.40.0
+    container_name: gasdf-metrics-agent
+    restart: unless-stopped
+    volumes:
+      - ./agent-config.yaml:/etc/agent/agent.yaml
+    environment:
+      - METRICS_API_KEY=${METRICS_API_KEY}
+      - GRAFANA_REMOTE_WRITE_URL=${GRAFANA_REMOTE_WRITE_URL}
+      - GRAFANA_USER_ID=${GRAFANA_USER_ID}
+      - GRAFANA_API_KEY=${GRAFANA_API_KEY}
+    command:
+      - '-config.file=/etc/agent/agent.yaml'
+      - '-config.expand-env=true'
+    # No ports needed - agent pushes to Grafana Cloud

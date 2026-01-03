@@ -34,13 +34,14 @@
 - [x] Jito bundles: Currently disabled (optional feature)
 - [x] Prometheus metrics enabled (requires `x-metrics-key` header)
 - [x] Sentry: Not needed - alerting.js covers fee payer, circuit breaker, Redis alerts
-- [ ] Deploy Prometheus scraper (guide in docs/MONITORING.md)
+- [x] Prometheus scraper setup (monitoring/ directory with Docker Compose)
 
 ## Infrastructure
 
 - **API:** https://gasdf-43r8.onrender.com
 - **Status:** https://status.asdfasdfa.tech
 - **Discord Alerts:** Configured via GitHub Actions secret
+- **Monitoring:** `monitoring/` (Grafana Agent + Docker Compose)
 
 ## Notes
 
