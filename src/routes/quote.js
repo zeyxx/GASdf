@@ -4,9 +4,10 @@ const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const jupiter = require('../services/jupiter');
+const helius = require('../services/helius');
 const { reserveBalance, isCircuitOpen, getCircuitState } = require('../services/fee-payer-pool');
 const { ensureTreasuryAta, getTreasuryAddress } = require('../services/treasury-ata');
-const { clamp, safeMul, safeCeil, MAX_COMPUTE_UNITS } = require('../utils/safe-math');
+const { clamp, MAX_COMPUTE_UNITS } = require('../utils/safe-math');
 const { quoteLimiter, walletQuoteLimiter } = require('../middleware/security');
 const { validate } = require('../middleware/validation');
 const { quotesTotal, quoteDuration, activeQuotes } = require('../utils/metrics');
@@ -87,20 +88,30 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
     }
 
     // ==========================================================================
-    // FEE CALCULATION - Derived from first principles, no magic numbers
+    // FEE CALCULATION - Dynamic priority fees via Helius SDK
     // ==========================================================================
     //
     // BASE_FEE = NETWORK_FEE × (1/TREASURY_RATIO) × MARKUP
     //          = 5000 × 5 × 2 = 50000 lamports (~$0.01)
     //
-    // All accepted tokens pay the same fee (token gating handles risk)
+    // PRIORITY_FEE = Helius real-time estimate (adapts to network congestion)
     // ==========================================================================
 
     // Clamp compute units to valid Solana range
     const clampedCU = clamp(estimatedComputeUnits, 1, MAX_COMPUTE_UNITS);
 
-    // Priority fee: CU * micro-lamports (0.000001 SOL = 1000 lamports per 1M CU)
-    const priorityFee = safeCeil(safeMul(clampedCU, 0.001)) || 0;
+    // Get dynamic priority fee from Helius (adapts to network conditions)
+    const priorityFeeData = await helius.calculatePriorityFee(clampedCU, {
+      priorityLevel: 'Medium', // Balance between speed and cost
+    });
+    const priorityFee = priorityFeeData.priorityFeeLamports;
+
+    logger.debug('QUOTE', 'Priority fee calculated', {
+      requestId: req.requestId,
+      computeUnits: clampedCU,
+      microLamportsPerCU: priorityFeeData.microLamportsPerCU,
+      priorityFeeLamports: priorityFee,
+    });
 
     // Total base fee (before holder discount)
     const baseAdjustedFee = config.BASE_FEE_LAMPORTS + priorityFee;
