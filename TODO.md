@@ -19,7 +19,7 @@
 
 - [x] Monitor burn worker (E2E tests added, 76.4% burn ratio confirmed)
 - [x] Jito bundles: Currently disabled (optional feature)
-- [ ] Enable Prometheus metrics (set `PROMETHEUS_ENABLED=true` on Render)
+- [x] Prometheus metrics enabled (requires `x-metrics-key` header)
 - [x] Sentry: Not needed - alerting.js covers fee payer, circuit breaker, Redis alerts
 
 ## Infrastructure
