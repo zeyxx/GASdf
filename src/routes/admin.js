@@ -6,6 +6,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const { checkAndExecuteBurn, getTreasuryTokenBalances } = require('../services/burn');
+const db = require('../utils/db');
 
 const router = express.Router();
 
@@ -145,6 +146,71 @@ router.get('/treasury', async (req, res) => {
     res.status(500).json({
       error: error.message,
       code: 'TREASURY_CHECK_FAILED',
+    });
+  }
+});
+
+// =============================================================================
+// GET /admin/transactions - Get transaction history from PostgreSQL
+// =============================================================================
+
+router.get('/transactions', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const result = await db.getTransactionHistory({ limit, offset });
+
+    if (!result) {
+      return res.status(503).json({
+        error: 'PostgreSQL not available',
+        code: 'DB_UNAVAILABLE',
+      });
+    }
+
+    res.json({
+      transactions: result.transactions,
+      total: result.total,
+      limit,
+      offset,
+      hasMore: offset + result.transactions.length < result.total,
+    });
+  } catch (error) {
+    logger.error('ADMIN', 'Transaction history query failed', { error: error.message });
+    res.status(500).json({
+      error: error.message,
+      code: 'QUERY_FAILED',
+    });
+  }
+});
+
+// =============================================================================
+// GET /admin/burns - Get burn history from PostgreSQL
+// =============================================================================
+
+router.get('/burns', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+
+    const result = await db.getBurnHistory(limit);
+
+    if (!result) {
+      return res.status(503).json({
+        error: 'PostgreSQL not available',
+        code: 'DB_UNAVAILABLE',
+      });
+    }
+
+    res.json({
+      burns: result.burns,
+      total: result.total,
+      limit,
+    });
+  } catch (error) {
+    logger.error('ADMIN', 'Burn history query failed', { error: error.message });
+    res.status(500).json({
+      error: error.message,
+      code: 'QUERY_FAILED',
     });
   }
 });
