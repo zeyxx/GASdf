@@ -41,6 +41,9 @@
     "tweetnacl": "^1.0.3",
     "uuid": "^10.0.0"
   },
+  "overrides": {
+    "bigint-buffer": "npm:@gsknnft/bigint-buffer@^1.4.7"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "eslint": "^9.39.2",
