@@ -55,7 +55,6 @@ describe('Database Client', () => {
     mockQuery.mockResolvedValue({ rows: [] });
   });
 
-
   describe('isConnected()', () => {
     it('should return false when pool is not initialized', () => {
       // Reset module state for this test
@@ -176,7 +175,12 @@ describe('Database Client', () => {
     });
 
     it('should accept error message for failed transactions', async () => {
-      const result = await db.updateTransactionStatus('quote-123', 'failed', null, 'Transaction failed');
+      const result = await db.updateTransactionStatus(
+        'quote-123',
+        'failed',
+        null,
+        'Transaction failed'
+      );
       expect(result).toBeNull();
     });
   });
@@ -353,4 +357,3 @@ describe('Database Client', () => {
     });
   });
 });
-
