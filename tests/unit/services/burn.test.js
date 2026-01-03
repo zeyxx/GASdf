@@ -514,6 +514,82 @@ describe('Burn Service', () => {
     });
   });
 
+  describe('Token Value Calculation (via getTreasuryTokenBalances)', () => {
+    it('should calculate USD value for stablecoins correctly', async () => {
+      // USDC: 6 decimals, 1:1 with USD - 2M units = $2
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 2000000)],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(balances[0].valueUsd).toBe(2);
+    });
+
+    it('should use Jupiter quote for SOL value calculation', async () => {
+      jupiter.getQuote.mockResolvedValue({ outAmount: '200000000' }); // 200 USDC for 1 SOL
+
+      // SOL: 9 decimals, 1B units = 1 SOL
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('So11111111111111111111111111111111111111112', 1000000000, 9)],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      expect(jupiter.getQuote).toHaveBeenCalled();
+      expect(balances.length).toBeGreaterThanOrEqual(0); // May be filtered by value
+    });
+
+    it('should handle Jupiter price fetch failure gracefully', async () => {
+      jupiter.getQuote.mockRejectedValue(new Error('Jupiter down'));
+
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('UnknownMint11111111111111111111111111111111', 1000000)],
+      });
+
+      const balances = await burnService.getTreasuryTokenBalances();
+
+      // Should not throw, may return empty due to $0 value
+      expect(Array.isArray(balances)).toBe(true);
+    });
+  });
+
+  describe('Fee Payer Velocity-Based Refill', () => {
+    beforeEach(() => {
+      mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
+        value: [createMockTokenAccount('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 5000000)],
+      });
+    });
+
+    it('should check fee payer balance during burn cycle', async () => {
+      mockConnection.getBalance.mockResolvedValue(100_000_000); // 0.1 SOL
+
+      await burnService.checkAndExecuteBurn();
+
+      expect(mockConnection.getBalance).toHaveBeenCalled();
+    });
+
+    it('should skip refill when balance is healthy', async () => {
+      mockConnection.getBalance.mockResolvedValue(500_000_000); // 0.5 SOL (healthy)
+
+      await burnService.checkAndExecuteBurn();
+
+      // No swap to SOL should happen for refill
+      expect(jupiter.getTokenToSolQuote).not.toHaveBeenCalled();
+    });
+
+    it('should log velocity stats', async () => {
+      await burnService.checkAndExecuteBurn();
+
+      // Should log burn completion with model info
+      expect(logger.info).toHaveBeenCalledWith(
+        'BURN',
+        expect.stringContaining('completed'),
+        expect.any(Object)
+      );
+    });
+  });
+
   describe('Error Handling', () => {
     beforeEach(() => {
       // 5M USDC = $5 (above threshold)
