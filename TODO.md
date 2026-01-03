@@ -24,7 +24,8 @@
 - [x] anomaly-detector.js tests (25% → 46% coverage)
 - [x] data-sync.js tests (7% → 94% coverage)
 - [x] db.js tests (21% → 73% coverage)
-- [x] 1199 tests passing, 72% overall coverage
+- [x] redis.js tests (49% → 59% coverage)
+- [x] 1221 tests passing, 73% overall coverage
 
 ## Next Steps
 
