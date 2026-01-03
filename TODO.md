@@ -9,14 +9,16 @@
 - [x] db.js unit tests (42 tests)
 - [x] All lint warnings fixed (unused variables prefixed with `_`)
 - [x] 895 tests passing
-- [x] Test coverage increased to 63% (1073 tests passing)
+- [x] Test coverage increased to 67% (1097 tests passing)
 - [x] Added 158 new unit tests (tokens, admin, stats, tx-queue, pyth, revenue-channels)
-- [x] Added 17 flow tests for quote endpoint lifecycle
+- [x] Added 21 flow tests for quote endpoint lifecycle
 - [x] Added E2E test suite (20 tests: quote, tokens, burn worker, submit)
 - [x] npm run test:e2e command
 - [x] ARCHITECTURE.md for developer onboarding
 - [x] MONITORING.md with Grafana Cloud setup guide
 - [x] validator.js security tests (52% → 81% coverage)
+- [x] alerting.js tests improved (30% → 58% coverage)
+- [x] burn.js tests improved (57% → 62% coverage)
 - [x] k6 load test script
 
 ## Next Steps
