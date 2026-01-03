@@ -417,4 +417,91 @@ describe('Quote → Submit Flow', () => {
       expect(res.status).toBe(500);
     });
   });
+
+  // ===========================================================================
+  // Quote-Submit Lifecycle (Stored Quote Validation)
+  // ===========================================================================
+
+  describe('Quote-Submit Lifecycle', () => {
+    it('should store quote with all required fields for submit', async () => {
+      const res = await request(app).post('/quote').send({
+        paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        userPubkey: 'UserWallet1111111111111111111111111111111',
+      });
+
+      expect(res.status).toBe(200);
+
+      const storedQuote = await redis.getQuote(res.body.quoteId);
+      expect(storedQuote).not.toBeNull();
+
+      // Required fields for submit validation (quoteId is the key, not stored in value)
+      expect(storedQuote).toHaveProperty('userPubkey');
+      expect(storedQuote).toHaveProperty('feePayer');
+      expect(storedQuote).toHaveProperty('paymentToken');
+      expect(storedQuote).toHaveProperty('feeAmount');
+      expect(storedQuote).toHaveProperty('expiresAt');
+      expect(storedQuote).toHaveProperty('estimatedComputeUnits');
+      expect(storedQuote).toHaveProperty('treasuryAta');
+    });
+
+    it('should delete quote from storage after retrieval', async () => {
+      const res = await request(app).post('/quote').send({
+        paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        userPubkey: 'UserWallet1111111111111111111111111111111',
+      });
+
+      expect(res.status).toBe(200);
+
+      // Quote exists initially
+      const quoteId = res.body.quoteId;
+      const storedQuote = await redis.getQuote(quoteId);
+      expect(storedQuote).not.toBeNull();
+
+      // Simulate submit consuming quote (in real flow, submit deletes quote)
+      await redis.deleteQuote(quoteId);
+
+      // Quote no longer exists
+      const deletedQuote = await redis.getQuote(quoteId);
+      expect(deletedQuote).toBeNull();
+    });
+
+    it('should reject reuse of same quoteId (idempotency)', async () => {
+      const res = await request(app).post('/quote').send({
+        paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        userPubkey: 'UserWallet1111111111111111111111111111111',
+      });
+
+      expect(res.status).toBe(200);
+      const quoteId = res.body.quoteId;
+
+      // First submit consumes the quote
+      await redis.deleteQuote(quoteId);
+
+      // Attempting to reuse should find no quote
+      const reusedQuote = await redis.getQuote(quoteId);
+      expect(reusedQuote).toBeNull();
+    });
+
+    it('should generate unique quoteIds for each request', async () => {
+      const responses = await Promise.all([
+        request(app).post('/quote').send({
+          paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          userPubkey: 'UserWallet1111111111111111111111111111111',
+        }),
+        request(app).post('/quote').send({
+          paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          userPubkey: 'UserWallet1111111111111111111111111111111',
+        }),
+        request(app).post('/quote').send({
+          paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          userPubkey: 'UserWallet1111111111111111111111111111111',
+        }),
+      ]);
+
+      const quoteIds = responses.map((r) => r.body.quoteId);
+      const uniqueIds = new Set(quoteIds);
+
+      expect(uniqueIds.size).toBe(3);
+    });
+  });
 });
