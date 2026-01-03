@@ -147,12 +147,12 @@ async function sendBundle(transactions, options = {}) {
     params: [serializedTxs, { encoding: 'base64' }],
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
   try {
     bundlesSent++;
     totalTipsPaid += tipLamports;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(bundleUrl, {
       method: 'POST',
@@ -160,8 +160,6 @@ async function sendBundle(transactions, options = {}) {
       body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     const result = await response.json();
 
@@ -188,6 +186,8 @@ async function sendBundle(transactions, options = {}) {
 
     logger.error('JITO', 'Bundle send failed', { error: error.message });
     return { bundleId: null, success: false, error: error.message };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -221,18 +221,16 @@ async function sendTransaction(transaction, options = {}) {
     params: [base64Tx, { encoding: 'base64' }],
   };
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  try {
     const response = await fetch(`${txUrl}${queryParams}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     const result = await response.json();
 
@@ -252,6 +250,8 @@ async function sendTransaction(transaction, options = {}) {
 
     logger.error('JITO', 'Transaction send failed', { error: error.message });
     return { signature: null, success: false, error: error.message };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

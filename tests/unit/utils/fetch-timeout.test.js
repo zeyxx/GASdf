@@ -340,6 +340,9 @@ describe('Fetch Timeout Utilities', () => {
 
       const result = await retryWithTimeout(fn);
       expect(result).toBe('result');
+
+      // Restore fake timers to prevent open handles
+      jest.useFakeTimers();
     });
   });
 });

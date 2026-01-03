@@ -91,7 +91,22 @@ function timeoutPromise(ms, operation = 'Operation') {
  * @returns {Promise<T>}
  */
 async function withTimeout(promise, ms, operation = 'Operation') {
-  return Promise.race([promise, timeoutPromise(ms, operation)]);
+  let timeoutId;
+
+  const timeoutPromiseWithCleanup = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error(`${operation} timeout after ${ms}ms`);
+      error.code = 'TIMEOUT';
+      error.timeoutMs = ms;
+      reject(error);
+    }, ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromiseWithCleanup]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**

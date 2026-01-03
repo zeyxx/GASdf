@@ -28,4 +28,10 @@ global.waitFor = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks();
+  jest.clearAllTimers();
+});
+
+// Ensure all timers are cleared after all tests
+afterAll(() => {
+  jest.useRealTimers();
 });
