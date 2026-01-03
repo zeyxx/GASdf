@@ -401,6 +401,23 @@ docker run -p 3000:3000 --env-file .env gasdf
 - **HolDex**: https://asdev-backend.onrender.com/api
 - **$ASDF Ecosystem**: https://alonisthe.dev
 
+## Known Issues
+
+### npm audit: bigint-buffer vulnerability (CVE-2025-3194)
+
+`npm audit` reports 7 high-severity vulnerabilities in `bigint-buffer`. This is an **ecosystem-wide issue** affecting the entire Solana JavaScript ecosystem.
+
+**Status**: No fix available upstream. All versions of `bigint-buffer` (0.0.0 to 1.1.5) are affected.
+
+**Risk for GASdf**: LOW
+- Attack requires controlling input to `toBigIntLE()` function
+- Our inputs come from trusted Solana RPC responses
+- Server-side application, not exposed to direct user input
+
+**Do NOT run `npm audit fix --force`** - this would downgrade `@solana/spl-token` to 0.1.8 (breaking change).
+
+Reference: [GHSA-3gc7-fjrx-p6mg](https://github.com/advisories/GHSA-3gc7-fjrx-p6mg)
+
 ## License
 
 MIT
