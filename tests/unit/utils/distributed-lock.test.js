@@ -4,7 +4,7 @@
  */
 
 // Mock redis client for testing
-const mockRedisClient = {
+const _mockRedisClient = {
   set: jest.fn(),
   get: jest.fn(),
   eval: jest.fn(),

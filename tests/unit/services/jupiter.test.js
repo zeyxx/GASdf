@@ -20,9 +20,9 @@ jest.mock('../../../src/utils/fetch-timeout', () => ({
   JUPITER_TIMEOUT: 15000,
 }));
 
-const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
-const { jupiterBreaker } = require('../../../src/utils/circuit-breaker');
-const config = require('../../../src/utils/config');
+const { fetchWithTimeout: _fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
+const { jupiterBreaker: _jupiterBreaker } = require('../../../src/utils/circuit-breaker');
+const _config = require('../../../src/utils/config');
 
 describe('Jupiter Service', () => {
   let jupiter;

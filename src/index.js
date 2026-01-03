@@ -233,7 +233,7 @@ app.use((req, res) => {
 });
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   logger.error('EXPRESS', 'Unhandled error', {
     requestId: req.requestId,
     error: err.message,

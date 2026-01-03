@@ -116,11 +116,11 @@ const redis = require('../../../src/utils/redis');
 const rpc = require('../../../src/utils/rpc');
 const jupiter = require('../../../src/services/jupiter');
 const feePayerPool = require('../../../src/services/fee-payer-pool');
-const treasuryAta = require('../../../src/services/treasury-ata');
+const _treasuryAta = require('../../../src/services/treasury-ata');
 const safeMath = require('../../../src/utils/safe-math');
 const splToken = require('@solana/spl-token');
 const logger = require('../../../src/utils/logger');
-const config = require('../../../src/utils/config');
+const _config = require('../../../src/utils/config');
 
 // Require burn service after mocks are set up
 const burnService = require('../../../src/services/burn');
@@ -162,7 +162,7 @@ describe('Burn Service', () => {
     rpc.getConnection.mockReturnValue(mockConnection);
 
     // Default lock behavior
-    redis.withLock.mockImplementation(async (name, fn, ttl) => {
+    redis.withLock.mockImplementation(async (name, fn, _ttl) => {
       const result = await fn();
       return { success: true, result };
     });

@@ -1,14 +1,14 @@
 const config = require('./config');
-const logger = require('./logger');
+const _logger = require('./logger');
 
 // =============================================================================
 // Prometheus-style Metrics (without prom-client dependency)
 // =============================================================================
 
 // Metric types
-const COUNTER = 'counter';
-const GAUGE = 'gauge';
-const HISTOGRAM = 'histogram';
+const _COUNTER = 'counter';
+const _GAUGE = 'gauge';
+const _HISTOGRAM = 'histogram';
 
 // Histogram bucket boundaries (seconds)
 const DEFAULT_BUCKETS = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];

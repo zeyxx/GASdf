@@ -2,7 +2,10 @@ const { Transaction, VersionedTransaction, PublicKey, SystemProgram } = require(
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const crypto = require('crypto');
 const nacl = require('tweetnacl');
-const { getAllFeePayerPublicKeys, getTransactionFeePayer } = require('./signer');
+const {
+  getAllFeePayerPublicKeys,
+  getTransactionFeePayer: _getTransactionFeePayer,
+} = require('./signer');
 const config = require('../utils/config');
 
 // System Program instruction discriminators
@@ -548,7 +551,7 @@ async function validateFeePayment(transaction, quote, userPubkey) {
 
         // Transfer (3) or TransferChecked (12)
         if (discriminator === 3 || discriminator === 12) {
-          const sourceAccount = getAccountAtIndex(ix, 0, accountKeys);
+          const _sourceAccount = getAccountAtIndex(ix, 0, accountKeys);
           const destAccount =
             discriminator === 3
               ? getAccountAtIndex(ix, 1, accountKeys)

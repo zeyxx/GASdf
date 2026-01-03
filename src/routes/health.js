@@ -279,8 +279,8 @@ async function checkFeePayer() {
     const {
       getPayerBalances,
       getHealthSummary,
-      MIN_HEALTHY_BALANCE,
-      WARNING_BALANCE,
+      MIN_HEALTHY_BALANCE: _MIN_HEALTHY_BALANCE,
+      WARNING_BALANCE: _WARNING_BALANCE,
     } = require('../services/signer');
 
     const balances = await getPayerBalances();

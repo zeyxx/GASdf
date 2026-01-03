@@ -1,4 +1,3 @@
-const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const { alertingService } = require('./alerting');

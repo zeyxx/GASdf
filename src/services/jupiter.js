@@ -1,6 +1,6 @@
 const config = require('../utils/config');
 const { jupiterBreaker } = require('../utils/circuit-breaker');
-const { safeProportion, safeCeil, clamp } = require('../utils/safe-math');
+const { safeProportion, safeCeil, clamp: _clamp } = require('../utils/safe-math');
 const { fetchWithTimeout, JUPITER_TIMEOUT } = require('../utils/fetch-timeout');
 const redis = require('../utils/redis');
 const logger = require('../utils/logger');

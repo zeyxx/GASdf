@@ -15,7 +15,10 @@ const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
 const holdex = require('./holdex');
 const jito = require('./jito');
-const { calculateTreasurySplit, validateSolanaAmount } = require('../utils/safe-math');
+const {
+  calculateTreasurySplit,
+  validateSolanaAmount: _validateSolanaAmount,
+} = require('../utils/safe-math');
 
 // Lazy-load ASDF mint to avoid startup errors in dev
 let _asdfMint = null;
@@ -595,7 +598,7 @@ async function executeBurnWithLock(tokenBalances) {
  * @returns {Object} Processing result (without burn execution)
  */
 async function processTokenForBatch(token, pendingBurns) {
-  const { mint, balance, symbol, valueUsd } = token;
+  const { mint, balance, symbol, valueUsd: _valueUsd } = token;
   const isAsdf = mint === config.ASDF_MINT;
 
   // Get ecosystem burn bonus for non-ASDF tokens

@@ -16,7 +16,7 @@ const {
   Keypair,
   Transaction,
   SystemProgram,
-  PublicKey,
+  PublicKey: _PublicKey,
   VersionedTransaction,
   TransactionMessage,
 } = require('@solana/web3.js');

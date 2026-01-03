@@ -1,4 +1,4 @@
-const config = require('../utils/config');
+const _config = require('../utils/config');
 const redis = require('../utils/redis');
 const logger = require('../utils/logger');
 
@@ -6,9 +6,9 @@ const logger = require('../utils/logger');
 // Constants
 // =============================================================================
 
-const QUEUE_KEY = 'tx:queue';
-const PROCESSING_KEY = 'tx:processing';
-const FAILED_KEY = 'tx:failed';
+const _QUEUE_KEY = 'tx:queue';
+const _PROCESSING_KEY = 'tx:processing';
+const _FAILED_KEY = 'tx:failed';
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -219,7 +219,7 @@ async function getStats() {
 /**
  * Clean up old entries
  */
-async function cleanup(maxAgeMs = 24 * 60 * 60 * 1000) {
+async function cleanup(_maxAgeMs = 24 * 60 * 60 * 1000) {
   // In production, this would scan and delete old entries
   logger.debug('TX_QUEUE', 'Cleanup completed');
 }

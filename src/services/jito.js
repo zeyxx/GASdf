@@ -9,7 +9,11 @@
  * Philosophy: "Bundle swaps to protect burn economics"
  */
 
-const { PublicKey, SystemProgram, TransactionInstruction } = require('@solana/web3.js');
+const {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction: _TransactionInstruction,
+} = require('@solana/web3.js');
 const logger = require('../utils/logger');
 const config = require('../utils/config');
 

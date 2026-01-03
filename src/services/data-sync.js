@@ -13,7 +13,7 @@
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
 const db = require('../utils/db');
-const config = require('../utils/config');
+const _config = require('../utils/config');
 
 // Sync interval: 5 minutes
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;

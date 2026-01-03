@@ -9,8 +9,8 @@ const { withTimeout } = require('./fetch-timeout');
 
 // RPC operation timeouts (prevents hanging on slow/unresponsive RPC)
 const RPC_SIMULATION_TIMEOUT = 30_000; // 30 seconds for simulation
-const RPC_SEND_TIMEOUT = 15_000; // 15 seconds for send
-const RPC_QUERY_TIMEOUT = 10_000; // 10 seconds for queries
+const _RPC_SEND_TIMEOUT = 15_000; // 15 seconds for send
+const _RPC_QUERY_TIMEOUT = 10_000; // 10 seconds for queries
 
 // =============================================================================
 // Rate Limit Tracking (Proactive backoff before 429)

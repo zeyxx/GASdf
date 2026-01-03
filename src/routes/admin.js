@@ -262,7 +262,10 @@ router.post('/migrate-redis', async (req, res) => {
   try {
     logger.info('ADMIN', 'Redis key migration triggered', { dryRun, ip: req.ip });
 
-    const { migrateRedisKeys, cleanupOldKeys } = require('../../scripts/migrate-redis-keys');
+    const {
+      migrateRedisKeys,
+      cleanupOldKeys: _cleanupOldKeys,
+    } = require('../../scripts/migrate-redis-keys');
     const result = await migrateRedisKeys(dryRun);
 
     logger.info('ADMIN', 'Redis key migration completed', {

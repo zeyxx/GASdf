@@ -37,7 +37,7 @@ jest.mock('@solana/web3.js', () => ({
 
 describe('Jito Bundle Service', () => {
   let jito;
-  let config;
+  let _config;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -46,7 +46,7 @@ describe('Jito Bundle Service', () => {
     // Fresh require of the module
     jest.isolateModules(() => {
       jito = require('../../../src/services/jito');
-      config = require('../../../src/utils/config');
+      _config = require('../../../src/utils/config');
     });
   });
 

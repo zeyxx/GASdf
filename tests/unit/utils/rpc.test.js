@@ -22,7 +22,7 @@ jest.mock('@solana/web3.js', () => ({
   })),
 }));
 
-const { Connection } = require('@solana/web3.js');
+const { Connection: _Connection } = require('@solana/web3.js');
 
 describe('RPC Failover', () => {
   let rpc;

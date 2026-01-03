@@ -94,8 +94,8 @@ const MAX_BUFFER_SIZE = 100;
 const FLUSH_INTERVAL_MS = 10_000; // 10 seconds
 
 // Redis key for audit logs
-const AUDIT_KEY = 'audit:log';
-const AUDIT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days retention
+const _AUDIT_KEY = 'audit:log';
+const _AUDIT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days retention
 
 // Stats tracking
 const eventCounts = new Map();

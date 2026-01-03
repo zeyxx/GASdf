@@ -18,12 +18,7 @@ const { submitLimiter, walletSubmitLimiter } = require('../middleware/security')
 const { validate } = require('../middleware/validation');
 const txQueue = require('../services/tx-queue');
 const { submitsTotal, submitDuration, activeQuotes } = require('../utils/metrics');
-const {
-  logSubmitSuccess,
-  logSubmitRejected,
-  logSecurityEvent,
-  AUDIT_EVENTS,
-} = require('../services/audit');
+const { logSubmitSuccess, logSecurityEvent, AUDIT_EVENTS } = require('../services/audit');
 const { anomalyDetector } = require('../services/anomaly-detector');
 
 const router = express.Router();
@@ -293,7 +288,7 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     });
 
     // Enqueue transaction for tracking
-    const txEntry = await txQueue.enqueue({
+    const _txEntry = await txQueue.enqueue({
       quoteId,
       transaction,
       userPubkey,

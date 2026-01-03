@@ -1,4 +1,4 @@
-const { Keypair, Transaction, VersionedTransaction } = require('@solana/web3.js');
+const { Keypair, Transaction: _Transaction, VersionedTransaction } = require('@solana/web3.js');
 const bs58 = require('bs58').default;
 const config = require('../utils/config');
 const logger = require('../utils/logger');
