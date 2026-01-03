@@ -72,9 +72,7 @@ describe('Admin Route', () => {
     });
 
     it('should reject request with invalid API key', async () => {
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', 'wrong-key');
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', 'wrong-key');
 
       expect(res.status).toBe(401);
       expect(res.body.code).toBe('INVALID_API_KEY');
@@ -83,9 +81,7 @@ describe('Admin Route', () => {
     it('should accept request with valid API key', async () => {
       getTreasuryTokenBalances.mockResolvedValue([]);
 
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
     });
@@ -114,9 +110,7 @@ describe('Admin Route', () => {
     it('should return no tokens message when treasury is empty', async () => {
       getTreasuryTokenBalances.mockResolvedValue([]);
 
-      const res = await request(app)
-        .post('/admin/burn')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/burn').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(false);
@@ -129,9 +123,7 @@ describe('Admin Route', () => {
       ]);
       checkAndExecuteBurn.mockResolvedValue(null);
 
-      const res = await request(app)
-        .post('/admin/burn')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/burn').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(false);
@@ -149,9 +141,7 @@ describe('Admin Route', () => {
         totalTreasury: 1000000000, // 1 SOL
       });
 
-      const res = await request(app)
-        .post('/admin/burn')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/burn').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -165,9 +155,7 @@ describe('Admin Route', () => {
       ]);
       checkAndExecuteBurn.mockRejectedValue(new Error('RPC timeout'));
 
-      const res = await request(app)
-        .post('/admin/burn')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/burn').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('BURN_FAILED');
@@ -182,9 +170,7 @@ describe('Admin Route', () => {
     it('should return empty treasury', async () => {
       getTreasuryTokenBalances.mockResolvedValue([]);
 
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.tokens).toEqual([]);
@@ -198,9 +184,7 @@ describe('Admin Route', () => {
         { mint: 'SOL', symbol: 'SOL', uiAmount: 1, valueUsd: 200 },
       ]);
 
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.tokens).toHaveLength(2);
@@ -213,9 +197,7 @@ describe('Admin Route', () => {
         { mint: 'DUST', symbol: 'DUST', uiAmount: 0.001, valueUsd: 0.1 },
       ]);
 
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', TEST_API_KEY);
 
       expect(res.body.tokens[0].eligible).toBe(false);
     });
@@ -223,9 +205,7 @@ describe('Admin Route', () => {
     it('should return 500 when getTreasuryTokenBalances throws', async () => {
       getTreasuryTokenBalances.mockRejectedValue(new Error('RPC error'));
 
-      const res = await request(app)
-        .get('/admin/treasury')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/treasury').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('TREASURY_CHECK_FAILED');
@@ -243,9 +223,7 @@ describe('Admin Route', () => {
         total: 1,
       });
 
-      const res = await request(app)
-        .get('/admin/transactions')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/transactions').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.transactions).toHaveLength(1);
@@ -302,9 +280,7 @@ describe('Admin Route', () => {
     it('should return 503 when DB unavailable', async () => {
       db.getTransactionHistory.mockResolvedValue(null);
 
-      const res = await request(app)
-        .get('/admin/transactions')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/transactions').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(503);
       expect(res.body.code).toBe('DB_UNAVAILABLE');
@@ -313,9 +289,7 @@ describe('Admin Route', () => {
     it('should return 500 when getTransactionHistory throws', async () => {
       db.getTransactionHistory.mockRejectedValue(new Error('Connection refused'));
 
-      const res = await request(app)
-        .get('/admin/transactions')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/transactions').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('QUERY_FAILED');
@@ -333,9 +307,7 @@ describe('Admin Route', () => {
         total: 1,
       });
 
-      const res = await request(app)
-        .get('/admin/burns')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/burns').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(res.body.burns).toHaveLength(1);
@@ -375,9 +347,7 @@ describe('Admin Route', () => {
     it('should return 503 when DB unavailable', async () => {
       db.getBurnHistory.mockResolvedValue(null);
 
-      const res = await request(app)
-        .get('/admin/burns')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/burns').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(503);
       expect(res.body.code).toBe('DB_UNAVAILABLE');
@@ -386,9 +356,7 @@ describe('Admin Route', () => {
     it('should return 500 when getBurnHistory throws', async () => {
       db.getBurnHistory.mockRejectedValue(new Error('Query timeout'));
 
-      const res = await request(app)
-        .get('/admin/burns')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).get('/admin/burns').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('QUERY_FAILED');
@@ -406,9 +374,7 @@ describe('Admin Route', () => {
         stats: { migrated: 5 },
       });
 
-      const res = await request(app)
-        .post('/admin/migrate-redis')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/migrate-redis').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(migrateRedisKeys).toHaveBeenCalledWith(true);
@@ -432,9 +398,7 @@ describe('Admin Route', () => {
     it('should return 500 when migration throws', async () => {
       migrateRedisKeys.mockRejectedValue(new Error('Redis connection failed'));
 
-      const res = await request(app)
-        .post('/admin/migrate-redis')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/migrate-redis').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('MIGRATION_FAILED');
@@ -452,9 +416,7 @@ describe('Admin Route', () => {
         stats: { deleted: 3 },
       });
 
-      const res = await request(app)
-        .post('/admin/cleanup-redis')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/cleanup-redis').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(200);
       expect(cleanupOldKeys).toHaveBeenCalledWith(true);
@@ -478,9 +440,7 @@ describe('Admin Route', () => {
     it('should return 500 when cleanup throws', async () => {
       cleanupOldKeys.mockRejectedValue(new Error('Redis connection failed'));
 
-      const res = await request(app)
-        .post('/admin/cleanup-redis')
-        .set('x-admin-key', TEST_API_KEY);
+      const res = await request(app).post('/admin/cleanup-redis').set('x-admin-key', TEST_API_KEY);
 
       expect(res.status).toBe(500);
       expect(res.body.code).toBe('CLEANUP_FAILED');

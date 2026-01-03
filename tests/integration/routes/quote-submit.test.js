@@ -147,9 +147,9 @@ jest.mock('../../../src/services/token-gate', () => ({
     accepted: true,
     reason: 'trusted',
   }),
-  getAcceptedTokensList: jest.fn().mockReturnValue([
-    { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC' },
-  ]),
+  getAcceptedTokensList: jest
+    .fn()
+    .mockReturnValue([{ mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC' }]),
 }));
 
 // Mock holder-tiers
@@ -193,9 +193,7 @@ jest.mock('../../../src/services/validator', () => ({
   validateTransaction: jest.fn().mockResolvedValue({
     valid: true,
     message: {
-      staticAccountKeys: [
-        { toBase58: () => 'FeePayer111111111111111111111111111111111' },
-      ],
+      staticAccountKeys: [{ toBase58: () => 'FeePayer111111111111111111111111111111111' }],
       recentBlockhash: 'TestBlockhash123456789',
     },
     feePayer: 'FeePayer111111111111111111111111111111111',

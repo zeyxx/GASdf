@@ -558,13 +558,12 @@ describe('Validator Service', () => {
       // Then corrupt the signature by replacing it with a wrong one
       // Create a fake signature from wrong user for the same message
       const nacl = require('tweetnacl');
-      const wrongSignature = nacl.sign.detached(
-        tx.serializeMessage(),
-        wrongUser.secretKey
-      );
+      const wrongSignature = nacl.sign.detached(tx.serializeMessage(), wrongUser.secretKey);
 
       // Replace user's valid signature with wrong user's signature
-      const userSig = tx.signatures.find((s) => s.publicKey.toBase58() === user.publicKey.toBase58());
+      const userSig = tx.signatures.find(
+        (s) => s.publicKey.toBase58() === user.publicKey.toBase58()
+      );
       if (userSig) {
         userSig.signature = Buffer.from(wrongSignature);
       }
@@ -612,7 +611,9 @@ describe('Validator Service', () => {
 
       const result = validateTransaction(tx, 5000, user.publicKey.toBase58());
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Token.Transfer') && e.includes('fee payer'))).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes('Token.Transfer') && e.includes('fee payer'))
+      ).toBe(true);
     });
 
     it('should detect Token.Approve with fee payer as authority', () => {
@@ -956,9 +957,7 @@ describe('Validator Service', () => {
       // Add instruction with no data
       tx.add({
         programId: SystemProgram.programId,
-        keys: [
-          { pubkey: user.publicKey, isSigner: true, isWritable: true },
-        ],
+        keys: [{ pubkey: user.publicKey, isSigner: true, isWritable: true }],
         data: Buffer.alloc(0),
       });
       tx.partialSign(user);
@@ -978,9 +977,7 @@ describe('Validator Service', () => {
       // Add instruction with only 2 bytes (less than 4-byte discriminator)
       tx.add({
         programId: SystemProgram.programId,
-        keys: [
-          { pubkey: user.publicKey, isSigner: true, isWritable: true },
-        ],
+        keys: [{ pubkey: user.publicKey, isSigner: true, isWritable: true }],
         data: Buffer.from([1, 2]),
       });
       tx.partialSign(user);

@@ -194,7 +194,10 @@ describe('Quote → Submit Flow', () => {
       const res = await request(app).post('/quote').send(validQuoteRequest);
 
       expect(res.status).toBe(200);
-      expect(res.body.paymentToken).toHaveProperty('mint', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      expect(res.body.paymentToken).toHaveProperty(
+        'mint',
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+      );
       expect(res.body.paymentToken).toHaveProperty('symbol', 'USDC');
       expect(res.body.paymentToken).toHaveProperty('decimals', 6);
     });

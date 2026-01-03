@@ -165,11 +165,7 @@ describe('Transaction Queue Service', () => {
       expect(entry.attempts).toBe(0);
       expect(entry.maxRetries).toBe(3);
       expect(entry.errors).toEqual([]);
-      expect(redis.setQuote).toHaveBeenCalledWith(
-        'tx:quote-123',
-        expect.any(Object),
-        3600
-      );
+      expect(redis.setQuote).toHaveBeenCalledWith('tx:quote-123', expect.any(Object), 3600);
       expect(logger.info).toHaveBeenCalledWith(
         'TX_QUEUE',
         'Transaction enqueued',

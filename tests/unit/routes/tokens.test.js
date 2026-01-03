@@ -29,8 +29,18 @@ jest.mock('../../../src/services/holder-tiers', () => ({
 
 jest.mock('../../../src/services/token-gate', () => ({
   getAcceptedTokensList: jest.fn().mockReturnValue([
-    { mint: 'So11111111111111111111111111111111111111112', symbol: 'SOL', decimals: 9, trusted: true },
-    { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', decimals: 6, trusted: true },
+    {
+      mint: 'So11111111111111111111111111111111111111112',
+      symbol: 'SOL',
+      decimals: 9,
+      trusted: true,
+    },
+    {
+      mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      symbol: 'USDC',
+      decimals: 6,
+      trusted: true,
+    },
   ]),
   isTokenAccepted: jest.fn(),
 }));
@@ -116,7 +126,9 @@ describe('Tokens Route', () => {
     });
 
     it('should return 400 for mint address with invalid characters', async () => {
-      const res = await request(app).get('/tokens/0OIl00000000000000000000000000000000000000/check');
+      const res = await request(app).get(
+        '/tokens/0OIl00000000000000000000000000000000000000/check'
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('Invalid mint address format');
@@ -202,7 +214,9 @@ describe('Tokens Route', () => {
     });
 
     it('should return 400 for wallet with invalid base58 characters', async () => {
-      const res = await request(app).get('/tokens/tiers/0OIl00000000000000000000000000000000000000');
+      const res = await request(app).get(
+        '/tokens/tiers/0OIl00000000000000000000000000000000000000'
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('Invalid wallet address format');
