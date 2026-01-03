@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * GASdf Metrics Pusher
- * Scrapes /metrics and pushes to Grafana Cloud
+ * Scrapes /metrics and pushes to Grafana Cloud via InfluxDB protocol
  */
 
 const https = require('https');
@@ -12,7 +12,7 @@ const config = {
   metricsUrl: process.env.GASDF_METRICS_URL || 'https://gasdf-43r8.onrender.com/metrics',
   metricsApiKey: process.env.METRICS_API_KEY,
 
-  // Grafana Cloud
+  // Grafana Cloud - derive Influx endpoint from remote_write URL
   grafanaUrl: process.env.GRAFANA_REMOTE_WRITE_URL,
   grafanaUser: process.env.GRAFANA_USER_ID,
   grafanaKey: process.env.GRAFANA_API_KEY,
@@ -24,7 +24,7 @@ const config = {
 // Validate config
 function validateConfig() {
   const required = ['metricsApiKey', 'grafanaUrl', 'grafanaUser', 'grafanaKey'];
-  const missing = required.filter(k => !config[k]);
+  const missing = required.filter((k) => !config[k]);
   if (missing.length > 0) {
     console.error('Missing required env vars:', missing.join(', '));
     process.exit(1);
@@ -47,7 +47,7 @@ async function fetchMetrics() {
 
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         if (res.statusCode === 200) {
           resolve(data);
@@ -62,77 +62,76 @@ async function fetchMetrics() {
   });
 }
 
-// Parse Prometheus text format to samples
-function parsePrometheusText(text) {
-  const samples = [];
-  const lines = text.split('\n');
+// Convert Prometheus text format to InfluxDB line protocol
+function prometheusToInflux(text) {
+  const lines = [];
+  const timestamp = Date.now() * 1000000; // nanoseconds
 
-  for (const line of lines) {
+  for (const line of text.split('\n')) {
     // Skip comments and empty lines
     if (line.startsWith('#') || line.trim() === '') continue;
 
-    // Parse: metric_name{label="value"} 123.45 timestamp
-    const match = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)((?:\{[^}]*\})?)?\s+([0-9.eE+-]+)(?:\s+(\d+))?$/);
-    if (match) {
-      const [, name, labelsStr, value] = match;
-      const labels = parseLabels(labelsStr || '');
-      samples.push({
-        name,
-        labels,
-        value: parseFloat(value),
-        timestamp: Date.now(),
-      });
+    // Parse: metric_name{label="value"} 123.45
+    const match = line.match(
+      /^([a-zA-Z_:][a-zA-Z0-9_:]*)((?:\{[^}]*\})?)\s+([0-9.eE+-]+(?:e[+-]?\d+)?)/i
+    );
+    if (!match) continue;
+
+    const [, name, labelsStr, valueStr] = match;
+    const value = parseFloat(valueStr);
+
+    // Skip NaN and Inf values
+    if (!isFinite(value)) continue;
+
+    // Parse labels
+    const tags = ['service=gasdf', 'env=production'];
+    if (labelsStr && labelsStr !== '{}') {
+      const inner = labelsStr.slice(1, -1);
+      const pairs = inner.match(/([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"/g) || [];
+      for (const pair of pairs) {
+        const eqIdx = pair.indexOf('=');
+        const key = pair.slice(0, eqIdx);
+        const val = pair.slice(eqIdx + 2, -1); // Remove =" and trailing "
+        // Escape special chars in tag values
+        const escaped = val.replace(/[,= ]/g, '\\$&');
+        if (escaped) tags.push(`${key}=${escaped}`);
+      }
     }
+
+    // InfluxDB line protocol: measurement,tag1=v1,tag2=v2 value=123.45 timestamp
+    const tagStr = tags.length > 0 ? ',' + tags.join(',') : '';
+    lines.push(`${name}${tagStr} value=${value} ${timestamp}`);
   }
 
-  return samples;
+  return lines.join('\n');
 }
 
-// Parse labels string {foo="bar",baz="qux"} to object
-function parseLabels(str) {
-  const labels = { service: 'gasdf', env: 'production' };
-  if (!str || str === '{}') return labels;
-
-  const inner = str.slice(1, -1); // Remove { }
-  const pairs = inner.match(/([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"/g) || [];
-
-  for (const pair of pairs) {
-    const [key, value] = pair.split('=');
-    labels[key] = value.replace(/^"|"$/g, '');
-  }
-
-  return labels;
-}
-
-// Convert samples to Prometheus remote write format (snappy compressed protobuf)
-// For simplicity, we'll use the Influx line protocol via Grafana's carbon endpoint
-// Or use the simpler JSON push endpoint
-
-// Actually, let's use the Prometheus push gateway format which is simpler
-async function pushToGrafana(metricsText) {
+// Push to Grafana Cloud via InfluxDB write endpoint
+async function pushToGrafana(influxData) {
   return new Promise((resolve, reject) => {
-    const url = new URL(config.grafanaUrl);
-
-    // Add job label for push gateway compatibility
-    const body = metricsText;
+    // Convert remote_write URL to influx write URL
+    // From: https://prometheus-prod-XX-prod-XX.grafana.net/api/prom/push
+    // To: https://influx-prod-XX-prod-XX.grafana.net/api/v1/push/influx/write
+    const baseUrl = new URL(config.grafanaUrl);
+    const influxHost = baseUrl.hostname.replace('prometheus-', 'influx-');
 
     const auth = Buffer.from(`${config.grafanaUser}:${config.grafanaKey}`).toString('base64');
 
     const options = {
-      hostname: url.hostname,
-      port: url.port || 443,
-      path: url.pathname,
+      hostname: influxHost,
+      port: 443,
+      path: '/api/v1/push/influx/write',
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain',
-        'Authorization': `Basic ${auth}`,
-        'Content-Length': Buffer.byteLength(body),
+        Authorization: `Basic ${auth}`,
+        'Content-Length': Buffer.byteLength(influxData),
       },
     };
 
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(data);
@@ -143,7 +142,7 @@ async function pushToGrafana(metricsText) {
     });
 
     req.on('error', reject);
-    req.write(body);
+    req.write(influxData);
     req.end();
   });
 }
@@ -152,11 +151,12 @@ async function pushToGrafana(metricsText) {
 async function scrape() {
   try {
     console.log(`[${new Date().toISOString()}] Scraping metrics...`);
-    const metrics = await fetchMetrics();
-    const lineCount = metrics.split('\n').filter(l => l && !l.startsWith('#')).length;
-    console.log(`[${new Date().toISOString()}] Fetched ${lineCount} metrics`);
+    const prometheusText = await fetchMetrics();
+    const influxData = prometheusToInflux(prometheusText);
+    const lineCount = influxData.split('\n').filter((l) => l).length;
+    console.log(`[${new Date().toISOString()}] Converted ${lineCount} metrics to InfluxDB format`);
 
-    await pushToGrafana(metrics);
+    await pushToGrafana(influxData);
     console.log(`[${new Date().toISOString()}] Pushed to Grafana Cloud`);
   } catch (err) {
     console.error(`[${new Date().toISOString()}] Error:`, err.message);
@@ -198,7 +198,7 @@ async function main() {
   console.log(`Scraping every ${config.interval / 1000}s`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });
