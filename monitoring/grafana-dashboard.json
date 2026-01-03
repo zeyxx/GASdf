@@ -1,78 +1,161 @@
 {
-  "id": null,
-  "uid": "gasdf-monitoring",
-  "title": "GASdf Monitoring",
-  "description": "GASdf - Gasless transactions for Solana",
-  "tags": ["gasdf", "solana"],
-  "timezone": "browser",
-  "editable": true,
-  "graphTooltip": 0,
-  "panels": [
+  "__inputs": [
     {
-      "id": 1,
-      "type": "text",
-      "title": "",
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
-      "options": {
-        "mode": "markdown",
-        "content": "# GASdf Monitoring\nGasless transactions for Solana - Pay fees with any token, burn $ASDF"
-      }
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.0.0"
     },
     {
-      "id": 2,
-      "type": "stat",
-      "title": "Total Quotes",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
-      "targets": [
-        {
-          "expr": "gasdf_quotes_total{service=\"gasdf\"}",
-          "refId": "A"
-        }
-      ],
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "text",
+      "name": "Text",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "GASdf - Gasless transactions for Solana. Pay network fees with any token, burn $ASDF.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "# GASdf Monitoring\nGasless transactions for Solana - Pay fees with any token, burn $ASDF",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.5.0",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [{ "color": "blue", "value": null }]
           }
-        }
-      }
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Total Submits",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
-          "expr": "gasdf_submits_total{service=\"gasdf\"}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "gasdf_quotes_total{service=\"gasdf\"}",
           "refId": "A"
         }
       ],
+      "title": "Total Quotes",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [{ "color": "green", "value": null }]
           }
-        }
-      }
-    },
-    {
-      "id": 4,
-      "type": "stat",
-      "title": "Fee Payer SOL",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
-          "expr": "gasdf_fee_payer_balance_lamports{service=\"gasdf\"} / 1000000000",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "gasdf_submits_total{service=\"gasdf\"}",
           "refId": "A"
         }
       ],
+      "title": "Total Submits",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "color": { "mode": "thresholds" },
           "decimals": 4,
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -80,140 +163,306 @@
               { "color": "yellow", "value": 0.1 },
               { "color": "green", "value": 0.5 }
             ]
-          }
-        }
-      }
-    },
-    {
-      "id": 5,
-      "type": "stat",
-      "title": "Total Burned",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "gasdf_fee_payer_balance_lamports{service=\"gasdf\"} / 1000000000",
+          "refId": "A"
+        }
+      ],
+      "title": "Fee Payer SOL",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "orange", "value": null }]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.5.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "expr": "gasdf_asdf_burned_total{service=\"gasdf\"}",
           "refId": "A"
         }
       ],
+      "title": "Total Burned",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "orange", "value": null }]
-          }
-        }
-      }
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Request Rate",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "rate(gasdf_http_requests_total{service=\"gasdf\"}[5m])",
           "legendFormat": "{{route}} - {{status}}",
+          "range": true,
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10
-          }
-        }
-      }
+      "title": "Request Rate",
+      "type": "timeseries"
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Response Time",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.95\"}",
           "legendFormat": "P95 {{route}}",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.5\"}",
           "legendFormat": "P50 {{route}}",
+          "range": true,
           "refId": "B"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10
-          }
-        }
-      }
+      "title": "Response Time",
+      "type": "timeseries"
     },
     {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Quotes & Submits",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "gasdf_quotes_total{service=\"gasdf\"}",
           "legendFormat": "Quotes",
+          "range": true,
           "refId": "A"
         },
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "gasdf_submits_total{service=\"gasdf\"}",
           "legendFormat": "Submits",
+          "range": true,
           "refId": "B"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 20
-          }
-        }
-      }
+      "title": "Quotes & Submits",
+      "type": "timeseries"
     },
     {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Fee Payer Balance History",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "yellow", "mode": "fixed" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.0",
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
           "expr": "gasdf_fee_payer_balance_lamports{service=\"gasdf\"} / 1000000000",
           "legendFormat": "SOL Balance",
+          "range": true,
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 4,
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 30
-          },
-          "color": { "mode": "fixed", "fixedColor": "yellow" }
-        }
-      }
+      "title": "Fee Payer Balance History",
+      "type": "timeseries"
     }
   ],
-  "time": { "from": "now-1h", "to": "now" },
   "refresh": "30s",
-  "schemaVersion": 17,
-  "version": 0,
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["gasdf", "solana"],
   "templating": { "list": [] },
-  "annotations": { "list": [] },
-  "links": []
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "GASdf Monitoring",
+  "uid": "gasdf-monitoring",
+  "version": 1,
+  "weekStart": ""
 }
