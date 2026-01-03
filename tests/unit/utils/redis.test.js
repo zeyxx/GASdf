@@ -16,6 +16,7 @@ jest.mock('../../../src/utils/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
+  debug: jest.fn(),
 }));
 
 describe('Redis Utilities', () => {
@@ -237,6 +238,156 @@ describe('Redis Utilities', () => {
       const result = await redis.ping();
       expect(result).toBeDefined();
       // Returns PONG string in memory mode, object otherwise
+    });
+  });
+
+  describe('Transaction slot (atomic anti-replay)', () => {
+    it('claimTransactionSlot should return claimed=true for new hash', async () => {
+      const hash = `atomic-test-${Date.now()}`;
+      const result = await redis.claimTransactionSlot(hash);
+      expect(result.claimed).toBe(true);
+    });
+
+    it('claimTransactionSlot should return claimed=false for duplicate hash', async () => {
+      const hash = `atomic-dup-${Date.now()}`;
+      await redis.claimTransactionSlot(hash);
+      const result = await redis.claimTransactionSlot(hash);
+      expect(result.claimed).toBe(false);
+    });
+
+    it('releaseTransactionSlot should allow re-claim', async () => {
+      const hash = `atomic-release-${Date.now()}`;
+      await redis.claimTransactionSlot(hash);
+      await redis.releaseTransactionSlot(hash);
+      const result = await redis.claimTransactionSlot(hash);
+      expect(result.claimed).toBe(true);
+    });
+  });
+
+  describe('Wallet burn tracking', () => {
+    it('incrWalletBurn should track burn amount and tx count', async () => {
+      const wallet = `burn-wallet-${Date.now()}`;
+      const result = await redis.incrWalletBurn(wallet, 1000);
+      expect(result).toHaveProperty('totalBurned');
+      expect(result).toHaveProperty('txCount');
+      expect(result.totalBurned).toBeGreaterThanOrEqual(1000);
+      expect(result.txCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it('getWalletBurnStats should return burn statistics', async () => {
+      const wallet = `stats-wallet-${Date.now()}`;
+      await redis.incrWalletBurn(wallet, 500);
+      const stats = await redis.getWalletBurnStats(wallet);
+      expect(stats).toHaveProperty('wallet', wallet);
+      expect(stats).toHaveProperty('totalBurned');
+      expect(stats).toHaveProperty('txCount');
+      expect(stats.totalBurned).toBeGreaterThanOrEqual(500);
+    });
+
+    it('getBurnLeaderboard should return array', async () => {
+      const result = await redis.getBurnLeaderboard(10);
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('getBurnerCount should return a number', async () => {
+      const count = await redis.getBurnerCount();
+      expect(typeof count).toBe('number');
+    });
+  });
+
+  describe('Memory sync helpers', () => {
+    it('setOnReconnectCallback should accept function', () => {
+      expect(() => {
+        redis.setOnReconnectCallback(() => {});
+      }).not.toThrow();
+    });
+
+    it('getMemoryStatsData should return object', () => {
+      const data = redis.getMemoryStatsData();
+      expect(typeof data).toBe('object');
+    });
+
+    it('clearMemoryStats should not throw', () => {
+      expect(() => redis.clearMemoryStats()).not.toThrow();
+    });
+  });
+
+  describe('Distributed locking', () => {
+    it('acquireLock should not throw', async () => {
+      const key = `test-lock-${Date.now()}`;
+      await expect(redis.acquireLock(key, 5000)).resolves.not.toThrow();
+    });
+
+    it('releaseLock should not throw', async () => {
+      const key = `release-lock-${Date.now()}`;
+      await expect(redis.releaseLock(key)).resolves.not.toThrow();
+    });
+
+    it('isLockHeld should return boolean', async () => {
+      const key = `check-lock-${Date.now()}`;
+      const result = await redis.isLockHeld(key);
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('withLock should execute callback', async () => {
+      const key = `with-lock-${Date.now()}`;
+      const callback = jest.fn().mockResolvedValue('result');
+      const result = await redis.withLock(key, callback, 5000);
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('Velocity tracking', () => {
+    it('recordTransactionVelocity should not throw', async () => {
+      await expect(redis.recordTransactionVelocity(5000)).resolves.not.toThrow();
+    });
+
+    it('getVelocityMetrics should return metrics object', async () => {
+      const metrics = await redis.getVelocityMetrics();
+      expect(metrics).toBeDefined();
+      expect(typeof metrics).toBe('object');
+    });
+
+    it('calculateVelocityBasedBuffer should return buffer object', async () => {
+      const buffer = await redis.calculateVelocityBasedBuffer();
+      expect(buffer).toBeDefined();
+      expect(buffer).toHaveProperty('required');
+      expect(buffer).toHaveProperty('target');
+      expect(buffer).toHaveProperty('velocity');
+    });
+  });
+
+  describe('Jupiter quote caching', () => {
+    it('cacheJupiterQuote should store quote', async () => {
+      await expect(
+        redis.cacheJupiterQuote('token1', 'token2', 1000, { quote: 'data' })
+      ).resolves.not.toThrow();
+    });
+
+    it('getCachedJupiterQuote should return cached or null', async () => {
+      const result = await redis.getCachedJupiterQuote('token1', 'token2', 1000);
+      // May return null if not cached or data if cached
+      expect(result === null || typeof result === 'object').toBe(true);
+    });
+
+    it('getJupiterCacheStats should return stats object', () => {
+      const stats = redis.getJupiterCacheStats();
+      expect(stats).toHaveProperty('ttlSeconds');
+      expect(stats).toHaveProperty('prefix');
+    });
+  });
+
+  describe('getClient()', () => {
+    it('should return client or null', async () => {
+      const client = await redis.getClient();
+      // In test mode, may return null (memory fallback) or client
+      expect(client === null || typeof client === 'object').toBe(true);
+    });
+  });
+
+  describe('disconnect()', () => {
+    it('should not throw', async () => {
+      await expect(redis.disconnect()).resolves.not.toThrow();
     });
   });
 });
