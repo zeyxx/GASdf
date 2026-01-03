@@ -48,13 +48,13 @@
         "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "#E040FB",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
     ]
   },
-  "description": "Monitor GASdf gasless transaction service for Solana. Track quotes, submits, burns, and fee payer balance.",
+  "description": "GASdf - Gasless transactions for Solana. Pay fees with any token, burn $ASDF. Built with Helius RPC.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -68,7 +68,7 @@
       "tags": [],
       "targetBlank": true,
       "title": "GASdf API",
-      "tooltip": "Open GASdf API",
+      "tooltip": "",
       "type": "link",
       "url": "https://gasdf-43r8.onrender.com"
     },
@@ -79,8 +79,20 @@
       "keepTime": false,
       "tags": [],
       "targetBlank": true,
+      "title": "Helius",
+      "tooltip": "",
+      "type": "link",
+      "url": "https://helius.dev"
+    },
+    {
+      "asDropdown": false,
+      "icon": "doc",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
       "title": "GitHub",
-      "tooltip": "View source code",
+      "tooltip": "",
       "type": "link",
       "url": "https://github.com/zeyxx/GASdf"
     }
@@ -92,8 +104,8 @@
       "id": 1,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
-        "content": "# GASdf Monitoring\n**Gasless transactions for Solana** - Pay network fees with any token, swap to $ASDF and burn",
-        "mode": "markdown"
+        "content": "<div style=\"text-align: center;\">\n<span style=\"font-size: 24px; font-weight: bold; background: linear-gradient(90deg, #E040FB, #7C4DFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;\">GASdf Monitoring</span>\n<br/>\n<span style=\"color: #B388FF; font-size: 14px;\">Gasless Transactions for Solana • Powered by Helius RPC</span>\n</div>",
+        "mode": "html"
       },
       "title": "",
       "transparent": true,
@@ -101,17 +113,17 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Total number of quote requests",
+      "description": "Total quote requests processed",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "color": { "fixedColor": "#7C4DFF", "mode": "fixed" },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7C4DFF", "value": null }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 2 },
       "id": 2,
       "options": {
         "colorMode": "value",
@@ -134,17 +146,17 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Total number of submitted transactions",
+      "description": "Transactions successfully submitted",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "green", "mode": "fixed" },
+          "color": { "fixedColor": "#00E676", "mode": "fixed" },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#00E676", "value": null }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 2 },
       "id": 3,
       "options": {
         "colorMode": "value",
@@ -167,7 +179,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Fee payer wallet SOL balance",
+      "description": "Treasury wallet SOL balance for gas fees",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -176,16 +188,16 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.1 },
-              { "color": "green", "value": 0.5 }
+              { "color": "#FF5252", "value": null },
+              { "color": "#FFD740", "value": 0.1 },
+              { "color": "#00E676", "value": 0.5 }
             ]
           },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 2 },
       "id": 4,
       "options": {
         "colorMode": "value",
@@ -203,22 +215,22 @@
           "refId": "A"
         }
       ],
-      "title": "Fee Payer SOL",
+      "title": "Treasury SOL",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Total $ASDF tokens burned",
+      "description": "Total $ASDF tokens burned forever",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "orange", "mode": "fixed" },
+          "color": { "fixedColor": "#E040FB", "mode": "fixed" },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#E040FB", "value": null }] },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 2 },
       "id": 5,
       "options": {
         "colorMode": "value",
@@ -236,12 +248,77 @@
           "refId": "A"
         }
       ],
-      "title": "Total $ASDF Burned",
+      "title": "$ASDF Burned 🔥",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "HTTP requests per second by route and status",
+      "description": "API requests per second via Helius RPC",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7C4DFF", "value": null }] },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*200.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*4[0-9]{2}.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FFD740", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*5[0-9]{2}.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF5252", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
+          "expr": "rate(gasdf_http_requests_total{service=\"gasdf\"}[5m])",
+          "legendFormat": "{{route}} [{{status}}]",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "description": "Helius RPC latency - P50 (typical) and P95 (worst case)",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -267,73 +344,21 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
-      "id": 6,
-      "options": {
-        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "editorMode": "code",
-          "expr": "rate(gasdf_http_requests_total{service=\"gasdf\"}[5m])",
-          "legendFormat": "{{route}} [{{status}}]",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Request Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Response time percentiles (P50 and P95)",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
-          "unit": "s"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7C4DFF", "value": null }] },
+          "unit": "ms"
         },
         "overrides": [
           {
             "matcher": { "id": "byRegexp", "options": "P95.*" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "properties": [{ "id": "color", "value": { "fixedColor": "#E040FB", "mode": "fixed" } }]
           },
           {
             "matcher": { "id": "byRegexp", "options": "P50.*" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "properties": [{ "id": "color", "value": { "fixedColor": "#B388FF", "mode": "fixed" } }]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
       "id": 7,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -343,7 +368,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.95\"}",
+          "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.95\"} * 1000",
           "legendFormat": "P95 {{route}}",
           "range": true,
           "refId": "A"
@@ -351,18 +376,18 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.5\"}",
+          "expr": "gasdf_http_request_duration_seconds{service=\"gasdf\",quantile=\"0.5\"} * 1000",
           "legendFormat": "P50 {{route}}",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Response Time (P50 / P95)",
+      "title": "Response Latency",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Cumulative quotes and transaction submissions over time",
+      "description": "Conversion funnel: Quotes requested vs Transactions submitted",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -374,7 +399,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 25,
+            "fillOpacity": 30,
             "gradientMode": "opacity",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
             "insertNulls": false,
@@ -388,21 +413,21 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7C4DFF", "value": null }] },
           "unit": "short"
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Quotes" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+            "properties": [{ "id": "color", "value": { "fixedColor": "#7C4DFF", "mode": "fixed" } }]
           },
           {
             "matcher": { "id": "byName", "options": "Submits" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
       "id": 8,
       "options": {
         "legend": { "calcs": ["last", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -426,15 +451,15 @@
           "refId": "B"
         }
       ],
-      "title": "Quotes & Submits Over Time",
+      "title": "Quote → Submit Funnel",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Fee payer wallet SOL balance history",
+      "description": "Treasury SOL balance - Alert threshold at 0.1 SOL",
       "fieldConfig": {
         "defaults": {
-          "color": { "fixedColor": "yellow", "mode": "fixed" },
+          "color": { "fixedColor": "#FFD740", "mode": "fixed" },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -443,7 +468,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 30,
+            "fillOpacity": 35,
             "gradientMode": "opacity",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
             "insertNulls": false,
@@ -455,11 +480,7 @@
             "spanNulls": false,
             "stacking": { "group": "A", "mode": "none" },
             "thresholdsStyle": {
-              "mode": "line+area",
-              "steps": [
-                { "color": "red", "value": null },
-                { "color": "transparent", "value": 0.1 }
-              ]
+              "mode": "line+area"
             }
           },
           "decimals": 4,
@@ -468,16 +489,15 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.1 },
-              { "color": "green", "value": 0.5 }
+              { "color": "#FF5252", "value": null },
+              { "color": "transparent", "value": 0.1 }
             ]
           },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
       "id": 9,
       "options": {
         "legend": { "calcs": ["last", "min"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -488,18 +508,18 @@
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
           "expr": "gasdf_fee_payer_balance_lamports{service=\"gasdf\"} / 1000000000",
-          "legendFormat": "SOL Balance",
+          "legendFormat": "Treasury Balance",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Fee Payer Balance History",
+      "title": "Treasury Balance",
       "type": "timeseries"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 38,
-  "tags": ["gasdf", "solana", "crypto"],
+  "tags": ["gasdf", "solana", "helius", "asdf"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {
