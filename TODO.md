@@ -22,7 +22,8 @@
 - [x] k6 load test script
 - [x] fee-payer-pool.js tests (29% → 46% coverage)
 - [x] anomaly-detector.js tests (25% → 46% coverage)
-- [x] 1141 tests passing
+- [x] data-sync.js tests (7% → 94% coverage)
+- [x] 1177 tests passing, 70% overall coverage
 
 ## Next Steps
 
