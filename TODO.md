@@ -9,11 +9,12 @@
 - [x] db.js unit tests (42 tests)
 - [x] All lint warnings fixed (unused variables prefixed with `_`)
 - [x] 895 tests passing
+- [x] Test coverage increased to 63% (1053 tests passing)
+- [x] Added 158 new unit tests (tokens, admin, stats, tx-queue, pyth, revenue-channels)
+- [x] Added 17 flow tests for quote endpoint lifecycle
 
 ## Next Steps
 
-- [ ] Increase test coverage (currently ~59%, target 70%+)
-- [ ] Add integration tests for quote/submit flow
 - [ ] Add E2E tests with test wallet
 - [ ] Monitor burn worker in production
 - [ ] Review Jito bundle success rate
