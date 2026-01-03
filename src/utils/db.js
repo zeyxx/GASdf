@@ -257,7 +257,10 @@ async function withDb(queryFn, options = {}) {
 
       // Check if retryable
       if (isTransientError(error) && attempt < retries) {
-        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        // Exponential backoff with jitter to prevent thundering herd
+        const baseDelay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        const jitter = Math.floor(Math.random() * 500);
+        const delay = baseDelay + jitter;
         logger.warn('DB', `Transient error, retry ${attempt + 1}/${retries}`, {
           operation,
           error: error.message,

@@ -4,6 +4,8 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const logger = require('../utils/logger');
 const { checkAndExecuteBurn, getTreasuryTokenBalances } = require('../services/burn');
 const db = require('../utils/db');
@@ -11,8 +13,41 @@ const db = require('../utils/db');
 const router = express.Router();
 
 // =============================================================================
+// Admin Rate Limiting
+// =============================================================================
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Admin rate limit exceeded',
+    code: 'ADMIN_RATE_LIMITED',
+  },
+  // Use default key generator (handles IPv6 properly)
+  validate: { xForwardedForHeader: false },
+});
+
+// =============================================================================
 // Admin Authentication Middleware
 // =============================================================================
+
+/**
+ * Timing-safe string comparison to prevent timing attacks
+ */
+function timingSafeCompare(a, b) {
+  if (!a || !b) return false;
+  // Ensure both strings are same length to prevent early exit
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Compare against self to maintain constant time
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 function adminAuth(req, res, next) {
   // SECURITY: Only accept API key from header, never from query params
@@ -36,7 +71,8 @@ function adminAuth(req, res, next) {
     });
   }
 
-  if (!apiKey || apiKey !== expectedKey) {
+  // SECURITY: Use timing-safe comparison to prevent timing attacks
+  if (!timingSafeCompare(apiKey, expectedKey)) {
     logger.warn('ADMIN', 'Unauthorized admin access attempt', {
       ip: req.ip,
       path: req.path,
@@ -50,7 +86,8 @@ function adminAuth(req, res, next) {
   next();
 }
 
-// Apply auth to all admin routes
+// Apply rate limiting and auth to all admin routes
+router.use(adminLimiter);
 router.use(adminAuth);
 
 // =============================================================================

@@ -375,6 +375,9 @@ async function getTreasuryBalance() {
   );
 }
 
+// Treasury history TTL: 30 days retention
+const TREASURY_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
+
 async function recordTreasuryEvent(event) {
   const entry = {
     ...event,
@@ -383,9 +386,11 @@ async function recordTreasuryEvent(event) {
 
   return withRedis(
     async (redis) => {
-      // Keep last 100 treasury events
-      await redis.lPush(`${KEY_PREFIX}treasury:history`, JSON.stringify(entry));
-      await redis.lTrim(`${KEY_PREFIX}treasury:history`, 0, 99);
+      const key = `${KEY_PREFIX}treasury:history`;
+      // Keep last 100 treasury events with TTL
+      await redis.lPush(key, JSON.stringify(entry));
+      await redis.lTrim(key, 0, 99);
+      await redis.expire(key, TREASURY_HISTORY_TTL_SECONDS);
     },
     () => {
       // In-memory: just log
@@ -700,6 +705,11 @@ async function getBurnerCount() {
 // Burn Proofs (Verifiable On-Chain)
 // =============================================================================
 
+// Burn proofs TTL: 90 days retention (compliance/audit trail)
+const BURN_PROOFS_TTL_SECONDS = 90 * 24 * 60 * 60;
+// Individual proof TTL: 1 year (for signature lookups)
+const BURN_PROOF_TTL_SECONDS = 365 * 24 * 60 * 60;
+
 /**
  * Record a burn proof with verifiable on-chain signatures
  */
@@ -718,13 +728,18 @@ async function recordBurnProof(proof) {
 
   return withRedis(
     async (redis) => {
+      const proofKey = `${KEY_PREFIX}burn:proof:${proof.burnSignature}`;
+      const listKey = `${KEY_PREFIX}burn:proofs`;
+
       const multi = redis.multi();
-      // Store proof by burn signature for lookup
-      multi.set(`${KEY_PREFIX}burn:proof:${proof.burnSignature}`, JSON.stringify(entry));
+      // Store proof by burn signature for lookup (with TTL)
+      multi.set(proofKey, JSON.stringify(entry), { EX: BURN_PROOF_TTL_SECONDS });
       // Add to chronological list (newest first)
-      multi.lPush(`${KEY_PREFIX}burn:proofs`, JSON.stringify(entry));
+      multi.lPush(listKey, JSON.stringify(entry));
       // Keep last 1000 proofs
-      multi.lTrim(`${KEY_PREFIX}burn:proofs`, 0, 999);
+      multi.lTrim(listKey, 0, 999);
+      // Set TTL on the list
+      multi.expire(listKey, BURN_PROOFS_TTL_SECONDS);
       // Track total verified burns
       multi.incr(`${KEY_PREFIX}burn:proof:count`);
       await multi.exec();
