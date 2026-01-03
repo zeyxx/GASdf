@@ -312,7 +312,9 @@ async function start() {
       }
 
       // Start alert monitoring (checks every 60 seconds)
-      startAlertMonitoring(60000);
+      // Delay startup by 30s to avoid duplicate alerts during deploys
+      // (old instance may still be running briefly)
+      setTimeout(() => startAlertMonitoring(60000), 30000);
     });
   } catch (error) {
     logger.error('BOOT', 'Failed to start server', { error: error.message });
