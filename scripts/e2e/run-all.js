@@ -11,7 +11,7 @@ const path = require('path');
 
 const E2E_DIR = __dirname;
 
-const tests = ['test-quote-flow.js', 'test-tokens.js', 'test-burn-worker.js'];
+const tests = ['test-quote-flow.js', 'test-tokens.js', 'test-burn-worker.js', 'test-submit.js'];
 
 console.log('========================================');
 console.log('GASdf E2E Test Suite');
