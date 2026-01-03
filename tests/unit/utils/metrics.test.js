@@ -162,13 +162,13 @@ describe('Metrics Module', () => {
     it('should place values in correct buckets', () => {
       histogram.observe({ path: '/quote' }, 0.05); // <= 0.1
       histogram.observe({ path: '/quote' }, 0.25); // <= 0.5
-      histogram.observe({ path: '/quote' }, 0.8);  // <= 1
+      histogram.observe({ path: '/quote' }, 0.8); // <= 1
 
       const obs = histogram.observations.get('/quote');
       // Buckets are stored in a Map with bucket boundary as key
       expect(obs.buckets.get(0.1)).toBe(1); // 0.1 bucket: 1 value (0.05)
       expect(obs.buckets.get(0.5)).toBe(2); // 0.5 bucket: 2 values (0.05, 0.25)
-      expect(obs.buckets.get(1)).toBe(3);   // 1 bucket: 3 values (0.05, 0.25, 0.8)
+      expect(obs.buckets.get(1)).toBe(3); // 1 bucket: 3 values (0.05, 0.25, 0.8)
     });
 
     it('should collect prometheus format output', () => {

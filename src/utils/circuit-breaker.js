@@ -5,8 +5,8 @@ const logger = require('./logger');
 // =============================================================================
 
 const STATE = {
-  CLOSED: 'closed',     // Normal operation
-  OPEN: 'open',         // Failures threshold reached, fast-fail
+  CLOSED: 'closed', // Normal operation
+  OPEN: 'open', // Failures threshold reached, fast-fail
   HALF_OPEN: 'half-open', // Testing if service recovered
 };
 
@@ -214,9 +214,10 @@ class CircuitBreaker {
       resetTimeout: this.resetTimeout,
       lastFailure: this.lastFailure,
       openedAt: this.openedAt,
-      timeUntilRetry: this.state === STATE.OPEN
-        ? Math.max(0, this.resetTimeout - (Date.now() - this.openedAt))
-        : 0,
+      timeUntilRetry:
+        this.state === STATE.OPEN
+          ? Math.max(0, this.resetTimeout - (Date.now() - this.openedAt))
+          : 0,
     };
   }
 
@@ -226,9 +227,10 @@ class CircuitBreaker {
   getStats() {
     return {
       ...this.stats,
-      successRate: this.stats.totalRequests > 0
-        ? (this.stats.successfulRequests / this.stats.totalRequests * 100).toFixed(2) + '%'
-        : 'N/A',
+      successRate:
+        this.stats.totalRequests > 0
+          ? ((this.stats.successfulRequests / this.stats.totalRequests) * 100).toFixed(2) + '%'
+          : 'N/A',
       recentStateChanges: this.stats.stateChanges.slice(-5),
     };
   }
@@ -294,32 +296,36 @@ const rpcBreaker = new CircuitBreaker({
   isFailure: (error) => {
     const msg = error.message?.toLowerCase() || '';
     // Only count network/service errors
-    return msg.includes('timeout') ||
-           msg.includes('econnrefused') ||
-           msg.includes('service unavailable') ||
-           msg.includes('too many requests');
+    return (
+      msg.includes('timeout') ||
+      msg.includes('econnrefused') ||
+      msg.includes('service unavailable') ||
+      msg.includes('too many requests')
+    );
   },
 });
 
 // HolDex API circuit breaker
 const holdexBreaker = new CircuitBreaker({
   name: 'holdex',
-  failureThreshold: 3,       // Open after 3 failures
-  resetTimeout: 60000,       // 60 seconds - external API, give it time
+  failureThreshold: 3, // Open after 3 failures
+  resetTimeout: 60000, // 60 seconds - external API, give it time
   isFailure: (error) => {
     const msg = error.message?.toLowerCase() || '';
     // Don't count 404 (token not found) as failure - that's expected
     // Don't count client errors (400) as failure
     // Only count network/service errors
-    return msg.includes('timeout') ||
-           msg.includes('aborted') ||
-           msg.includes('econnrefused') ||
-           msg.includes('enotfound') ||
-           msg.includes('service unavailable') ||
-           msg.includes('500') ||
-           msg.includes('502') ||
-           msg.includes('503') ||
-           msg.includes('504');
+    return (
+      msg.includes('timeout') ||
+      msg.includes('aborted') ||
+      msg.includes('econnrefused') ||
+      msg.includes('enotfound') ||
+      msg.includes('service unavailable') ||
+      msg.includes('500') ||
+      msg.includes('502') ||
+      msg.includes('503') ||
+      msg.includes('504')
+    );
   },
 });
 

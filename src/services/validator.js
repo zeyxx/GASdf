@@ -42,12 +42,12 @@ const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 // Defense-in-depth: block obvious attacks, but simulation is primary defense
 const TOKEN_DANGEROUS_INSTRUCTIONS = {
   3: 'Transfer',
-  4: 'Approve',           // Grants delegate access
-  5: 'Revoke',            // Could be part of exploit chain
-  6: 'SetAuthority',      // Changes ownership
-  7: 'MintTo',            // Could mint if fee payer is mint authority
-  8: 'Burn',              // Burns tokens
-  9: 'CloseAccount',      // Closes account, sends SOL to destination
+  4: 'Approve', // Grants delegate access
+  5: 'Revoke', // Could be part of exploit chain
+  6: 'SetAuthority', // Changes ownership
+  7: 'MintTo', // Could mint if fee payer is mint authority
+  8: 'Burn', // Burns tokens
+  9: 'CloseAccount', // Closes account, sends SOL to destination
   12: 'TransferChecked',
   13: 'ApproveChecked',
   14: 'MintToChecked',
@@ -57,8 +57,8 @@ const TOKEN_DANGEROUS_INSTRUCTIONS = {
 // System Program dangerous instructions
 const SYSTEM_DANGEROUS_INSTRUCTIONS = {
   2: 'Transfer',
-  3: 'CreateAccountWithSeed',  // Could create account for draining
-  8: 'Allocate',               // Could manipulate account data
+  3: 'CreateAccountWithSeed', // Could create account for draining
+  8: 'Allocate', // Could manipulate account data
   9: 'AllocateWithSeed',
   10: 'AssignWithSeed',
   11: 'TransferWithSeed',
@@ -121,7 +121,7 @@ function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
 
   // Get all valid fee payer pubkeys
   const validFeePayerPubkeys = getAllFeePayerPublicKeys();
-  const validPubkeySet = new Set(validFeePayerPubkeys.map(p => p.toBase58()));
+  const validPubkeySet = new Set(validFeePayerPubkeys.map((p) => p.toBase58()));
 
   // Check 1: Fee payer must be one of our wallets
   let txFeePayer;
@@ -225,19 +225,19 @@ function validateNoFeePayerTokenDrain(transaction, feePayerPubkeys) {
           let authorityIndex;
 
           switch (discriminator) {
-            case 3:  // Transfer
-            case 4:  // Approve
-            case 5:  // Revoke
-            case 8:  // Burn
+            case 3: // Transfer
+            case 4: // Approve
+            case 5: // Revoke
+            case 8: // Burn
               authorityIndex = 2; // source, (dest|delegate), authority
               break;
-            case 6:  // SetAuthority
+            case 6: // SetAuthority
               authorityIndex = 1; // account, currentAuthority
               break;
-            case 7:  // MintTo
+            case 7: // MintTo
               authorityIndex = 2; // mint, dest, mintAuthority
               break;
-            case 9:  // CloseAccount
+            case 9: // CloseAccount
               authorityIndex = 2; // account, dest, authority
               break;
             case 12: // TransferChecked
@@ -308,9 +308,7 @@ function verifyUserSignature(transaction, userPubkey) {
     } else {
       // Legacy Transaction
       messageBytes = transaction.serializeMessage();
-      const userSig = transaction.signatures.find(
-        (sig) => sig.publicKey.toBase58() === userPubkey
-      );
+      const userSig = transaction.signatures.find((sig) => sig.publicKey.toBase58() === userPubkey);
 
       if (!userSig) {
         return { valid: false, error: 'User public key not found in transaction signers' };
@@ -326,8 +324,10 @@ function verifyUserSignature(transaction, userPubkey) {
 
     // Cryptographic Ed25519 signature verification
     const signatureBytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
-    const messageUint8 = messageBytes instanceof Uint8Array ? messageBytes : new Uint8Array(messageBytes);
-    const pubkeyUint8 = publicKeyBytes instanceof Uint8Array ? publicKeyBytes : new Uint8Array(publicKeyBytes);
+    const messageUint8 =
+      messageBytes instanceof Uint8Array ? messageBytes : new Uint8Array(messageBytes);
+    const pubkeyUint8 =
+      publicKeyBytes instanceof Uint8Array ? publicKeyBytes : new Uint8Array(publicKeyBytes);
 
     const isValid = nacl.sign.detached.verify(messageUint8, signatureBytes, pubkeyUint8);
 
@@ -512,7 +512,9 @@ async function validateFeePayment(transaction, quote, userPubkey) {
 
   const expectedAmount = parseInt(quote.feeAmount);
   const paymentToken = quote.paymentToken?.mint || quote.paymentToken;
-  const isSOL = paymentToken === config.WSOL_MINT || paymentToken === 'So11111111111111111111111111111111111111112';
+  const isSOL =
+    paymentToken === config.WSOL_MINT ||
+    paymentToken === 'So11111111111111111111111111111111111111112';
 
   let foundPayment = false;
   let actualAmount = 0;
@@ -547,12 +549,14 @@ async function validateFeePayment(transaction, quote, userPubkey) {
         // Transfer (3) or TransferChecked (12)
         if (discriminator === 3 || discriminator === 12) {
           const sourceAccount = getAccountAtIndex(ix, 0, accountKeys);
-          const destAccount = discriminator === 3
-            ? getAccountAtIndex(ix, 1, accountKeys)
-            : getAccountAtIndex(ix, 2, accountKeys); // TransferChecked has mint at index 1
-          const authority = discriminator === 3
-            ? getAccountAtIndex(ix, 2, accountKeys)
-            : getAccountAtIndex(ix, 3, accountKeys);
+          const destAccount =
+            discriminator === 3
+              ? getAccountAtIndex(ix, 1, accountKeys)
+              : getAccountAtIndex(ix, 2, accountKeys); // TransferChecked has mint at index 1
+          const authority =
+            discriminator === 3
+              ? getAccountAtIndex(ix, 2, accountKeys)
+              : getAccountAtIndex(ix, 3, accountKeys);
 
           // Verify authority is the user
           if (authority !== userPubkey) continue;

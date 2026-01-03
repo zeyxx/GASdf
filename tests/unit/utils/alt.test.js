@@ -12,7 +12,9 @@ const mockPublicKey = jest.fn().mockImplementation((key) => ({
 jest.mock('@solana/web3.js', () => ({
   PublicKey: mockPublicKey,
   AddressLookupTableProgram: {
-    createLookupTable: jest.fn().mockReturnValue([{ type: 'createAlt' }, { toBase58: () => 'new-alt-address' }]),
+    createLookupTable: jest
+      .fn()
+      .mockReturnValue([{ type: 'createAlt' }, { toBase58: () => 'new-alt-address' }]),
     extendLookupTable: jest.fn().mockReturnValue({ type: 'extendAlt' }),
   },
   TransactionMessage: jest.fn().mockImplementation(() => ({
@@ -171,19 +173,27 @@ describe('ALT Utility', () => {
     });
 
     it('should contain token program', () => {
-      expect(alt.CORE_ADDRESSES.TOKEN_PROGRAM.toBase58()).toBe('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+      expect(alt.CORE_ADDRESSES.TOKEN_PROGRAM.toBase58()).toBe(
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+      );
     });
 
     it('should contain Jupiter program', () => {
-      expect(alt.CORE_ADDRESSES.JUPITER_PROGRAM.toBase58()).toBe('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4');
+      expect(alt.CORE_ADDRESSES.JUPITER_PROGRAM.toBase58()).toBe(
+        'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'
+      );
     });
 
     it('should contain WSOL mint', () => {
-      expect(alt.CORE_ADDRESSES.WSOL_MINT.toBase58()).toBe('So11111111111111111111111111111111111111112');
+      expect(alt.CORE_ADDRESSES.WSOL_MINT.toBase58()).toBe(
+        'So11111111111111111111111111111111111111112'
+      );
     });
 
     it('should contain USDC mint', () => {
-      expect(alt.CORE_ADDRESSES.USDC_MINT.toBase58()).toBe('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      expect(alt.CORE_ADDRESSES.USDC_MINT.toBase58()).toBe(
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+      );
     });
   });
 

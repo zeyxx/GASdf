@@ -8,7 +8,11 @@ const db = require('./utils/db');
 const { securityHeaders, globalLimiter } = require('./middleware/security');
 const { startBurnWorker } = require('./services/burn');
 const { collect: collectMetrics, metricsMiddleware } = require('./utils/metrics');
-const { startMonitoring: startAlertMonitoring, stopMonitoring: stopAlertMonitoring, alertingService } = require('./services/alerting');
+const {
+  startMonitoring: startAlertMonitoring,
+  stopMonitoring: stopAlertMonitoring,
+  alertingService,
+} = require('./services/alerting');
 const dataSync = require('./services/data-sync');
 
 // Routes
@@ -26,12 +30,14 @@ app.set('trust proxy', 1);
 
 // Security middleware
 app.use(securityHeaders);
-app.use(cors({
-  // SECURITY: In production, require explicit ALLOWED_ORIGINS - never default to '*'
-  origin: config.IS_DEV ? '*' : (process.env.ALLOWED_ORIGINS?.split(',') || []),
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'x-request-id'],
-}));
+app.use(
+  cors({
+    // SECURITY: In production, require explicit ALLOWED_ORIGINS - never default to '*'
+    origin: config.IS_DEV ? '*' : process.env.ALLOWED_ORIGINS?.split(',') || [],
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'x-request-id'],
+  })
+);
 
 // Request parsing
 app.use(express.json({ limit: '100kb' }));
@@ -155,7 +161,7 @@ app.get('/status', async (req, res) => {
       oracle: oracleHealth,
     };
 
-    const statuses = Object.values(components).map(c => c.status);
+    const statuses = Object.values(components).map((c) => c.status);
     let overall = 'operational';
     if (statuses.includes('outage')) overall = 'major_outage';
     else if (statuses.includes('degraded')) overall = 'degraded';
@@ -295,7 +301,11 @@ async function start() {
       console.log('');
 
       // Start burn worker only if properly configured
-      if (config.FEE_PAYER_PRIVATE_KEY && config.ASDF_MINT && !config.ASDF_MINT.includes('DEVNET')) {
+      if (
+        config.FEE_PAYER_PRIVATE_KEY &&
+        config.ASDF_MINT &&
+        !config.ASDF_MINT.includes('DEVNET')
+      ) {
         startBurnWorker(60000);
       } else if (config.IS_DEV) {
         logger.info('BOOT', 'Burn worker disabled (dev mode or missing ASDF_MINT)');

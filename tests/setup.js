@@ -4,9 +4,10 @@
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 process.env.HELIUS_API_KEY = 'test-helius-key';
-process.env.FEE_PAYER_PRIVATE_KEY = '4wBqpZM9xwHtzshcmxqXQKfTu1fnjgPHykLqxGtDFaYvwXLvEv7zgRMy9aVRZpgRdCZh5Qw7BxXhyKDBPfzJML4N';
+process.env.FEE_PAYER_PRIVATE_KEY =
+  '4wBqpZM9xwHtzshcmxqXQKfTu1fnjgPHykLqxGtDFaYvwXLvEv7zgRMy9aVRZpgRdCZh5Qw7BxXhyKDBPfzJML4N';
 process.env.ASDF_MINT = 'ASdfTest111111111111111111111111111111111111';
-process.env.REDIS_URL = '';  // Force memory fallback
+process.env.REDIS_URL = ''; // Force memory fallback
 
 // Suppress console during tests unless DEBUG=true
 if (!process.env.DEBUG) {
@@ -22,7 +23,7 @@ if (!process.env.DEBUG) {
 }
 
 // Global test utilities
-global.waitFor = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+global.waitFor = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Clean up after each test
 afterEach(() => {

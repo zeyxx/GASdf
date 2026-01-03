@@ -67,12 +67,7 @@ describe('Jupiter Service', () => {
         json: () => Promise.resolve(mockQuote),
       });
 
-      const result = await jupiter.getQuote(
-        'inputMint123',
-        'outputMint456',
-        1000000,
-        50
-      );
+      const result = await jupiter.getQuote('inputMint123', 'outputMint456', 1000000, 50);
 
       expect(result).toEqual(mockQuote);
       expect(fetchWithTimeout).toHaveBeenCalledWith(
@@ -155,10 +150,7 @@ describe('Jupiter Service', () => {
         json: () => Promise.resolve(mockSwap),
       });
 
-      const result = await jupiter.getSwapTransaction(
-        mockQuoteResponse,
-        'userPubkey123'
-      );
+      const result = await jupiter.getSwapTransaction(mockQuoteResponse, 'userPubkey123');
 
       expect(result).toEqual(mockSwap);
     });
@@ -194,9 +186,9 @@ describe('Jupiter Service', () => {
         statusText: 'Internal Server Error',
       });
 
-      await expect(
-        jupiter.getSwapTransaction(mockQuoteResponse, 'user')
-      ).rejects.toThrow('Jupiter swap failed: Internal Server Error');
+      await expect(jupiter.getSwapTransaction(mockQuoteResponse, 'user')).rejects.toThrow(
+        'Jupiter swap failed: Internal Server Error'
+      );
     });
 
     it('should execute through circuit breaker', async () => {
@@ -234,11 +226,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '2000000', // 2 USDC for 2x SOL
-          outAmount: '10000000', // 0.01 SOL (2x of 0.005 SOL)
-          priceImpactPct: '0.05',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '2000000', // 2 USDC for 2x SOL
+            outAmount: '10000000', // 0.01 SOL (2x of 0.005 SOL)
+            priceImpactPct: '0.05',
+          }),
       });
 
       const result = await jupiter.getFeeInToken(
@@ -256,11 +249,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000',
-          outAmount: '10000000',
-          priceImpactPct: '0.01',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000',
+            outAmount: '10000000',
+            priceImpactPct: '0.01',
+          }),
       });
 
       // Test USDC
@@ -276,11 +270,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000',
-          outAmount: '10000000',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000',
+            outAmount: '10000000',
+            priceImpactPct: '0',
+          }),
       });
 
       const result = await jupiter.getFeeInToken('UnknownMint123', 5000000);
@@ -292,16 +287,17 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000',
-          outAmount: '0',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000',
+            outAmount: '0',
+            priceImpactPct: '0',
+          }),
       });
 
-      await expect(
-        jupiter.getFeeInToken('SomeToken123', 5000000)
-      ).rejects.toThrow('Jupiter returned zero output amount');
+      await expect(jupiter.getFeeInToken('SomeToken123', 5000000)).rejects.toThrow(
+        'Jupiter returned zero output amount'
+      );
     });
 
     it('should include route in response', async () => {
@@ -415,27 +411,25 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockRejectedValue(new Error('Jupiter unavailable'));
 
-      await expect(
-        jupiter.getFeeInToken('SomeToken', 5000000)
-      ).rejects.toThrow('Jupiter unavailable');
+      await expect(jupiter.getFeeInToken('SomeToken', 5000000)).rejects.toThrow(
+        'Jupiter unavailable'
+      );
     });
 
     it('should throw error when calculation overflows', async () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: String(Number.MAX_SAFE_INTEGER),
-          outAmount: '1',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: String(Number.MAX_SAFE_INTEGER),
+            outAmount: '1',
+            priceImpactPct: '0',
+          }),
       });
 
-      await expect(
-        jupiter.getFeeInToken('SomeToken', Number.MAX_SAFE_INTEGER)
-      ).rejects.toThrow();
+      await expect(jupiter.getFeeInToken('SomeToken', Number.MAX_SAFE_INTEGER)).rejects.toThrow();
     });
-
   });
 
   describe('swapToAsdf()', () => {
@@ -524,11 +518,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000',
-          outAmount: '10000000',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000',
+            outAmount: '10000000',
+            priceImpactPct: '0',
+          }),
       });
 
       const result = await jupiter.getFeeInToken(
@@ -543,11 +538,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000000',
-          outAmount: '10000000',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000000',
+            outAmount: '10000000',
+            priceImpactPct: '0',
+          }),
       });
 
       const result = await jupiter.getFeeInToken(
@@ -562,11 +558,12 @@ describe('Jupiter Service', () => {
       const { fetchWithTimeout } = require('../../../src/utils/fetch-timeout');
       fetchWithTimeout.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          inAmount: '1000000000',
-          outAmount: '10000000',
-          priceImpactPct: '0',
-        }),
+        json: () =>
+          Promise.resolve({
+            inAmount: '1000000000',
+            outAmount: '10000000',
+            priceImpactPct: '0',
+          }),
       });
 
       const result = await jupiter.getFeeInToken(

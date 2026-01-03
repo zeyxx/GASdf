@@ -69,13 +69,19 @@ async function checkTreasuryAta(tokenMint) {
     if (account) {
       // Cache the result
       ataCache.set(mintStr, ataAddress.toBase58());
-      logger.debug('TREASURY_ATA', 'ATA exists', { mint: mintStr.slice(0, 8), ata: ataAddress.toBase58().slice(0, 8) });
+      logger.debug('TREASURY_ATA', 'ATA exists', {
+        mint: mintStr.slice(0, 8),
+        ata: ataAddress.toBase58().slice(0, 8),
+      });
       return ataAddress.toBase58();
     }
 
     return null;
   } catch (error) {
-    logger.error('TREASURY_ATA', 'Error checking ATA', { mint: mintStr.slice(0, 8), error: error.message });
+    logger.error('TREASURY_ATA', 'Error checking ATA', {
+      mint: mintStr.slice(0, 8),
+      error: error.message,
+    });
     return null;
   }
 }
@@ -91,7 +97,7 @@ async function createTreasuryAta(tokenMint, tokenProgram = TOKEN_PROGRAM_ID) {
   if (pendingCreations.has(mintStr)) {
     logger.debug('TREASURY_ATA', 'Creation already pending', { mint: mintStr.slice(0, 8) });
     // Wait a bit and check again
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
     return checkTreasuryAta(tokenMint);
   }
 
@@ -114,7 +120,10 @@ async function createTreasuryAta(tokenMint, tokenProgram = TOKEN_PROGRAM_ID) {
       return ataAddress.toBase58();
     }
 
-    logger.info('TREASURY_ATA', 'Creating ATA', { mint: mintStr.slice(0, 8), treasury: treasury.toBase58().slice(0, 8) });
+    logger.info('TREASURY_ATA', 'Creating ATA', {
+      mint: mintStr.slice(0, 8),
+      treasury: treasury.toBase58().slice(0, 8),
+    });
 
     // Get fee payer for creation
     const feePayer = getFeePayer();
@@ -129,11 +138,11 @@ async function createTreasuryAta(tokenMint, tokenProgram = TOKEN_PROGRAM_ID) {
 
     transaction.add(
       createAssociatedTokenAccountInstruction(
-        feePayer.publicKey,  // payer
-        ataAddress,          // ata
-        treasury,            // owner
-        mint,                // mint
-        tokenProgram         // token program
+        feePayer.publicKey, // payer
+        ataAddress, // ata
+        treasury, // owner
+        mint, // mint
+        tokenProgram // token program
       )
     );
 
@@ -144,11 +153,14 @@ async function createTreasuryAta(tokenMint, tokenProgram = TOKEN_PROGRAM_ID) {
       preflightCommitment: 'confirmed',
     });
 
-    await connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, 'confirmed');
+    await connection.confirmTransaction(
+      {
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      },
+      'confirmed'
+    );
 
     // Cache the result
     ataCache.set(mintStr, ataAddress.toBase58());
@@ -161,7 +173,10 @@ async function createTreasuryAta(tokenMint, tokenProgram = TOKEN_PROGRAM_ID) {
 
     return ataAddress.toBase58();
   } catch (error) {
-    logger.error('TREASURY_ATA', 'Failed to create ATA', { mint: mintStr.slice(0, 8), error: error.message });
+    logger.error('TREASURY_ATA', 'Failed to create ATA', {
+      mint: mintStr.slice(0, 8),
+      error: error.message,
+    });
     throw error;
   } finally {
     pendingCreations.delete(mintStr);
@@ -203,7 +218,10 @@ async function detectTokenProgram(tokenMint) {
  */
 async function ensureTreasuryAta(tokenMint, tokenProgram = null) {
   // Skip for native SOL
-  if (tokenMint === config.WSOL_MINT || tokenMint === 'So11111111111111111111111111111111111111112') {
+  if (
+    tokenMint === config.WSOL_MINT ||
+    tokenMint === 'So11111111111111111111111111111111111111112'
+  ) {
     return null; // Native SOL doesn't need ATA
   }
 
@@ -231,7 +249,10 @@ async function getTreasuryAtaInfo(tokenMint) {
   }
 
   // Native SOL doesn't need ATA
-  if (tokenMint === config.WSOL_MINT || tokenMint === 'So11111111111111111111111111111111111111112') {
+  if (
+    tokenMint === config.WSOL_MINT ||
+    tokenMint === 'So11111111111111111111111111111111111111112'
+  ) {
     return {
       exists: true,
       address: treasury.toBase58(),

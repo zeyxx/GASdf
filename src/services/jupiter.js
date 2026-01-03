@@ -38,11 +38,11 @@ function getJupiterHeaders(contentType = false) {
 
 // Common token info (avoid extra API calls)
 const TOKEN_INFO = {
-  'So11111111111111111111111111111111111111112': { symbol: 'SOL', decimals: 9 },
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { symbol: 'USDC', decimals: 6 },
-  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', decimals: 6 },
-  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', decimals: 9 },
-  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn': { symbol: 'jitoSOL', decimals: 9 },
+  So11111111111111111111111111111111111111112: { symbol: 'SOL', decimals: 9 },
+  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: { symbol: 'USDC', decimals: 6 },
+  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: { symbol: 'USDT', decimals: 6 },
+  mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So: { symbol: 'mSOL', decimals: 9 },
+  J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn: { symbol: 'jitoSOL', decimals: 9 },
   '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump': { symbol: '$ASDF', decimals: 6 },
 };
 
@@ -214,7 +214,7 @@ async function getFeeInToken(inputMint, solAmountLamports) {
         inputAmount = Math.ceil((solAmountLamports / 1e9) * 200 * Math.pow(10, tokenInfo.decimals));
       } else {
         // For other tokens, assume 1:1 with SOL as fallback
-        inputAmount = Math.ceil(solAmountLamports * Math.pow(10, tokenInfo.decimals) / 1e9);
+        inputAmount = Math.ceil((solAmountLamports * Math.pow(10, tokenInfo.decimals)) / 1e9);
       }
 
       return {
@@ -296,9 +296,10 @@ module.exports = {
     cache: {
       hits: cacheHits,
       misses: cacheMisses,
-      hitRate: cacheHits + cacheMisses > 0
-        ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(1) + '%'
-        : 'N/A',
+      hitRate:
+        cacheHits + cacheMisses > 0
+          ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(1) + '%'
+          : 'N/A',
       ...redis.getJupiterCacheStats(),
     },
   }),

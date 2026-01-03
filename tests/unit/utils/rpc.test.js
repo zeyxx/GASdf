@@ -63,7 +63,7 @@ describe('RPC Failover', () => {
     test('should always include public endpoint as fallback', () => {
       pool.initialize();
 
-      const publicEndpoint = pool.endpoints.find(e => e.name === 'public');
+      const publicEndpoint = pool.endpoints.find((e) => e.name === 'public');
       expect(publicEndpoint).toBeDefined();
       expect(publicEndpoint.priority).toBe(100);
     });
@@ -72,9 +72,7 @@ describe('RPC Failover', () => {
       pool.initialize();
 
       for (let i = 1; i < pool.endpoints.length; i++) {
-        expect(pool.endpoints[i].priority).toBeGreaterThanOrEqual(
-          pool.endpoints[i - 1].priority
-        );
+        expect(pool.endpoints[i].priority).toBeGreaterThanOrEqual(pool.endpoints[i - 1].priority);
       }
     });
 
@@ -113,7 +111,7 @@ describe('RPC Failover', () => {
       pool.initialize();
 
       // Force all circuits open
-      pool.endpoints.forEach(e => e.breaker.forceOpen());
+      pool.endpoints.forEach((e) => e.breaker.forceOpen());
 
       const status = pool.getStatus();
 
@@ -138,10 +136,7 @@ describe('RPC Failover', () => {
     test('should use primary endpoint when healthy', async () => {
       pool.initialize();
 
-      const result = await pool.executeWithFailover(
-        async (conn) => conn.getSlot(),
-        'getSlot'
-      );
+      const result = await pool.executeWithFailover(async (conn) => conn.getSlot(), 'getSlot');
 
       expect(result).toBe(12345678);
       expect(pool.endpoints[0].health.totalRequests).toBe(1);
@@ -153,10 +148,7 @@ describe('RPC Failover', () => {
       // Make primary always fail
       pool.endpoints[0].breaker.forceOpen();
 
-      const result = await pool.executeWithFailover(
-        async (conn) => conn.getSlot(),
-        'getSlot'
-      );
+      const result = await pool.executeWithFailover(async (conn) => conn.getSlot(), 'getSlot');
 
       expect(result).toBe(12345678);
       // Secondary should have been used
@@ -167,13 +159,12 @@ describe('RPC Failover', () => {
       pool.initialize();
 
       // Force all circuits open
-      pool.endpoints.forEach(e => e.breaker.forceOpen());
+      pool.endpoints.forEach((e) => e.breaker.forceOpen());
 
       await expect(
-        pool.executeWithFailover(
-          async () => { throw new Error('Connection failed'); },
-          'test'
-        )
+        pool.executeWithFailover(async () => {
+          throw new Error('Connection failed');
+        }, 'test')
       ).rejects.toThrow();
     });
   });

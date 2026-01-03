@@ -12,7 +12,14 @@ const {
   MAX_COMPUTE_UNITS,
   SIGNATURE_SIZE,
 } = require('../../../src/services/validator');
-const { Keypair, Transaction, SystemProgram, PublicKey, VersionedTransaction, TransactionMessage } = require('@solana/web3.js');
+const {
+  Keypair,
+  Transaction,
+  SystemProgram,
+  PublicKey,
+  VersionedTransaction,
+  TransactionMessage,
+} = require('@solana/web3.js');
 
 // Create mock fee payer for tests
 const mockFeePayer = Keypair.generate();
@@ -213,7 +220,9 @@ describe('Validator Service', () => {
       }).compileToV0Message();
 
       const versionedTx = new VersionedTransaction(message);
-      expect(getTransactionBlockhash(versionedTx)).toBe('DemoBlockhash123456789012345678901234567890123');
+      expect(getTransactionBlockhash(versionedTx)).toBe(
+        'DemoBlockhash123456789012345678901234567890123'
+      );
     });
   });
 
@@ -364,7 +373,7 @@ describe('Validator Service', () => {
       const result = validateTransaction(tx, 5000, user.publicKey.toBase58());
       expect(result.valid).toBe(false);
       // Should have signature-related error
-      expect(result.errors.some(e => e.includes('signature') || e.includes('signer'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('signature') || e.includes('signer'))).toBe(true);
     });
 
     it('should detect unauthorized SOL transfer from fee payer', () => {
@@ -393,7 +402,9 @@ describe('Validator Service', () => {
 
       const result = validateTransaction(tx, 5000, user.publicKey.toBase58());
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('Unauthorized') && e.includes('Transfer'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('Unauthorized') && e.includes('Transfer'))).toBe(
+        true
+      );
     });
   });
 

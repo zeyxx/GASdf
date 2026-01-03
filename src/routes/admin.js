@@ -122,7 +122,7 @@ router.post('/burn', async (req, res) => {
         success: false,
         message: 'Burn not executed (already in progress or below threshold)',
         treasury: {
-          tokens: balances.map(b => ({
+          tokens: balances.map((b) => ({
             mint: b.mint,
             symbol: b.symbol,
             balance: b.uiAmount,
@@ -168,12 +168,12 @@ router.get('/treasury', async (req, res) => {
     const balances = await getTreasuryTokenBalances();
 
     res.json({
-      tokens: balances.map(b => ({
+      tokens: balances.map((b) => ({
         mint: b.mint,
         symbol: b.symbol,
         balance: b.uiAmount,
         valueUsd: b.valueUsd,
-        eligible: b.valueUsd >= 0.50, // MIN_VALUE_USD
+        eligible: b.valueUsd >= 0.5, // MIN_VALUE_USD
       })),
       totalTokens: balances.length,
       totalValueUsd: balances.reduce((sum, b) => sum + (b.valueUsd || 0), 0),

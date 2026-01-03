@@ -297,7 +297,10 @@ async function getBundleStatus(bundleId) {
     }
 
     // Track landed bundles
-    if (bundleStatus.confirmation_status === 'confirmed' || bundleStatus.confirmation_status === 'finalized') {
+    if (
+      bundleStatus.confirmation_status === 'confirmed' ||
+      bundleStatus.confirmation_status === 'finalized'
+    ) {
       bundlesLanded++;
     }
 

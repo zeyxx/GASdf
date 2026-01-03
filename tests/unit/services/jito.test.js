@@ -125,14 +125,17 @@ describe('Jito Bundle Service', () => {
 
     it('should reject more than 5 transactions', async () => {
       const transactions = Array(6).fill({ serialize: () => Buffer.from('tx') });
-      await expect(jito.sendBundle(transactions)).rejects.toThrow('Bundle cannot exceed 5 transactions');
+      await expect(jito.sendBundle(transactions)).rejects.toThrow(
+        'Bundle cannot exceed 5 transactions'
+      );
     });
 
     it('should send bundle to Jito endpoint', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve({
-          result: 'bundle-id-123',
-        }),
+        json: () =>
+          Promise.resolve({
+            result: 'bundle-id-123',
+          }),
       });
 
       const mockTx = {
@@ -154,9 +157,10 @@ describe('Jito Bundle Service', () => {
 
     it('should handle Jito API errors', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve({
-          error: { code: -32000, message: 'Bundle rejected' },
-        }),
+        json: () =>
+          Promise.resolve({
+            error: { code: -32000, message: 'Bundle rejected' },
+          }),
       });
 
       const mockTx = { serialize: () => Buffer.from('tx') };
@@ -180,9 +184,10 @@ describe('Jito Bundle Service', () => {
   describe('sendTransaction()', () => {
     it('should send transaction via Jito', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve({
-          result: 'signature-123',
-        }),
+        json: () =>
+          Promise.resolve({
+            result: 'signature-123',
+          }),
       });
 
       const mockTx = { serialize: () => Buffer.from('tx') };
@@ -215,18 +220,19 @@ describe('Jito Bundle Service', () => {
 
     it('should fetch bundle status from Jito', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve({
-          result: {
-            value: [
-              {
-                bundle_id: 'bundle-123',
-                confirmation_status: 'confirmed',
-                slot: 12345,
-                transactions: ['tx1', 'tx2'],
-              },
-            ],
-          },
-        }),
+        json: () =>
+          Promise.resolve({
+            result: {
+              value: [
+                {
+                  bundle_id: 'bundle-123',
+                  confirmation_status: 'confirmed',
+                  slot: 12345,
+                  transactions: ['tx1', 'tx2'],
+                },
+              ],
+            },
+          }),
       });
 
       const result = await jito.getBundleStatus('bundle-123');
@@ -238,9 +244,10 @@ describe('Jito Bundle Service', () => {
 
     it('should handle bundle not found', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve({
-          result: { value: [] },
-        }),
+        json: () =>
+          Promise.resolve({
+            result: { value: [] },
+          }),
       });
 
       const result = await jito.getBundleStatus('unknown-bundle');
@@ -251,15 +258,16 @@ describe('Jito Bundle Service', () => {
   describe('getTipFloor()', () => {
     it('should fetch tip floor from Jito API', async () => {
       global.fetch.mockResolvedValueOnce({
-        json: () => Promise.resolve([
-          {
-            time: '2024-01-01T00:00:00Z',
-            landed_tips_50th_percentile: 0.00001,
-            landed_tips_75th_percentile: 0.00002,
-            landed_tips_95th_percentile: 0.0001,
-            ema_landed_tips_50th_percentile: 0.000015,
-          },
-        ]),
+        json: () =>
+          Promise.resolve([
+            {
+              time: '2024-01-01T00:00:00Z',
+              landed_tips_50th_percentile: 0.00001,
+              landed_tips_75th_percentile: 0.00002,
+              landed_tips_95th_percentile: 0.0001,
+              ema_landed_tips_50th_percentile: 0.000015,
+            },
+          ]),
       });
 
       const result = await jito.getTipFloor();
@@ -282,13 +290,14 @@ describe('Jito Bundle Service', () => {
   describe('getRecommendedTip()', () => {
     beforeEach(() => {
       global.fetch.mockResolvedValue({
-        json: () => Promise.resolve([
-          {
-            landed_tips_50th_percentile: 0.00001,
-            landed_tips_75th_percentile: 0.00003,
-            landed_tips_95th_percentile: 0.0001,
-          },
-        ]),
+        json: () =>
+          Promise.resolve([
+            {
+              landed_tips_50th_percentile: 0.00001,
+              landed_tips_75th_percentile: 0.00003,
+              landed_tips_95th_percentile: 0.0001,
+            },
+          ]),
       });
     });
 

@@ -16,9 +16,9 @@ const RETRY_DELAYS = [1000, 5000, 15000]; // ms (legacy, kept for compatibility)
 
 // Exponential backoff configuration
 const BACKOFF_CONFIG = {
-  baseDelayMs: 500,      // Initial delay
-  maxDelayMs: 15000,     // Cap at 15 seconds
-  jitterMs: 500,         // Random jitter range (0 to jitterMs)
+  baseDelayMs: 500, // Initial delay
+  maxDelayMs: 15000, // Cap at 15 seconds
+  jitterMs: 500, // Random jitter range (0 to jitterMs)
 };
 
 /**
@@ -34,10 +34,7 @@ function getRetryDelay(attempt) {
   const { baseDelayMs, maxDelayMs, jitterMs } = BACKOFF_CONFIG;
 
   // Exponential: 500ms, 1000ms, 2000ms, 4000ms, 8000ms... capped at maxDelay
-  const exponentialDelay = Math.min(
-    baseDelayMs * Math.pow(2, attempt - 1),
-    maxDelayMs
-  );
+  const exponentialDelay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
 
   // Add random jitter to prevent synchronized retries
   const jitter = Math.floor(Math.random() * jitterMs);
@@ -144,9 +141,7 @@ async function markSuccess(txId, signature) {
  */
 function isRetryableError(error) {
   const errorStr = String(error.message || error);
-  return RETRYABLE_ERRORS.some(pattern =>
-    errorStr.toLowerCase().includes(pattern.toLowerCase())
-  );
+  return RETRYABLE_ERRORS.some((pattern) => errorStr.toLowerCase().includes(pattern.toLowerCase()));
 }
 
 /**
@@ -246,7 +241,7 @@ module.exports = {
 
   // Constants
   MAX_RETRIES,
-  RETRY_DELAYS,      // Legacy, use getRetryDelay() instead
+  RETRY_DELAYS, // Legacy, use getRetryDelay() instead
   RETRYABLE_ERRORS,
   BACKOFF_CONFIG,
 };

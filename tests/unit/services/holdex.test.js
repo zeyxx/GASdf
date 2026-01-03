@@ -173,13 +173,14 @@ describe('HolDex Service', () => {
     it('should handle nested token response with kRank', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          token: {
-            kScore: 85,
-            kRank: { tier: 'Platinum', icon: '💠', level: 5 },
-            hasCommunityUpdate: true
-          }
-        }),
+        json: () =>
+          Promise.resolve({
+            token: {
+              kScore: 85,
+              kRank: { tier: 'Platinum', icon: '💠', level: 5 },
+              hasCommunityUpdate: true,
+            },
+          }),
       });
 
       const result = await holdex.getToken(testMint);
@@ -192,19 +193,20 @@ describe('HolDex Service', () => {
     it('should handle conviction data from API', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          token: {
-            kScore: 75,
-            conviction: {
-              score: 80,
-              accumulators: 150,
-              holders: 200,
-              reducers: 30,
-              extractors: 20,
-              analyzed: 400
-            }
-          }
-        }),
+        json: () =>
+          Promise.resolve({
+            token: {
+              kScore: 75,
+              conviction: {
+                score: 80,
+                accumulators: 150,
+                holders: 200,
+                reducers: 30,
+                extractors: 20,
+                analyzed: 400,
+              },
+            },
+          }),
       });
 
       const result = await holdex.getToken(testMint);
@@ -588,7 +590,7 @@ describe('HolDex Service', () => {
       // For 30% burned: multiplier = 1 - φ^(-1) = 1 - 0.618 = 0.382
       // ecosystemBurn = 0.382 × 0.382 ≈ 14.6%
       const result = holdex.calculateEcosystemBurnBonus(30);
-      const expectedMultiplier = 1 - Math.pow(PHI, -30/30);
+      const expectedMultiplier = 1 - Math.pow(PHI, -30 / 30);
       const expectedEco = maxEco * expectedMultiplier;
       expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
     });
@@ -596,7 +598,7 @@ describe('HolDex Service', () => {
     it('should calculate correct ecosystem burn for 20% token burned', () => {
       // Formula: (1/φ²) × (1 - φ^(-20/30))
       const result = holdex.calculateEcosystemBurnBonus(20);
-      const expectedMultiplier = 1 - Math.pow(PHI, -20/30);
+      const expectedMultiplier = 1 - Math.pow(PHI, -20 / 30);
       const expectedEco = maxEco * expectedMultiplier;
       expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
       expect(result.ecosystemBurnPct).toBeCloseTo(0.105, 2); // ~10.5%
@@ -604,7 +606,7 @@ describe('HolDex Service', () => {
 
     it('should calculate correct ecosystem burn for 50% token burned', () => {
       const result = holdex.calculateEcosystemBurnBonus(50);
-      const expectedMultiplier = 1 - Math.pow(PHI, -50/30);
+      const expectedMultiplier = 1 - Math.pow(PHI, -50 / 30);
       const expectedEco = maxEco * expectedMultiplier;
       expect(result.ecosystemBurnPct).toBeCloseTo(expectedEco, 5);
     });
@@ -628,14 +630,14 @@ describe('HolDex Service', () => {
     });
 
     it('should maintain 1/φ³ (23.6%) treasury regardless of ecosystem burn', () => {
-      [0, 10, 20, 50, 80, 100].forEach(burnedPercent => {
+      [0, 10, 20, 50, 80, 100].forEach((burnedPercent) => {
         const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
         expect(result.treasuryPct).toBeCloseTo(treasuryPct, 5);
       });
     });
 
     it('should have percentages sum to 100%', () => {
-      [0, 10, 20, 50, 80, 100].forEach(burnedPercent => {
+      [0, 10, 20, 50, 80, 100].forEach((burnedPercent) => {
         const result = holdex.calculateEcosystemBurnBonus(burnedPercent);
         const total = result.ecosystemBurnPct + result.asdfBurnPct + result.treasuryPct;
         expect(total).toBeCloseTo(1.0, 5);
@@ -677,12 +679,13 @@ describe('HolDex Service', () => {
     it('should include supply data when available from API', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          token: {
-            kScore: 75,
-            supply: '800000000000000', // 80% remaining = 20% burned
-          }
-        }),
+        json: () =>
+          Promise.resolve({
+            token: {
+              kScore: 75,
+              supply: '800000000000000', // 80% remaining = 20% burned
+            },
+          }),
       });
 
       const result = await holdex.getToken(testMint);
@@ -695,36 +698,39 @@ describe('HolDex Service', () => {
     it('should include ecosystemBurn data with golden formula', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          token: {
-            kScore: 75,
-            supply: '800000000000000', // 20% burned
-          }
-        }),
+        json: () =>
+          Promise.resolve({
+            token: {
+              kScore: 75,
+              supply: '800000000000000', // 20% burned
+            },
+          }),
       });
 
       const result = await holdex.getToken(testMint);
 
       expect(result.ecosystemBurn).toBeDefined();
       // Golden formula: (1/φ²) × (1 - φ^(-20/30)) ≈ 10.5%
-      const expectedMultiplier = 1 - Math.pow(PHI, -20/30);
+      const expectedMultiplier = 1 - Math.pow(PHI, -20 / 30);
       const expectedEco = maxEco * expectedMultiplier;
       expect(result.ecosystemBurn.ecosystemBurnPct).toBeCloseTo(expectedEco, 4);
       expect(result.ecosystemBurn.treasuryPct).toBeCloseTo(treasuryPct, 5);
       // Total should be 100%
-      const total = result.ecosystemBurn.ecosystemBurnPct +
-                   result.ecosystemBurn.asdfBurnPct +
-                   result.ecosystemBurn.treasuryPct;
+      const total =
+        result.ecosystemBurn.ecosystemBurnPct +
+        result.ecosystemBurn.asdfBurnPct +
+        result.ecosystemBurn.treasuryPct;
       expect(total).toBeCloseTo(1.0, 5);
     });
 
     it('should handle missing supply data gracefully', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({
-          kScore: 75,
-          // No supply field
-        }),
+        json: () =>
+          Promise.resolve({
+            kScore: 75,
+            // No supply field
+          }),
       });
 
       const result = await holdex.getToken(testMint);

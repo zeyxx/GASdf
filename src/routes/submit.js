@@ -18,7 +18,12 @@ const { submitLimiter, walletSubmitLimiter } = require('../middleware/security')
 const { validate } = require('../middleware/validation');
 const txQueue = require('../services/tx-queue');
 const { submitsTotal, submitDuration, activeQuotes } = require('../utils/metrics');
-const { logSubmitSuccess, logSubmitRejected, logSecurityEvent, AUDIT_EVENTS } = require('../services/audit');
+const {
+  logSubmitSuccess,
+  logSubmitRejected,
+  logSecurityEvent,
+  AUDIT_EVENTS,
+} = require('../services/audit');
 const { anomalyDetector } = require('../services/anomaly-detector');
 
 const router = express.Router();
@@ -313,23 +318,30 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     if (!simulation.success) {
       const isCpiAttack = simulation.securityViolation === 'CPI_DRAIN_DETECTED';
 
-      logger.warn('SUBMIT', isCpiAttack ? 'CPI drain attack detected' : 'Transaction simulation failed', {
-        requestId: req.requestId,
-        quoteId,
-        error: simulation.error,
-        securityViolation: simulation.securityViolation,
-        balanceChanges: simulation.balanceChanges,
-        logs: simulation.logs?.slice(-5),
-      });
+      logger.warn(
+        'SUBMIT',
+        isCpiAttack ? 'CPI drain attack detected' : 'Transaction simulation failed',
+        {
+          requestId: req.requestId,
+          quoteId,
+          error: simulation.error,
+          securityViolation: simulation.securityViolation,
+          balanceChanges: simulation.balanceChanges,
+          logs: simulation.logs?.slice(-5),
+        }
+      );
 
-      logSecurityEvent(isCpiAttack ? AUDIT_EVENTS.CPI_ATTACK_DETECTED : AUDIT_EVENTS.SIMULATION_FAILED, {
-        quoteId,
-        error: simulation.error,
-        securityViolation: simulation.securityViolation,
-        balanceChanges: simulation.balanceChanges,
-        userPubkey,
-        ip: clientIp,
-      });
+      logSecurityEvent(
+        isCpiAttack ? AUDIT_EVENTS.CPI_ATTACK_DETECTED : AUDIT_EVENTS.SIMULATION_FAILED,
+        {
+          quoteId,
+          error: simulation.error,
+          securityViolation: simulation.securityViolation,
+          balanceChanges: simulation.balanceChanges,
+          userPubkey,
+          ip: clientIp,
+        }
+      );
 
       anomalyDetector.trackWallet(userPubkey, 'failure', clientIp).catch(() => {});
 
@@ -337,7 +349,9 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       releaseReservation(quoteId);
 
       return res.status(400).json({
-        error: isCpiAttack ? 'Transaction rejected: suspicious balance change detected' : 'Transaction simulation failed',
+        error: isCpiAttack
+          ? 'Transaction rejected: suspicious balance change detected'
+          : 'Transaction simulation failed',
         code: isCpiAttack ? 'CPI_ATTACK_DETECTED' : 'SIMULATION_FAILED',
         details: simulation.error,
         logs: simulation.logs?.slice(-3),
@@ -431,59 +445,62 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
       feeSolEquivalent: quote.feeAmountLamports,
       status: 'submitted',
       ipAddress: clientIp,
-    }).catch(err => {
+    }).catch((err) => {
       // Non-blocking: don't fail the request if DB recording fails
       logger.warn('SUBMIT', 'Failed to record transaction in PostgreSQL', { error: err.message });
     });
 
     // Verify transaction landed in background (don't block response)
     // Uses getSignatureStatus which doesn't require blockhash (avoids "block height exceeded")
-    rpc.checkSignatureStatus(result.signature, 3, 2000).then((status) => {
-      if (status.confirmed) {
-        logger.info('SUBMIT', 'Transaction confirmed', {
+    rpc
+      .checkSignatureStatus(result.signature, 3, 2000)
+      .then((status) => {
+        if (status.confirmed) {
+          logger.info('SUBMIT', 'Transaction confirmed', {
+            signature: result.signature,
+            slot: status.slot,
+            confirmationStatus: status.confirmationStatus,
+          });
+          // Update PostgreSQL status to confirmed
+          db.recordTransaction({
+            quoteId,
+            signature: result.signature,
+            userWallet: userPubkey,
+            paymentToken: quote.paymentToken || 'SOL',
+            feeAmount: quote.feeAmountLamports,
+            feeSolEquivalent: quote.feeAmountLamports,
+            status: 'confirmed',
+            ipAddress: clientIp,
+          }).catch(() => {}); // Silent fail for background update
+        } else if (status.err) {
+          logger.warn('SUBMIT', 'Transaction failed on-chain', {
+            signature: result.signature,
+            error: status.err,
+          });
+          // Update PostgreSQL status to failed
+          db.recordTransaction({
+            quoteId,
+            signature: result.signature,
+            userWallet: userPubkey,
+            paymentToken: quote.paymentToken || 'SOL',
+            feeAmount: quote.feeAmountLamports,
+            feeSolEquivalent: quote.feeAmountLamports,
+            status: 'failed',
+            ipAddress: clientIp,
+          }).catch(() => {}); // Silent fail for background update
+        } else {
+          logger.debug('SUBMIT', 'Transaction status unknown (may still be processing)', {
+            signature: result.signature,
+          });
+        }
+      })
+      .catch((err) => {
+        // Non-critical: tx was already sent successfully
+        logger.debug('SUBMIT', 'Background confirmation check failed', {
           signature: result.signature,
-          slot: status.slot,
-          confirmationStatus: status.confirmationStatus,
+          error: err.message,
         });
-        // Update PostgreSQL status to confirmed
-        db.recordTransaction({
-          quoteId,
-          signature: result.signature,
-          userWallet: userPubkey,
-          paymentToken: quote.paymentToken || 'SOL',
-          feeAmount: quote.feeAmountLamports,
-          feeSolEquivalent: quote.feeAmountLamports,
-          status: 'confirmed',
-          ipAddress: clientIp,
-        }).catch(() => {}); // Silent fail for background update
-      } else if (status.err) {
-        logger.warn('SUBMIT', 'Transaction failed on-chain', {
-          signature: result.signature,
-          error: status.err,
-        });
-        // Update PostgreSQL status to failed
-        db.recordTransaction({
-          quoteId,
-          signature: result.signature,
-          userWallet: userPubkey,
-          paymentToken: quote.paymentToken || 'SOL',
-          feeAmount: quote.feeAmountLamports,
-          feeSolEquivalent: quote.feeAmountLamports,
-          status: 'failed',
-          ipAddress: clientIp,
-        }).catch(() => {}); // Silent fail for background update
-      } else {
-        logger.debug('SUBMIT', 'Transaction status unknown (may still be processing)', {
-          signature: result.signature,
-        });
-      }
-    }).catch((err) => {
-      // Non-critical: tx was already sent successfully
-      logger.debug('SUBMIT', 'Background confirmation check failed', {
-        signature: result.signature,
-        error: err.message,
       });
-    });
 
     res.json({
       signature: result.signature,
@@ -585,7 +602,7 @@ function shouldMarkPayerUnhealthy(error) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

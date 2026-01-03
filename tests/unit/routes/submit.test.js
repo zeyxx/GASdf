@@ -36,7 +36,9 @@ jest.mock('../../../src/utils/rpc', () => ({
   simulateWithBalanceCheck: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
   sendTransaction: jest.fn().mockResolvedValue('test-signature-abc123'),
   confirmTransaction: jest.fn().mockResolvedValue(true),
-  checkSignatureStatus: jest.fn().mockResolvedValue({ confirmed: true, slot: 12345, confirmationStatus: 'confirmed' }),
+  checkSignatureStatus: jest
+    .fn()
+    .mockResolvedValue({ confirmed: true, slot: 12345, confirmationStatus: 'confirmed' }),
 }));
 
 jest.mock('../../../src/services/signer', () => ({
@@ -183,10 +185,7 @@ describe('Submit Route', () => {
 
   describe('POST /submit', () => {
     it('should return signature for valid submission', async () => {
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      const response = await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(response.body).toHaveProperty('signature');
       expect(response.body).toHaveProperty('status', 'submitted');
@@ -195,57 +194,39 @@ describe('Submit Route', () => {
     });
 
     it('should include explorer link in response', async () => {
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      const response = await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(response.body.explorer).toContain('solscan.io/tx/');
     });
 
     it('should delete quote after successful submission', async () => {
-      await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(redis.deleteQuote).toHaveBeenCalledWith(validRequest.quoteId);
     });
 
     it('should claim transaction slot to prevent replay', async () => {
-      await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(redis.claimTransactionSlot).toHaveBeenCalled();
     });
 
     it('should track pending swap', async () => {
-      await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(redis.addPendingSwap).toHaveBeenCalledWith(validQuote.feeAmountLamports);
       expect(redis.incrTxCount).toHaveBeenCalled();
     });
 
     it('should increment success metrics', async () => {
-      await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(metrics.submitsTotal.inc).toHaveBeenCalledWith({ status: 'success' });
       expect(metrics.activeQuotes.dec).toHaveBeenCalled();
     });
 
     it('should log successful submission', async () => {
-      await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/submit').send(validRequest).expect(200);
 
       expect(audit.logSubmitSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -261,10 +242,7 @@ describe('Submit Route', () => {
     it('should return 400 for non-existent quote', async () => {
       redis.getQuote.mockResolvedValue(null);
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.error).toContain('Quote not found');
       expect(response.body.code).toBe('QUOTE_NOT_FOUND');
@@ -276,10 +254,7 @@ describe('Submit Route', () => {
         expiresAt: Date.now() - 1000, // Expired
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.error).toBe('Quote expired');
       expect(response.body.code).toBe('QUOTE_EXPIRED');
@@ -291,9 +266,7 @@ describe('Submit Route', () => {
         expiresAt: Date.now() - 1000,
       });
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(redis.deleteQuote).toHaveBeenCalledWith(validRequest.quoteId);
     });
@@ -308,10 +281,7 @@ describe('Submit Route', () => {
         maxSize: 1232,
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('TX_TOO_LARGE');
       expect(response.body.size).toBe(2000);
@@ -325,9 +295,7 @@ describe('Submit Route', () => {
         maxSize: 1232,
       });
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(audit.logSecurityEvent).toHaveBeenCalledWith(
         audit.AUDIT_EVENTS.VALIDATION_FAILED,
@@ -344,10 +312,7 @@ describe('Submit Route', () => {
         throw new Error('Invalid transaction');
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('INVALID_TX_FORMAT');
     });
@@ -357,10 +322,7 @@ describe('Submit Route', () => {
     it('should return 400 for replay attack', async () => {
       redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.error).toBe('Transaction already submitted');
       expect(response.body.code).toBe('REPLAY_DETECTED');
@@ -369,9 +331,7 @@ describe('Submit Route', () => {
     it('should log security event for replay', async () => {
       redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(audit.logSecurityEvent).toHaveBeenCalledWith(
         audit.AUDIT_EVENTS.REPLAY_ATTACK_DETECTED,
@@ -384,9 +344,7 @@ describe('Submit Route', () => {
     it('should track failure for anomaly detection', async () => {
       redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(anomalyDetector.trackWallet).toHaveBeenCalledWith(
         validRequest.userPubkey,
@@ -400,10 +358,7 @@ describe('Submit Route', () => {
     it('should return 400 for expired blockhash', async () => {
       rpc.isBlockhashValid.mockResolvedValue(false);
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.error).toContain('blockhash expired');
       expect(response.body.code).toBe('BLOCKHASH_EXPIRED');
@@ -412,9 +367,7 @@ describe('Submit Route', () => {
     it('should log security event for stale blockhash', async () => {
       rpc.isBlockhashValid.mockResolvedValue(false);
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(audit.logSecurityEvent).toHaveBeenCalledWith(
         audit.AUDIT_EVENTS.BLOCKHASH_EXPIRED,
@@ -430,10 +383,7 @@ describe('Submit Route', () => {
         errors: ['Invalid instruction'],
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('VALIDATION_FAILED');
       expect(response.body.details).toContain('Invalid instruction');
@@ -450,10 +400,7 @@ describe('Submit Route', () => {
         feePayer: 'FeePayerPubkey111111111111111111111111111111',
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('FEE_PAYER_MISMATCH');
     });
@@ -464,10 +411,7 @@ describe('Submit Route', () => {
         feePayer: 'DifferentPayer11111111111111111111111111111',
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('FEE_PAYER_MISMATCH');
     });
@@ -481,10 +425,7 @@ describe('Submit Route', () => {
         logs: ['Error log 1', 'Error log 2'],
       });
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(400);
+      const response = await request(app).post('/submit').send(validRequest).expect(400);
 
       expect(response.body.code).toBe('SIMULATION_FAILED');
       expect(response.body.details).toBe('Simulation failed');
@@ -496,9 +437,7 @@ describe('Submit Route', () => {
         error: 'Simulation failed',
       });
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(feePayerPool.releaseReservation).toHaveBeenCalledWith(validRequest.quoteId);
     });
@@ -509,10 +448,7 @@ describe('Submit Route', () => {
       rpc.sendTransaction.mockRejectedValue(new Error('Network error'));
       txQueue.isRetryableError.mockReturnValue(true);
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(500);
+      const response = await request(app).post('/submit').send(validRequest).expect(500);
 
       expect(response.body.code).toBe('SUBMIT_FAILED');
       expect(response.body.attempts).toBeDefined();
@@ -523,10 +459,7 @@ describe('Submit Route', () => {
     it('should return 500 on unexpected error', async () => {
       redis.getQuote.mockRejectedValue(new Error('Database error'));
 
-      const response = await request(app)
-        .post('/submit')
-        .send(validRequest)
-        .expect(500);
+      const response = await request(app).post('/submit').send(validRequest).expect(500);
 
       expect(response.body.error).toBe('Failed to submit transaction');
       expect(response.body.code).toBe('SUBMIT_FAILED');
@@ -535,9 +468,7 @@ describe('Submit Route', () => {
     it('should increment error metrics on failure', async () => {
       redis.getQuote.mockRejectedValue(new Error('Database error'));
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(metrics.submitsTotal.inc).toHaveBeenCalledWith({ status: 'error' });
     });
@@ -545,9 +476,7 @@ describe('Submit Route', () => {
     it('should release reservation on error', async () => {
       redis.getQuote.mockRejectedValue(new Error('Database error'));
 
-      await request(app)
-        .post('/submit')
-        .send(validRequest);
+      await request(app).post('/submit').send(validRequest);
 
       expect(feePayerPool.releaseReservation).toHaveBeenCalled();
     });
@@ -564,9 +493,7 @@ describe('Submit Route', () => {
         completedAt: Date.now(),
       });
 
-      const response = await request(app)
-        .get('/submit/status/tx-123')
-        .expect(200);
+      const response = await request(app).get('/submit/status/tx-123').expect(200);
 
       expect(response.body.id).toBe('tx-123');
       expect(response.body.status).toBe('completed');
@@ -576,9 +503,7 @@ describe('Submit Route', () => {
     it('should return 404 for unknown transaction', async () => {
       txQueue.getEntry.mockResolvedValue(null);
 
-      const response = await request(app)
-        .get('/submit/status/unknown-tx')
-        .expect(404);
+      const response = await request(app).get('/submit/status/unknown-tx').expect(404);
 
       expect(response.body.code).toBe('TX_NOT_FOUND');
     });
@@ -586,9 +511,7 @@ describe('Submit Route', () => {
     it('should return 500 on error', async () => {
       txQueue.getEntry.mockRejectedValue(new Error('Database error'));
 
-      const response = await request(app)
-        .get('/submit/status/tx-123')
-        .expect(500);
+      const response = await request(app).get('/submit/status/tx-123').expect(500);
 
       expect(response.body.error).toBe('Failed to get transaction status');
     });

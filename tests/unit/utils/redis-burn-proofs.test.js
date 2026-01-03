@@ -21,8 +21,10 @@ describe('Burn Proofs', () => {
   });
 
   const mockProof = {
-    burnSignature: '5XzL8mK9vN2pQ7wR4tU6yH3jF8gC1bD9aE0iO5kM2nP3qS4rT7uV6wX8yZ1aB2cD3eF4gH5iJ6kL7mN8oP9qR0sT',
-    swapSignature: '4WyK7lJ8uM1oP6vQ3sT5xG2iE7fB0aC8zD9hN4jL1mO2pR3qS6tU5wV7xY0zA1bC2dE3fG4hI5jK6lM7nO8pQ9rS',
+    burnSignature:
+      '5XzL8mK9vN2pQ7wR4tU6yH3jF8gC1bD9aE0iO5kM2nP3qS4rT7uV6wX8yZ1aB2cD3eF4gH5iJ6kL7mN8oP9qR0sT',
+    swapSignature:
+      '4WyK7lJ8uM1oP6vQ3sT5xG2iE7fB0aC8zD9hN4jL1mO2pR3qS6tU5wV7xY0zA1bC2dE3fG4hI5jK6lM7nO8pQ9rS',
     amountBurned: 1500000000,
     solAmount: 50000000,
     treasuryAmount: 12500000,
@@ -53,9 +55,7 @@ describe('Burn Proofs', () => {
     test('should generate correct explorer URL', async () => {
       const result = await redis.recordBurnProof(mockProof);
 
-      expect(result.explorerUrl).toBe(
-        `https://solscan.io/tx/${mockProof.burnSignature}`
-      );
+      expect(result.explorerUrl).toBe(`https://solscan.io/tx/${mockProof.burnSignature}`);
     });
 
     test('should include network in proof', async () => {
@@ -110,9 +110,7 @@ describe('Burn Proofs', () => {
       const result = await redis.getBurnProofs(10);
 
       for (let i = 1; i < result.proofs.length; i++) {
-        expect(result.proofs[i - 1].timestamp).toBeGreaterThanOrEqual(
-          result.proofs[i].timestamp
-        );
+        expect(result.proofs[i - 1].timestamp).toBeGreaterThanOrEqual(result.proofs[i].timestamp);
       }
     });
   });

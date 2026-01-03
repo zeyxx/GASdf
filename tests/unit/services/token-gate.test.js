@@ -31,14 +31,63 @@ jest.mock('../../../src/services/holdex', () => ({
     return { tier: 'Rust', icon: '🔩', level: 1 };
   }),
   getCreditRating: jest.fn((score) => {
-    if (score >= 90) return { grade: 'A1', label: 'Prime Quality', risk: 'minimal', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 80) return { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 70) return { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 60) return { grade: 'B1', label: 'Fair', risk: 'moderate', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 50) return { grade: 'B2', label: 'Speculative', risk: 'high', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 40) return { grade: 'B3', label: 'Very Speculative', risk: 'very_high', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 20) return { grade: 'C', label: 'Substantial Risk', risk: 'severe', outlook: 'stable', trajectory: '→ Stable' };
-    return { grade: 'D', label: 'Default', risk: 'extreme', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 90)
+      return {
+        grade: 'A1',
+        label: 'Prime Quality',
+        risk: 'minimal',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    if (score >= 80)
+      return {
+        grade: 'A2',
+        label: 'Excellent',
+        risk: 'very_low',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    if (score >= 70)
+      return { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable', trajectory: '→ Stable' };
+    if (score >= 60)
+      return {
+        grade: 'B1',
+        label: 'Fair',
+        risk: 'moderate',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    if (score >= 50)
+      return {
+        grade: 'B2',
+        label: 'Speculative',
+        risk: 'high',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    if (score >= 40)
+      return {
+        grade: 'B3',
+        label: 'Very Speculative',
+        risk: 'very_high',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    if (score >= 20)
+      return {
+        grade: 'C',
+        label: 'Substantial Risk',
+        risk: 'severe',
+        outlook: 'stable',
+        trajectory: '→ Stable',
+      };
+    return {
+      grade: 'D',
+      label: 'Default',
+      risk: 'extreme',
+      outlook: 'stable',
+      trajectory: '→ Stable',
+    };
   }),
 }));
 
@@ -59,7 +108,9 @@ describe('Token Gate Service', () => {
   describe('isTokenAccepted()', () => {
     describe('DIAMOND_TOKENS (local, no network)', () => {
       it('should accept SOL with Diamond tier and credit rating', async () => {
-        const result = await tokenGate.isTokenAccepted('So11111111111111111111111111111111111111112');
+        const result = await tokenGate.isTokenAccepted(
+          'So11111111111111111111111111111111111111112'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -71,7 +122,9 @@ describe('Token Gate Service', () => {
       });
 
       it('should accept USDC with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+        const result = await tokenGate.isTokenAccepted(
+          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -79,7 +132,9 @@ describe('Token Gate Service', () => {
       });
 
       it('should accept USDT with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
+        const result = await tokenGate.isTokenAccepted(
+          'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -87,7 +142,9 @@ describe('Token Gate Service', () => {
       });
 
       it('should accept mSOL with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted('mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So');
+        const result = await tokenGate.isTokenAccepted(
+          'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -95,7 +152,9 @@ describe('Token Gate Service', () => {
       });
 
       it('should accept jitoSOL with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted('J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn');
+        const result = await tokenGate.isTokenAccepted(
+          'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -103,7 +162,9 @@ describe('Token Gate Service', () => {
       });
 
       it('should accept $ASDF with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
+        const result = await tokenGate.isTokenAccepted(
+          '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump'
+        );
 
         expect(result.accepted).toBe(true);
         expect(result.reason).toBe('diamond');
@@ -292,7 +353,7 @@ describe('Token Gate Service', () => {
       expect(tokens.length).toBeGreaterThanOrEqual(5);
 
       // Check structure - now uses tier instead of trusted
-      const sol = tokens.find(t => t.symbol === 'SOL');
+      const sol = tokens.find((t) => t.symbol === 'SOL');
       expect(sol).toBeDefined();
       expect(sol.mint).toBe('So11111111111111111111111111111111111111112');
       expect(sol.decimals).toBe(9);
@@ -302,7 +363,7 @@ describe('Token Gate Service', () => {
     it('should include $ASDF when configured', () => {
       const tokens = tokenGate.getDiamondTokensList();
 
-      const asdf = tokens.find(t => t.symbol === 'ASDF');
+      const asdf = tokens.find((t) => t.symbol === 'ASDF');
       expect(asdf).toBeDefined();
       expect(asdf.mint).toBe('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
       expect(asdf.tier).toBe('Diamond');
@@ -311,15 +372,15 @@ describe('Token Gate Service', () => {
     it('should include all major stablecoins', () => {
       const tokens = tokenGate.getDiamondTokensList();
 
-      expect(tokens.find(t => t.symbol === 'USDC')).toBeDefined();
-      expect(tokens.find(t => t.symbol === 'USDT')).toBeDefined();
+      expect(tokens.find((t) => t.symbol === 'USDC')).toBeDefined();
+      expect(tokens.find((t) => t.symbol === 'USDT')).toBeDefined();
     });
 
     it('should include liquid staking tokens', () => {
       const tokens = tokenGate.getDiamondTokensList();
 
-      expect(tokens.find(t => t.symbol === 'mSOL')).toBeDefined();
-      expect(tokens.find(t => t.symbol === 'jitoSOL')).toBeDefined();
+      expect(tokens.find((t) => t.symbol === 'mSOL')).toBeDefined();
+      expect(tokens.find((t) => t.symbol === 'jitoSOL')).toBeDefined();
     });
   });
 
@@ -338,8 +399,12 @@ describe('Token Gate Service', () => {
     });
 
     it('should contain the core Diamond tokens', () => {
-      expect(tokenGate.DIAMOND_TOKENS.has('So11111111111111111111111111111111111111112')).toBe(true);
-      expect(tokenGate.DIAMOND_TOKENS.has('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')).toBe(true);
+      expect(tokenGate.DIAMOND_TOKENS.has('So11111111111111111111111111111111111111112')).toBe(
+        true
+      );
+      expect(tokenGate.DIAMOND_TOKENS.has('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')).toBe(
+        true
+      );
     });
   });
 

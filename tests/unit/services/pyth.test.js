@@ -63,7 +63,9 @@ describe('Pyth Oracle Service', () => {
   describe('PYTH_FEEDS', () => {
     it('should have SOL/USD feed', () => {
       expect(pyth.PYTH_FEEDS['SOL/USD']).toBeDefined();
-      expect(pyth.PYTH_FEEDS['SOL/USD'].toBase58()).toBe('7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE');
+      expect(pyth.PYTH_FEEDS['SOL/USD'].toBase58()).toBe(
+        '7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'
+      );
     });
 
     it('should have BTC/USD feed', () => {
@@ -77,10 +79,7 @@ describe('Pyth Oracle Service', () => {
 
   describe('getFeeInToken()', () => {
     it('should return native source for SOL', async () => {
-      const result = await pyth.getFeeInToken(
-        'So11111111111111111111111111111111111111112',
-        50000
-      );
+      const result = await pyth.getFeeInToken('So11111111111111111111111111111111111111112', 50000);
 
       expect(result).toEqual({
         inputAmount: 50000,

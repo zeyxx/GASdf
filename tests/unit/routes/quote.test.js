@@ -178,10 +178,7 @@ describe('Quote Route', () => {
     };
 
     it('should return quote for valid request', async () => {
-      const response = await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
+      const response = await request(app).post('/quote').send(validRequest).expect(200);
 
       expect(response.body).toHaveProperty('quoteId');
       expect(response.body).toHaveProperty('feePayer');
@@ -193,10 +190,7 @@ describe('Quote Route', () => {
     });
 
     it('should include payment token info with acceptance reason', async () => {
-      const response = await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
+      const response = await request(app).post('/quote').send(validRequest).expect(200);
 
       expect(response.body.paymentToken).toMatchObject({
         mint: validRequest.paymentToken,
@@ -207,17 +201,13 @@ describe('Quote Route', () => {
     });
 
     it('should check token acceptance via token-gate', async () => {
-      await request(app)
-        .post('/quote')
-        .send(validRequest);
+      await request(app).post('/quote').send(validRequest);
 
       expect(tokenGate.isTokenAccepted).toHaveBeenCalledWith(validRequest.paymentToken);
     });
 
     it('should call jupiter for fee conversion', async () => {
-      await request(app)
-        .post('/quote')
-        .send(validRequest);
+      await request(app).post('/quote').send(validRequest);
 
       expect(jupiter.getFeeInToken).toHaveBeenCalledWith(
         validRequest.paymentToken,
@@ -226,10 +216,7 @@ describe('Quote Route', () => {
     });
 
     it('should store quote in redis', async () => {
-      await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/quote').send(validRequest).expect(200);
 
       expect(redis.setQuote).toHaveBeenCalledWith(
         expect.any(String),
@@ -243,10 +230,7 @@ describe('Quote Route', () => {
     });
 
     it('should increment metrics on success', async () => {
-      await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/quote').send(validRequest).expect(200);
 
       expect(metrics.quotesTotal.inc).toHaveBeenCalledWith({ status: 'success' });
       expect(metrics.quoteDuration.observe).toHaveBeenCalled();
@@ -254,10 +238,7 @@ describe('Quote Route', () => {
     });
 
     it('should log quote creation', async () => {
-      await request(app)
-        .post('/quote')
-        .send(validRequest)
-        .expect(200);
+      await request(app).post('/quote').send(validRequest).expect(200);
 
       expect(audit.logQuoteCreated).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -291,10 +272,7 @@ describe('Quote Route', () => {
           reason: 'not_verified',
         });
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(400);
+        const response = await request(app).post('/quote').send(validRequest).expect(400);
 
         expect(response.body.code).toBe('TOKEN_NOT_ACCEPTED');
         expect(response.body.reason).toBe('not_verified');
@@ -306,10 +284,7 @@ describe('Quote Route', () => {
           reason: 'holdex_verified',
         });
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(200);
+        const response = await request(app).post('/quote').send(validRequest).expect(200);
 
         expect(response.body.paymentToken.accepted).toBe('holdex_verified');
       });
@@ -320,9 +295,7 @@ describe('Quote Route', () => {
           reason: 'not_verified',
         });
 
-        await request(app)
-          .post('/quote')
-          .send(validRequest);
+        await request(app).post('/quote').send(validRequest);
 
         expect(audit.logQuoteRejected).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -340,10 +313,7 @@ describe('Quote Route', () => {
           closesAt: Date.now() + 30000,
         });
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(503);
+        const response = await request(app).post('/quote').send(validRequest).expect(503);
 
         expect(response.body.error).toContain('Service temporarily unavailable');
         expect(response.body.code).toBe('CIRCUIT_BREAKER_OPEN');
@@ -357,9 +327,7 @@ describe('Quote Route', () => {
           closesAt: Date.now() + 30000,
         });
 
-        await request(app)
-          .post('/quote')
-          .send(validRequest);
+        await request(app).post('/quote').send(validRequest);
 
         expect(audit.logQuoteRejected).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -374,10 +342,7 @@ describe('Quote Route', () => {
       it('should return 503 when no fee payer available', async () => {
         feePayerPool.reserveBalance.mockResolvedValue(null);
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(503);
+        const response = await request(app).post('/quote').send(validRequest).expect(503);
 
         expect(response.body.error).toContain('no fee payer capacity');
         expect(response.body.code).toBe('NO_PAYER_CAPACITY');
@@ -387,9 +352,7 @@ describe('Quote Route', () => {
       it('should log quote rejection for no capacity', async () => {
         feePayerPool.reserveBalance.mockResolvedValue(null);
 
-        await request(app)
-          .post('/quote')
-          .send(validRequest);
+        await request(app).post('/quote').send(validRequest);
 
         expect(audit.logQuoteRejected).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -403,10 +366,7 @@ describe('Quote Route', () => {
       it('should return 500 on jupiter error', async () => {
         jupiter.getFeeInToken.mockRejectedValue(new Error('Jupiter API error'));
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(500);
+        const response = await request(app).post('/quote').send(validRequest).expect(500);
 
         expect(response.body.error).toBe('Failed to generate quote');
         expect(response.body.code).toBe('QUOTE_FAILED');
@@ -415,10 +375,7 @@ describe('Quote Route', () => {
       it('should return 500 on token-gate error', async () => {
         tokenGate.isTokenAccepted.mockRejectedValue(new Error('Token gate error'));
 
-        const response = await request(app)
-          .post('/quote')
-          .send(validRequest)
-          .expect(500);
+        const response = await request(app).post('/quote').send(validRequest).expect(500);
 
         expect(response.body.code).toBe('QUOTE_FAILED');
       });
@@ -426,9 +383,7 @@ describe('Quote Route', () => {
       it('should increment error metrics on failure', async () => {
         jupiter.getFeeInToken.mockRejectedValue(new Error('Test error'));
 
-        await request(app)
-          .post('/quote')
-          .send(validRequest);
+        await request(app).post('/quote').send(validRequest);
 
         expect(metrics.quotesTotal.inc).toHaveBeenCalledWith({ status: 'error' });
       });

@@ -6,10 +6,10 @@
 const logger = require('./logger');
 
 // Default timeouts (in milliseconds)
-const DEFAULT_TIMEOUT = 10_000;      // 10 seconds for general requests
-const JUPITER_TIMEOUT = 15_000;      // 15 seconds for Jupiter API (can be slow)
-const WEBHOOK_TIMEOUT = 5_000;       // 5 seconds for webhooks
-const HEALTH_CHECK_TIMEOUT = 3_000;  // 3 seconds for health checks
+const DEFAULT_TIMEOUT = 10_000; // 10 seconds for general requests
+const JUPITER_TIMEOUT = 15_000; // 15 seconds for Jupiter API (can be slow)
+const WEBHOOK_TIMEOUT = 5_000; // 5 seconds for webhooks
+const HEALTH_CHECK_TIMEOUT = 3_000; // 3 seconds for health checks
 
 /**
  * Fetch with timeout protection
@@ -91,10 +91,7 @@ function timeoutPromise(ms, operation = 'Operation') {
  * @returns {Promise<T>}
  */
 async function withTimeout(promise, ms, operation = 'Operation') {
-  return Promise.race([
-    promise,
-    timeoutPromise(ms, operation),
-  ]);
+  return Promise.race([promise, timeoutPromise(ms, operation)]);
 }
 
 /**

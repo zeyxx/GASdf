@@ -245,10 +245,7 @@ describe('Oracle Service (Legacy)', () => {
 
       const result = await oracle.pingOracle();
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3001/health',
-        expect.any(Object)
-      );
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/health', expect.any(Object));
       expect(result.success).toBe(true);
       expect(result.latencyMs).toBeDefined();
     });

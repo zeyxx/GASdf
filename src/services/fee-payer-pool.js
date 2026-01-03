@@ -36,9 +36,9 @@ const RESERVATION_TTL_MS = 90_000; // 90 seconds
 
 // Key rotation states
 const KEY_STATUS = {
-  ACTIVE: 'active',       // Normal operation, accepts new quotes
-  RETIRING: 'retiring',   // No new quotes, still processes existing reservations
-  RETIRED: 'retired',     // Fully deprecated, should not be used
+  ACTIVE: 'active', // Normal operation, accepts new quotes
+  RETIRING: 'retiring', // No new quotes, still processes existing reservations
+  RETIRED: 'retired', // Fully deprecated, should not be used
 };
 
 class FeePayerPool {
@@ -140,12 +140,12 @@ class FeePayerPool {
     this.initialized = true;
 
     // Initial balance refresh
-    this.refreshBalances().catch(err => {
+    this.refreshBalances().catch((err) => {
       logger.warn('FEE_PAYER_POOL', 'Initial balance refresh failed', { error: err.message });
     });
 
     // SECURITY: Verify fee payers have no token accounts (critical invariant)
-    this.verifyNoTokenAccounts().catch(err => {
+    this.verifyNoTokenAccounts().catch((err) => {
       logger.error('FEE_PAYER_POOL', 'Security check failed', { error: err.message });
     });
   }
@@ -169,13 +169,12 @@ class FeePayerPool {
 
       try {
         const connection = rpc.getConnection();
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          pubkey,
-          { programId: TOKEN_PROGRAM_ID }
-        );
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
+          programId: TOKEN_PROGRAM_ID,
+        });
 
         if (tokenAccounts.value.length > 0) {
-          const accounts = tokenAccounts.value.map(acc => ({
+          const accounts = tokenAccounts.value.map((acc) => ({
             mint: acc.account.data.parsed.info.mint.slice(0, 8),
             balance: acc.account.data.parsed.info.tokenAmount.uiAmountString,
           }));
@@ -229,7 +228,7 @@ class FeePayerPool {
 
     try {
       // Batch fetch all balances in a single RPC call
-      const pubkeys = this.payers.map(p => p.publicKey);
+      const pubkeys = this.payers.map((p) => p.publicKey);
       const balanceMap = await rpc.getMultipleBalances(pubkeys);
 
       // Update balances and check health status
@@ -242,7 +241,10 @@ class FeePayerPool {
         // Auto-heal if balance is now healthy
         if (balance >= MIN_HEALTHY_BALANCE && this.unhealthyUntil.has(pubkey)) {
           this.unhealthyUntil.delete(pubkey);
-          logger.info('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... recovered (balance: ${balance / 1e9} SOL)`);
+          logger.info(
+            'FEE_PAYER_POOL',
+            `Payer ${pubkey.slice(0, 8)}... recovered (balance: ${balance / 1e9} SOL)`
+          );
         }
       }
 
@@ -322,7 +324,7 @@ class FeePayerPool {
    */
   getPayerByPubkey(pubkey) {
     this.initialize();
-    return this.payers.find(p => p.publicKey.toBase58() === pubkey);
+    return this.payers.find((p) => p.publicKey.toBase58() === pubkey);
   }
 
   /**
@@ -330,7 +332,10 @@ class FeePayerPool {
    */
   markUnhealthy(pubkey, durationMs = 60_000) {
     this.unhealthyUntil.set(pubkey, Date.now() + durationMs);
-    logger.warn('FEE_PAYER_POOL', `Marked ${pubkey.slice(0, 8)}... as unhealthy for ${durationMs / 1000}s`);
+    logger.warn(
+      'FEE_PAYER_POOL',
+      `Marked ${pubkey.slice(0, 8)}... as unhealthy for ${durationMs / 1000}s`
+    );
   }
 
   /**
@@ -338,7 +343,7 @@ class FeePayerPool {
    */
   getAllPublicKeys() {
     this.initialize();
-    return this.payers.map(p => p.publicKey);
+    return this.payers.map((p) => p.publicKey);
   }
 
   /**
@@ -357,8 +362,8 @@ class FeePayerPool {
         balance,
         balanceSol: balance / 1e9,
         isHealthy: this.isPayerHealthy(pubkey),
-        status: balance < MIN_HEALTHY_BALANCE ? 'critical' :
-                balance < WARNING_BALANCE ? 'warning' : 'ok',
+        status:
+          balance < MIN_HEALTHY_BALANCE ? 'critical' : balance < WARNING_BALANCE ? 'warning' : 'ok',
       });
     }
     return result;
@@ -469,14 +474,21 @@ class FeePayerPool {
     const existingStatus = this.getKeyStatus(pubkey);
 
     if (existingStatus.status !== KEY_STATUS.RETIRING) {
-      logger.warn('FEE_PAYER_POOL', `Cannot complete retirement for non-retiring key: ${pubkey.slice(0, 8)}...`);
+      logger.warn(
+        'FEE_PAYER_POOL',
+        `Cannot complete retirement for non-retiring key: ${pubkey.slice(0, 8)}...`
+      );
       return false;
     }
 
     // Check if there are pending reservations
     const pendingReservations = this.reservationsByPayer.get(pubkey)?.size || 0;
     if (pendingReservations > 0) {
-      logger.warn('FEE_PAYER_POOL', `Cannot complete retirement: ${pendingReservations} pending reservations`, { pubkey: pubkey.slice(0, 8) });
+      logger.warn(
+        'FEE_PAYER_POOL',
+        `Cannot complete retirement: ${pendingReservations} pending reservations`,
+        { pubkey: pubkey.slice(0, 8) }
+      );
       return false;
     }
 
@@ -511,10 +523,14 @@ class FeePayerPool {
       for (const quoteId of [...quoteIds]) {
         this.releaseReservation(quoteId);
       }
-      logger.error('FEE_PAYER_POOL', `Emergency retirement: cancelled ${cancelled} reservations`, { pubkey: pubkey.slice(0, 8) });
+      logger.error('FEE_PAYER_POOL', `Emergency retirement: cancelled ${cancelled} reservations`, {
+        pubkey: pubkey.slice(0, 8),
+      });
     }
 
-    logger.error('FEE_PAYER_POOL', `EMERGENCY key retirement for ${pubkey.slice(0, 8)}...`, { reason });
+    logger.error('FEE_PAYER_POOL', `EMERGENCY key retirement for ${pubkey.slice(0, 8)}...`, {
+      reason,
+    });
 
     // Log to audit
     try {
@@ -538,7 +554,10 @@ class FeePayerPool {
     }
 
     if (existingStatus.forced) {
-      logger.error('FEE_PAYER_POOL', `Cannot reactivate emergency-retired key: ${pubkey.slice(0, 8)}...`);
+      logger.error(
+        'FEE_PAYER_POOL',
+        `Cannot reactivate emergency-retired key: ${pubkey.slice(0, 8)}...`
+      );
       return false;
     }
 
@@ -566,7 +585,9 @@ class FeePayerPool {
         canAcceptQuotes: this.canAcceptNewQuotes(pubkey),
         canProcessReservations: this.canProcessReservations(pubkey),
         pendingReservations,
-        ...(keyInfo.retirementStartedAt && { retirementStartedAt: new Date(keyInfo.retirementStartedAt).toISOString() }),
+        ...(keyInfo.retirementStartedAt && {
+          retirementStartedAt: new Date(keyInfo.retirementStartedAt).toISOString(),
+        }),
         ...(keyInfo.retiredAt && { retiredAt: new Date(keyInfo.retiredAt).toISOString() }),
         ...(keyInfo.reason && { reason: keyInfo.reason }),
       });
@@ -649,81 +670,88 @@ class FeePayerPool {
     // Lock name is per-pool to prevent all reservations from blocking each other
     // Lock TTL is short (5s) to prevent deadlocks while allowing for retries
     // ==========================================================================
-    const lockResult = await redis.withLock('fee-payer-reservation', async () => {
-      // Cleanup expired reservations inside lock
-      await this._cleanupExpiredReservationsDistributed();
+    const lockResult = await redis.withLock(
+      'fee-payer-reservation',
+      async () => {
+        // Cleanup expired reservations inside lock
+        await this._cleanupExpiredReservationsDistributed();
 
-      // Check circuit breaker
-      if (this.isCircuitOpen()) {
-        logger.warn('FEE_PAYER_POOL', 'Circuit breaker open, rejecting reservation', { quoteId });
-        return null;
-      }
-
-      // Find a payer with capacity
-      for (let i = 0; i < this.payers.length; i++) {
-        const index = (this.currentIndex + i) % this.payers.length;
-        const payer = this.payers[index];
-        const pubkey = payer.publicKey.toBase58();
-
-        // Skip unhealthy payers
-        if (!this.isPayerHealthy(pubkey)) continue;
-
-        // Check reservation count limit (from Redis in multi-instance mode)
-        const reservationCount = await this._getReservationCountDistributed(pubkey);
-        if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
-          logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
-          continue;
+        // Check circuit breaker
+        if (this.isCircuitOpen()) {
+          logger.warn('FEE_PAYER_POOL', 'Circuit breaker open, rejecting reservation', { quoteId });
+          return null;
         }
 
-        // Check available balance (from Redis in multi-instance mode)
-        const availableBalance = await this._getAvailableBalanceDistributed(pubkey);
-        if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
-          logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... insufficient available balance`);
-          continue;
+        // Find a payer with capacity
+        for (let i = 0; i < this.payers.length; i++) {
+          const index = (this.currentIndex + i) % this.payers.length;
+          const payer = this.payers[index];
+          const pubkey = payer.publicKey.toBase58();
+
+          // Skip unhealthy payers
+          if (!this.isPayerHealthy(pubkey)) continue;
+
+          // Check reservation count limit (from Redis in multi-instance mode)
+          const reservationCount = await this._getReservationCountDistributed(pubkey);
+          if (reservationCount >= MAX_RESERVATIONS_PER_PAYER) {
+            logger.debug('FEE_PAYER_POOL', `Payer ${pubkey.slice(0, 8)}... at max reservations`);
+            continue;
+          }
+
+          // Check available balance (from Redis in multi-instance mode)
+          const availableBalance = await this._getAvailableBalanceDistributed(pubkey);
+          if (availableBalance < amountLamports + MIN_HEALTHY_BALANCE) {
+            logger.debug(
+              'FEE_PAYER_POOL',
+              `Payer ${pubkey.slice(0, 8)}... insufficient available balance`
+            );
+            continue;
+          }
+
+          // Create reservation in Redis (shared across instances)
+          const reservation = {
+            pubkey,
+            amount: amountLamports,
+            expiresAt: Date.now() + RESERVATION_TTL_MS,
+            createdAt: Date.now(),
+          };
+
+          await this._setReservationDistributed(quoteId, reservation);
+
+          // Also keep in-memory for fast lookups
+          this.reservations.set(quoteId, reservation);
+          if (!this.reservationsByPayer.has(pubkey)) {
+            this.reservationsByPayer.set(pubkey, new Set());
+          }
+          this.reservationsByPayer.get(pubkey).add(quoteId);
+
+          // Move to next payer for round-robin
+          this.currentIndex = (index + 1) % this.payers.length;
+
+          logger.debug('FEE_PAYER_POOL', 'Reserved balance (distributed)', {
+            quoteId,
+            pubkey: pubkey.slice(0, 8),
+            amount: amountLamports,
+            availableAfter: availableBalance - amountLamports,
+          });
+
+          // Reset consecutive failures on successful reservation
+          this.consecutiveFailures = 0;
+
+          return pubkey;
         }
 
-        // Create reservation in Redis (shared across instances)
-        const reservation = {
-          pubkey,
-          amount: amountLamports,
-          expiresAt: Date.now() + RESERVATION_TTL_MS,
-          createdAt: Date.now(),
-        };
-
-        await this._setReservationDistributed(quoteId, reservation);
-
-        // Also keep in-memory for fast lookups
-        this.reservations.set(quoteId, reservation);
-        if (!this.reservationsByPayer.has(pubkey)) {
-          this.reservationsByPayer.set(pubkey, new Set());
-        }
-        this.reservationsByPayer.get(pubkey).add(quoteId);
-
-        // Move to next payer for round-robin
-        this.currentIndex = (index + 1) % this.payers.length;
-
-        logger.debug('FEE_PAYER_POOL', 'Reserved balance (distributed)', {
+        // No payer available - record failure
+        this.recordFailure();
+        logger.error('FEE_PAYER_POOL', 'No payer available for reservation', {
           quoteId,
-          pubkey: pubkey.slice(0, 8),
           amount: amountLamports,
-          availableAfter: availableBalance - amountLamports,
         });
 
-        // Reset consecutive failures on successful reservation
-        this.consecutiveFailures = 0;
-
-        return pubkey;
-      }
-
-      // No payer available - record failure
-      this.recordFailure();
-      logger.error('FEE_PAYER_POOL', 'No payer available for reservation', {
-        quoteId,
-        amount: amountLamports,
-      });
-
-      return null;
-    }, 5); // 5 second lock TTL
+        return null;
+      },
+      5
+    ); // 5 second lock TTL
 
     // Handle lock acquisition failure
     if (!lockResult.success) {
@@ -988,7 +1016,7 @@ function isTransactionSignedByFeePayer(transaction) {
   pool.initialize();
 
   // Get all valid fee payer pubkeys
-  const validPubkeys = new Set(pool.payers.map(p => p.publicKey.toBase58()));
+  const validPubkeys = new Set(pool.payers.map((p) => p.publicKey.toBase58()));
 
   if (transaction instanceof VersionedTransaction) {
     const signerKeys = transaction.message.staticAccountKeys;
@@ -1012,8 +1040,8 @@ function isTransactionSignedByFeePayer(transaction) {
       return false;
     }
 
-    const feePayerSig = transaction.signatures.find(
-      (sig) => validPubkeys.has(sig.publicKey.toBase58())
+    const feePayerSig = transaction.signatures.find((sig) =>
+      validPubkeys.has(sig.publicKey.toBase58())
     );
     return feePayerSig?.signature !== null;
   }
@@ -1024,7 +1052,7 @@ function isTransactionSignedByFeePayer(transaction) {
  */
 function getTransactionFeePayer(transaction) {
   pool.initialize();
-  const validPubkeys = new Set(pool.payers.map(p => p.publicKey.toBase58()));
+  const validPubkeys = new Set(pool.payers.map((p) => p.publicKey.toBase58()));
 
   if (transaction instanceof VersionedTransaction) {
     const signerKeys = transaction.message.staticAccountKeys;

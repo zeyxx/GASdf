@@ -12,7 +12,9 @@ jest.mock('@solana/web3.js', () => {
     toBuffer: () => Buffer.from(key || ''),
     equals: () => false,
   }));
-  mockPublicKey.findProgramAddressSync = jest.fn().mockReturnValue([{ toBase58: () => 'PDA' }, 255]);
+  mockPublicKey.findProgramAddressSync = jest
+    .fn()
+    .mockReturnValue([{ toBase58: () => 'PDA' }, 255]);
 
   const mockSystemProgram = {
     programId: { toBase58: () => '11111111111111111111111111111111' },
@@ -80,18 +82,14 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('should include totalBurns count', async () => {
-      const response = await request(app)
-        .get('/v1/stats/burns')
-        .expect(200);
+      const response = await request(app).get('/v1/stats/burns').expect(200);
 
       expect(response.body).toHaveProperty('totalBurns');
       expect(typeof response.body.totalBurns).toBe('number');
     });
 
     test('should include verification message', async () => {
-      const response = await request(app)
-        .get('/v1/stats/burns')
-        .expect(200);
+      const response = await request(app).get('/v1/stats/burns').expect(200);
 
       expect(response.body).toHaveProperty('verification');
       expect(response.body.verification).toHaveProperty('message');
@@ -99,17 +97,13 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('should respect limit parameter', async () => {
-      const response = await request(app)
-        .get('/v1/stats/burns?limit=5')
-        .expect(200);
+      const response = await request(app).get('/v1/stats/burns?limit=5').expect(200);
 
       expect(response.body.burns.length).toBeLessThanOrEqual(5);
     });
 
     test('should cap limit at 100', async () => {
-      const response = await request(app)
-        .get('/v1/stats/burns?limit=500')
-        .expect(200);
+      const response = await request(app).get('/v1/stats/burns?limit=500').expect(200);
 
       // Should not exceed max limit
       expect(response.body.burns.length).toBeLessThanOrEqual(100);
@@ -119,18 +113,15 @@ describe('Stats & Burns API Routes', () => {
   describe('GET /v1/stats/burns/:signature', () => {
     test('should return 404 for non-existent signature', async () => {
       // Use a valid-looking signature that doesn't exist (87 chars base58)
-      const fakeSignature = '5XzL8mK9vN2pQ7wR4tU6yH3jF8gC1bD9aE0iO5kM2nP3qS4rT7uV6wX8yZ1aB2cD3eF4gH5iJ6kL7mN8oP9qR0sT';
-      const response = await request(app)
-        .get(`/v1/stats/burns/${fakeSignature}`)
-        .expect(404);
+      const fakeSignature =
+        '5XzL8mK9vN2pQ7wR4tU6yH3jF8gC1bD9aE0iO5kM2nP3qS4rT7uV6wX8yZ1aB2cD3eF4gH5iJ6kL7mN8oP9qR0sT';
+      const response = await request(app).get(`/v1/stats/burns/${fakeSignature}`).expect(404);
 
       expect(response.body).toHaveProperty('error');
     });
 
     test('should return 400 for invalid signature format', async () => {
-      const response = await request(app)
-        .get('/v1/stats/burns/short')
-        .expect(400);
+      const response = await request(app).get('/v1/stats/burns/short').expect(400);
 
       expect(response.body).toHaveProperty('error');
       expect(response.body.error).toContain('Invalid');
@@ -139,18 +130,13 @@ describe('Stats & Burns API Routes', () => {
 
   describe('GET /status', () => {
     test('should return 200 with status', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect('Content-Type', /json/)
-        .expect(200);
+      const response = await request(app).get('/status').expect('Content-Type', /json/).expect(200);
 
       expect(response.body).toHaveProperty('status');
     });
 
     test('should include components health', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect(200);
+      const response = await request(app).get('/status').expect(200);
 
       expect(response.body).toHaveProperty('components');
       expect(response.body.components).toHaveProperty('api');
@@ -159,27 +145,21 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('should include updated_at timestamp', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect(200);
+      const response = await request(app).get('/status').expect(200);
 
       expect(response.body).toHaveProperty('updated_at');
       expect(new Date(response.body.updated_at)).toBeInstanceOf(Date);
     });
 
     test('should include response_time_ms', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect(200);
+      const response = await request(app).get('/status').expect(200);
 
       expect(response.body).toHaveProperty('response_time_ms');
       expect(typeof response.body.response_time_ms).toBe('number');
     });
 
     test('should include Upptime-compatible page info', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect(200);
+      const response = await request(app).get('/status').expect(200);
 
       expect(response.body).toHaveProperty('page');
       expect(response.body.page).toHaveProperty('name');
@@ -187,9 +167,7 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('should include simple indicators', async () => {
-      const response = await request(app)
-        .get('/status')
-        .expect(200);
+      const response = await request(app).get('/status').expect(200);
 
       expect(response.body).toHaveProperty('indicators');
       expect(response.body.indicators).toHaveProperty('operational');
@@ -200,8 +178,7 @@ describe('Stats & Burns API Routes', () => {
 
   describe('Deprecation headers on legacy routes', () => {
     test('GET /health should include Deprecation header', async () => {
-      const response = await request(app)
-        .get('/health');
+      const response = await request(app).get('/health');
 
       // Health might return 503 in test mode (no Redis) but should still have headers
       expect([200, 503]).toContain(response.status);
@@ -209,17 +186,13 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('GET /stats should include Sunset header', async () => {
-      const response = await request(app)
-        .get('/stats')
-        .expect(200);
+      const response = await request(app).get('/stats').expect(200);
 
       expect(response.headers).toHaveProperty('sunset');
     });
 
     test('GET /stats should include Link header to v1', async () => {
-      const response = await request(app)
-        .get('/stats')
-        .expect(200);
+      const response = await request(app).get('/stats').expect(200);
 
       expect(response.headers).toHaveProperty('link');
       expect(response.headers.link).toContain('/v1');
@@ -227,9 +200,7 @@ describe('Stats & Burns API Routes', () => {
     });
 
     test('GET /v1/health should NOT include Deprecation header', async () => {
-      const response = await request(app)
-        .get('/v1/health')
-        .expect(200);
+      const response = await request(app).get('/v1/health').expect(200);
 
       expect(response.headers.deprecation).toBeUndefined();
     });

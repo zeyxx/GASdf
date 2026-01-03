@@ -21,11 +21,7 @@ const PII_SALT = process.env.AUDIT_PII_SALT || 'gasdf-audit-salt-v1';
 function hashPII(data, prefix = '') {
   if (!data) return null;
 
-  const hash = crypto
-    .createHmac('sha256', PII_SALT)
-    .update(data)
-    .digest('hex')
-    .slice(0, 16);
+  const hash = crypto.createHmac('sha256', PII_SALT).update(data).digest('hex').slice(0, 16);
 
   return prefix ? `${prefix}${hash}` : hash;
 }
@@ -122,7 +118,7 @@ class AuditService {
     if (this.flushInterval) return;
 
     this.flushInterval = setInterval(() => {
-      this.flush().catch(err => {
+      this.flush().catch((err) => {
         logger.error('AUDIT', 'Failed to flush audit buffer', { error: err.message });
       });
     }, FLUSH_INTERVAL_MS);
@@ -333,7 +329,8 @@ function logSecurityEvent(eventType, data) {
 }
 
 function logRateLimited(type, data) {
-  const eventType = type === 'wallet' ? AUDIT_EVENTS.WALLET_RATE_LIMITED : AUDIT_EVENTS.IP_RATE_LIMITED;
+  const eventType =
+    type === 'wallet' ? AUDIT_EVENTS.WALLET_RATE_LIMITED : AUDIT_EVENTS.IP_RATE_LIMITED;
   return auditService.log(eventType, {
     wallet: anonymizeWallet(data.wallet),
     ip: anonymizeIP(data.ip),

@@ -44,11 +44,11 @@ const PriceStatus = {
 // Token mint → Pyth feed mapping
 const MINT_TO_FEED = {
   // SOL (wrapped)
-  'So11111111111111111111111111111111111111112': 'SOL/USD',
+  So11111111111111111111111111111111111111112: 'SOL/USD',
   // USDC
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC/USD',
+  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 'USDC/USD',
   // USDT
-  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT/USD',
+  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 'USDT/USD',
 };
 
 // Cache for price data (reduces RPC calls)
@@ -159,7 +159,9 @@ async function getPrice(feedName) {
     // Validate it's a PriceUpdateV2 account (owner = Pyth Solana Receiver)
     const PYTH_RECEIVER = 'rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ';
     if (accountInfo.owner.toBase58() !== PYTH_RECEIVER) {
-      throw new Error(`Invalid account owner for ${feedName}: expected ${PYTH_RECEIVER}, got ${accountInfo.owner.toBase58()}`);
+      throw new Error(
+        `Invalid account owner for ${feedName}: expected ${PYTH_RECEIVER}, got ${accountInfo.owner.toBase58()}`
+      );
     }
 
     const priceData = parsePriceUpdateV2(accountInfo.data);
@@ -197,7 +199,10 @@ async function getPrice(feedName) {
 
     // Return stale cache if available
     if (cached) {
-      logger.warn('PYTH', 'Using stale cache', { feed: feedName, age: Date.now() - cached.fetchedAt });
+      logger.warn('PYTH', 'Using stale cache', {
+        feed: feedName,
+        age: Date.now() - cached.fetchedAt,
+      });
       return { ...cached, cached: true, stale: true };
     }
 
@@ -335,9 +340,10 @@ function getStatus() {
       ttlMs: CACHE_TTL_MS,
       hits: cacheHits,
       misses: cacheMisses,
-      hitRate: cacheHits + cacheMisses > 0
-        ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(1) + '%'
-        : 'N/A',
+      hitRate:
+        cacheHits + cacheMisses > 0
+          ? ((cacheHits / (cacheHits + cacheMisses)) * 100).toFixed(1) + '%'
+          : 'N/A',
     },
     rpcCalls,
   };

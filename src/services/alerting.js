@@ -4,8 +4,8 @@ const { fetchWithTimeout, WEBHOOK_TIMEOUT } = require('../utils/fetch-timeout');
 
 // Webhook retry configuration
 const WEBHOOK_MAX_RETRIES = 3;
-const WEBHOOK_INITIAL_DELAY_MS = 1000;  // 1 second
-const WEBHOOK_MAX_DELAY_MS = 10000;     // 10 seconds
+const WEBHOOK_INITIAL_DELAY_MS = 1000; // 1 second
+const WEBHOOK_MAX_DELAY_MS = 10000; // 10 seconds
 
 // =============================================================================
 // Alert Definitions
@@ -172,8 +172,12 @@ class AlertingService {
     }
 
     // Log the alert
-    const logMethod = alertDef.severity === SEVERITY.CRITICAL ? 'error' :
-                      alertDef.severity === SEVERITY.WARNING ? 'warn' : 'info';
+    const logMethod =
+      alertDef.severity === SEVERITY.CRITICAL
+        ? 'error'
+        : alertDef.severity === SEVERITY.WARNING
+          ? 'warn'
+          : 'info';
     logger[logMethod]('ALERT', alert.message, {
       alertId,
       severity: alert.severity,
@@ -268,7 +272,7 @@ class AlertingService {
           nextRetryMs: delay,
           error: lastError?.message,
         });
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -302,40 +306,52 @@ class AlertingService {
   }
 
   formatSlack(alert) {
-    const color = alert.severity === SEVERITY.CRITICAL ? '#dc3545' :
-                  alert.severity === SEVERITY.WARNING ? '#ffc107' : '#28a745';
+    const color =
+      alert.severity === SEVERITY.CRITICAL
+        ? '#dc3545'
+        : alert.severity === SEVERITY.WARNING
+          ? '#ffc107'
+          : '#28a745';
 
     return {
-      attachments: [{
-        color,
-        title: `[${alert.severity.toUpperCase()}] ${alert.title}`,
-        text: alert.message,
-        fields: [
-          { title: 'Environment', value: alert.environment, short: true },
-          { title: 'Network', value: alert.network, short: true },
-        ],
-        footer: 'GASdf Alerting',
-        ts: Math.floor(alert.timestamp / 1000),
-      }],
+      attachments: [
+        {
+          color,
+          title: `[${alert.severity.toUpperCase()}] ${alert.title}`,
+          text: alert.message,
+          fields: [
+            { title: 'Environment', value: alert.environment, short: true },
+            { title: 'Network', value: alert.network, short: true },
+          ],
+          footer: 'GASdf Alerting',
+          ts: Math.floor(alert.timestamp / 1000),
+        },
+      ],
     };
   }
 
   formatDiscord(alert) {
-    const color = alert.severity === SEVERITY.CRITICAL ? 0xdc3545 :
-                  alert.severity === SEVERITY.WARNING ? 0xffc107 : 0x28a745;
+    const color =
+      alert.severity === SEVERITY.CRITICAL
+        ? 0xdc3545
+        : alert.severity === SEVERITY.WARNING
+          ? 0xffc107
+          : 0x28a745;
 
     return {
-      embeds: [{
-        title: `[${alert.severity.toUpperCase()}] ${alert.title}`,
-        description: alert.message,
-        color,
-        fields: [
-          { name: 'Environment', value: alert.environment, inline: true },
-          { name: 'Network', value: alert.network, inline: true },
-        ],
-        footer: { text: 'GASdf Alerting' },
-        timestamp: new Date(alert.timestamp).toISOString(),
-      }],
+      embeds: [
+        {
+          title: `[${alert.severity.toUpperCase()}] ${alert.title}`,
+          description: alert.message,
+          color,
+          fields: [
+            { name: 'Environment', value: alert.environment, inline: true },
+            { name: 'Network', value: alert.network, inline: true },
+          ],
+          footer: { text: 'GASdf Alerting' },
+          timestamp: new Date(alert.timestamp).toISOString(),
+        },
+      ],
     };
   }
 
@@ -484,7 +500,9 @@ function checkFeePayerPoolCircuitBreaker() {
       alertingService.recover('CIRCUIT_BREAKER_OPEN', { name: 'fee_payer_pool' });
     }
   } catch (error) {
-    logger.error('ALERTING', 'Failed to check fee payer pool circuit breaker', { error: error.message });
+    logger.error('ALERTING', 'Failed to check fee payer pool circuit breaker', {
+      error: error.message,
+    });
   }
 }
 

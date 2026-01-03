@@ -34,16 +34,17 @@ class Counter {
   }
 
   getKey(labelsObj) {
-    return this.labels.map(l => labelsObj[l] || '').join('|');
+    return this.labels.map((l) => labelsObj[l] || '').join('|');
   }
 
   collect() {
     const lines = [`# HELP ${this.name} ${this.help}`, `# TYPE ${this.name} counter`];
     for (const [key, value] of this.values) {
       const labelValues = key.split('|');
-      const labelStr = this.labels.length > 0
-        ? `{${this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')}}`
-        : '';
+      const labelStr =
+        this.labels.length > 0
+          ? `{${this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')}}`
+          : '';
       lines.push(`${this.name}${labelStr} ${value}`);
     }
     return lines.join('\n');
@@ -76,16 +77,17 @@ class Gauge {
   }
 
   getKey(labelsObj) {
-    return this.labels.map(l => labelsObj[l] || '').join('|');
+    return this.labels.map((l) => labelsObj[l] || '').join('|');
   }
 
   collect() {
     const lines = [`# HELP ${this.name} ${this.help}`, `# TYPE ${this.name} gauge`];
     for (const [key, value] of this.values) {
       const labelValues = key.split('|');
-      const labelStr = this.labels.length > 0
-        ? `{${this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')}}`
-        : '';
+      const labelStr =
+        this.labels.length > 0
+          ? `{${this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')}}`
+          : '';
       lines.push(`${this.name}${labelStr} ${value}`);
     }
     return lines.join('\n');
@@ -105,7 +107,7 @@ class Histogram {
     const key = this.getKey(labelsObj);
     if (!this.observations.has(key)) {
       this.observations.set(key, {
-        buckets: new Map(this.buckets.map(b => [b, 0])),
+        buckets: new Map(this.buckets.map((b) => [b, 0])),
         sum: 0,
         count: 0,
       });
@@ -123,7 +125,7 @@ class Histogram {
   }
 
   getKey(labelsObj) {
-    return this.labels.map(l => labelsObj[l] || '').join('|');
+    return this.labels.map((l) => labelsObj[l] || '').join('|');
   }
 
   collect() {
@@ -131,16 +133,15 @@ class Histogram {
 
     for (const [key, obs] of this.observations) {
       const labelValues = key.split('|');
-      const baseLabelStr = this.labels.length > 0
-        ? this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')
-        : '';
+      const baseLabelStr =
+        this.labels.length > 0
+          ? this.labels.map((l, i) => `${l}="${labelValues[i]}"`).join(',')
+          : '';
 
       let cumulative = 0;
       for (const bucket of this.buckets) {
         cumulative += obs.buckets.get(bucket);
-        const labelStr = baseLabelStr
-          ? `{${baseLabelStr},le="${bucket}"}`
-          : `{le="${bucket}"}`;
+        const labelStr = baseLabelStr ? `{${baseLabelStr},le="${bucket}"}` : `{le="${bucket}"}`;
         lines.push(`${this.name}_bucket${labelStr} ${cumulative}`);
       }
 
@@ -161,23 +162,13 @@ class Histogram {
 // =============================================================================
 
 // Request counters
-const quotesTotal = new Counter(
-  'gasdf_quotes_total',
-  'Total number of quote requests',
-  ['status']
-);
+const quotesTotal = new Counter('gasdf_quotes_total', 'Total number of quote requests', ['status']);
 
-const submitsTotal = new Counter(
-  'gasdf_submits_total',
-  'Total number of submit requests',
-  ['status']
-);
+const submitsTotal = new Counter('gasdf_submits_total', 'Total number of submit requests', [
+  'status',
+]);
 
-const burnsTotal = new Counter(
-  'gasdf_burns_total',
-  'Total number of burn operations',
-  ['status']
-);
+const burnsTotal = new Counter('gasdf_burns_total', 'Total number of burn operations', ['status']);
 
 // Gauges
 const feePayerBalance = new Gauge(
@@ -192,11 +183,7 @@ const pendingSwapAmount = new Gauge(
   []
 );
 
-const activeQuotes = new Gauge(
-  'gasdf_active_quotes',
-  'Number of active quotes',
-  []
-);
+const activeQuotes = new Gauge('gasdf_active_quotes', 'Number of active quotes', []);
 
 const circuitBreakerState = new Gauge(
   'gasdf_circuit_breaker_state',
@@ -220,11 +207,11 @@ const submitDuration = new Histogram(
 );
 
 // HTTP request metrics
-const httpRequestsTotal = new Counter(
-  'gasdf_http_requests_total',
-  'Total HTTP requests',
-  ['method', 'path', 'status']
-);
+const httpRequestsTotal = new Counter('gasdf_http_requests_total', 'Total HTTP requests', [
+  'method',
+  'path',
+  'status',
+]);
 
 const httpRequestDuration = new Histogram(
   'gasdf_http_request_duration_seconds',

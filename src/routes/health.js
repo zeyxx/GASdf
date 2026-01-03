@@ -42,12 +42,22 @@ router.get('/', async (req, res) => {
     withTimeout(checkVelocity(), HEALTH_CHECK_TIMEOUT, 'Velocity metrics'),
   ]);
 
-  health.checks.redis = checks[0].status === 'fulfilled' ? checks[0].value : { status: 'error', error: checks[0].reason?.message };
-  health.checks.rpc = checks[1].status === 'fulfilled' ? checks[1].value : { status: 'error', error: checks[1].reason?.message };
-  health.checks.feePayer = checks[2].status === 'fulfilled' ? checks[2].value : { status: 'error', error: checks[2].reason?.message };
+  health.checks.redis =
+    checks[0].status === 'fulfilled'
+      ? checks[0].value
+      : { status: 'error', error: checks[0].reason?.message };
+  health.checks.rpc =
+    checks[1].status === 'fulfilled'
+      ? checks[1].value
+      : { status: 'error', error: checks[1].reason?.message };
+  health.checks.feePayer =
+    checks[2].status === 'fulfilled'
+      ? checks[2].value
+      : { status: 'error', error: checks[2].reason?.message };
 
   // Velocity metrics (behavioral proof for treasury refill)
-  health.velocity = checks[3].status === 'fulfilled' ? checks[3].value : { error: checks[3].reason?.message };
+  health.velocity =
+    checks[3].status === 'fulfilled' ? checks[3].value : { error: checks[3].reason?.message };
 
   // Add circuit breaker status (includes PostgreSQL circuit)
   health.circuitBreakers = {
@@ -78,13 +88,14 @@ router.get('/', async (req, res) => {
 
   // Determine overall status
   // In staging/production, Redis is CRITICAL - treat it as error
-  const hasError = Object.values(health.checks).some(c => c.status === 'error');
-  const hasCriticalWarning = (config.IS_STAGING || config.IS_PROD) && health.checks.redis?.status === 'warning';
-  const hasWarning = Object.values(health.checks).some(c => c.status === 'warning');
+  const hasError = Object.values(health.checks).some((c) => c.status === 'error');
+  const hasCriticalWarning =
+    (config.IS_STAGING || config.IS_PROD) && health.checks.redis?.status === 'warning';
+  const hasWarning = Object.values(health.checks).some((c) => c.status === 'warning');
 
   // Check if any circuit breaker is open
   const hasOpenCircuitBreaker = Object.values(health.circuitBreakers).some(
-    cb => cb.state === 'open' || (cb.state === undefined && cb.isConnected === false)
+    (cb) => cb.state === 'open' || (cb.state === undefined && cb.isConnected === false)
   );
 
   if (hasError || hasCriticalWarning) {
@@ -106,15 +117,22 @@ router.get('/ready', async (req, res) => {
   try {
     // Check critical dependencies with timeout protection
     const [redisCheck, rpcCheck, feePayerCheck] = await Promise.all([
-      withTimeout(checkRedis(), HEALTH_CHECK_TIMEOUT, 'Redis').catch(() => ({ status: 'error', message: 'timeout' })),
-      withTimeout(checkRpc(), HEALTH_CHECK_TIMEOUT, 'RPC').catch(() => ({ status: 'error', message: 'timeout' })),
-      withTimeout(checkFeePayer(), HEALTH_CHECK_TIMEOUT, 'FeePayer').catch(() => ({ status: 'error', message: 'timeout' })),
+      withTimeout(checkRedis(), HEALTH_CHECK_TIMEOUT, 'Redis').catch(() => ({
+        status: 'error',
+        message: 'timeout',
+      })),
+      withTimeout(checkRpc(), HEALTH_CHECK_TIMEOUT, 'RPC').catch(() => ({
+        status: 'error',
+        message: 'timeout',
+      })),
+      withTimeout(checkFeePayer(), HEALTH_CHECK_TIMEOUT, 'FeePayer').catch(() => ({
+        status: 'error',
+        message: 'timeout',
+      })),
     ]);
 
     // In staging/production, Redis is required
-    const redisOk = config.IS_DEV
-      ? redisCheck.status !== 'error'
-      : redisCheck.status === 'ok'; // Staging and production require actual Redis
+    const redisOk = config.IS_DEV ? redisCheck.status !== 'error' : redisCheck.status === 'ok'; // Staging and production require actual Redis
 
     const rpcOk = rpcCheck.status === 'ok';
     const feePayerOk = feePayerCheck.status !== 'error';
@@ -258,13 +276,18 @@ async function checkFeePayer() {
   }
 
   try {
-    const { getPayerBalances, getHealthSummary, MIN_HEALTHY_BALANCE, WARNING_BALANCE } = require('../services/signer');
+    const {
+      getPayerBalances,
+      getHealthSummary,
+      MIN_HEALTHY_BALANCE,
+      WARNING_BALANCE,
+    } = require('../services/signer');
 
     const balances = await getPayerBalances();
     const summary = getHealthSummary();
 
     // Format payer details
-    const payers = balances.map(p => ({
+    const payers = balances.map((p) => ({
       pubkey: `${p.pubkey.slice(0, 8)}...${p.pubkey.slice(-4)}`,
       balance: p.balanceSol.toFixed(4),
       status: p.status,

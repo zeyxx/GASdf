@@ -105,10 +105,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check code style (if eslint configured)
-        run: |
-          if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f ".eslintrc" ]; then
-            npm run lint 2>/dev/null || echo "Lint script not configured"
-          else
-            echo "ESLint not configured - skipping"
-          fi
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check formatting with Prettier
+        run: npx prettier --check src/ tests/

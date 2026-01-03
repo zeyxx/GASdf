@@ -214,7 +214,9 @@ describe('Validation Middleware', () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith(
           expect.objectContaining({
-            details: expect.arrayContaining(['estimatedComputeUnits must be between 1 and 1,400,000']),
+            details: expect.arrayContaining([
+              'estimatedComputeUnits must be between 1 and 1,400,000',
+            ]),
           })
         );
       });

@@ -56,9 +56,9 @@ describe('Fetch Timeout Utilities', () => {
         setTimeout(() => resolve('success'), 500);
       });
 
-      await expect(
-        withTimeout(slowPromise, 100, 'Slow operation')
-      ).rejects.toThrow('Slow operation timeout after 100ms');
+      await expect(withTimeout(slowPromise, 100, 'Slow operation')).rejects.toThrow(
+        'Slow operation timeout after 100ms'
+      );
     });
 
     it('should preserve original rejection', async () => {
@@ -66,9 +66,9 @@ describe('Fetch Timeout Utilities', () => {
         setTimeout(() => reject(new Error('Original error')), 50);
       });
 
-      await expect(
-        withTimeout(failingPromise, 200, 'Failing operation')
-      ).rejects.toThrow('Original error');
+      await expect(withTimeout(failingPromise, 200, 'Failing operation')).rejects.toThrow(
+        'Original error'
+      );
     });
 
     it('should handle immediate resolution', async () => {
@@ -104,16 +104,8 @@ describe('Fetch Timeout Utilities', () => {
   describe('Concurrent timeout handling', () => {
     it('should handle multiple concurrent timeouts independently', async () => {
       const results = await Promise.allSettled([
-        withTimeout(
-          new Promise((resolve) => setTimeout(() => resolve('fast'), 50)),
-          200,
-          'Fast'
-        ),
-        withTimeout(
-          new Promise((resolve) => setTimeout(() => resolve('slow'), 300)),
-          100,
-          'Slow'
-        ),
+        withTimeout(new Promise((resolve) => setTimeout(() => resolve('fast'), 50)), 200, 'Fast'),
+        withTimeout(new Promise((resolve) => setTimeout(() => resolve('slow'), 300)), 100, 'Slow'),
       ]);
 
       expect(results[0].status).toBe('fulfilled');
@@ -128,9 +120,7 @@ describe('Fetch Timeout Utilities', () => {
       const promises = [];
 
       for (let i = 0; i < 10; i++) {
-        promises.push(
-          withTimeout(Promise.resolve(i), 1000, `Op${i}`)
-        );
+        promises.push(withTimeout(Promise.resolve(i), 1000, `Op${i}`));
       }
 
       const results = await Promise.all(promises);
@@ -141,11 +131,7 @@ describe('Fetch Timeout Utilities', () => {
   describe('Edge cases', () => {
     it('should handle zero timeout', async () => {
       await expect(
-        withTimeout(
-          new Promise((resolve) => setTimeout(resolve, 10)),
-          0,
-          'Zero'
-        )
+        withTimeout(new Promise((resolve) => setTimeout(resolve, 10)), 0, 'Zero')
       ).rejects.toThrow('Zero timeout after 0ms');
     });
 
@@ -180,11 +166,15 @@ describe('Fetch Timeout Utilities', () => {
       const mockResponse = { ok: true };
       global.fetch.mockResolvedValue(mockResponse);
 
-      await fetchWithTimeout('https://example.com', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test: true }),
-      }, 1000);
+      await fetchWithTimeout(
+        'https://example.com',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ test: true }),
+        },
+        1000
+      );
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com',
@@ -201,9 +191,7 @@ describe('Fetch Timeout Utilities', () => {
       abortError.name = 'AbortError';
       global.fetch.mockRejectedValue(abortError);
 
-      await expect(
-        fetchWithTimeout('https://example.com', {}, 100)
-      ).rejects.toMatchObject({
+      await expect(fetchWithTimeout('https://example.com', {}, 100)).rejects.toMatchObject({
         code: 'TIMEOUT',
         url: 'https://example.com',
         timeoutMs: 100,
@@ -214,9 +202,9 @@ describe('Fetch Timeout Utilities', () => {
       const networkError = new Error('Network error');
       global.fetch.mockRejectedValue(networkError);
 
-      await expect(
-        fetchWithTimeout('https://example.com', {}, 1000)
-      ).rejects.toThrow('Network error');
+      await expect(fetchWithTimeout('https://example.com', {}, 1000)).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should use DEFAULT_TIMEOUT when not specified', async () => {
@@ -311,7 +299,8 @@ describe('Fetch Timeout Utilities', () => {
     it('should retry on failure', async () => {
       jest.useRealTimers(); // Use real timers for this test
 
-      const fn = jest.fn()
+      const fn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('fail 1'))
         .mockRejectedValueOnce(new Error('fail 2'))
         .mockResolvedValue('success');

@@ -206,7 +206,7 @@ function calculateSizeSavings(addressCount, altHits) {
     withoutAlt,
     withAlt,
     savings: withoutAlt - withAlt,
-    savingsPercent: ((withoutAlt - withAlt) / withoutAlt * 100).toFixed(1),
+    savingsPercent: (((withoutAlt - withAlt) / withoutAlt) * 100).toFixed(1),
   };
 }
 

@@ -2,11 +2,7 @@
  * Tests for Alerting Service
  */
 
-const {
-  alertingService,
-  ALERT_TYPES,
-  SEVERITY,
-} = require('../../../src/services/alerting');
+const { alertingService, ALERT_TYPES, SEVERITY } = require('../../../src/services/alerting');
 
 // Mock fetch for webhook tests
 global.fetch = jest.fn();

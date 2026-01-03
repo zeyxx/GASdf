@@ -80,7 +80,10 @@ router.get('/tiers/:wallet', async (req, res) => {
       discountPercent: tierInfo.discountPercent,
     });
   } catch (error) {
-    logger.error('TOKENS', 'Tier lookup failed', { wallet: req.params.wallet, error: error.message });
+    logger.error('TOKENS', 'Tier lookup failed', {
+      wallet: req.params.wallet,
+      error: error.message,
+    });
     res.status(500).json({ error: 'Failed to get tier info' });
   }
 });

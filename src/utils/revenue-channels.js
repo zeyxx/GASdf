@@ -72,34 +72,34 @@
 
 // Revenue source types
 const REVENUE_SOURCE = {
-  FEE_ASDF: 'fee_asdf',     // User paid fee in $ASDF
-  FEE_TOKEN: 'fee_token',   // User paid fee in other token
+  FEE_ASDF: 'fee_asdf', // User paid fee in $ASDF
+  FEE_TOKEN: 'fee_token', // User paid fee in other token
 };
 
 // Processing channels
 const CHANNEL = {
-  PURIST: 'purist',         // $ASDF → 100% burn
-  UNIFIED: 'unified',       // Token → $ASDF → burn/treasury split
+  PURIST: 'purist', // $ASDF → 100% burn
+  UNIFIED: 'unified', // Token → $ASDF → burn/treasury split
 };
 
 // Burn types
 const BURN_TYPE = {
-  DIRECT: 'burn_direct',       // $ASDF burned directly (purist)
-  SWAP: 'burn_swap',           // $ASDF burned from swap (unified)
+  DIRECT: 'burn_direct', // $ASDF burned directly (purist)
+  SWAP: 'burn_swap', // $ASDF burned from swap (unified)
   ECOSYSTEM: 'burn_ecosystem', // Token burned directly (flywheel)
 };
 
 // Treasury event types
 const TREASURY_EVENT = {
-  RETAIN: 'treasury_retain',   // $ASDF kept from unified channel
-  REFILL: 'treasury_refill',   // $ASDF → SOL for fee payer
+  RETAIN: 'treasury_retain', // $ASDF kept from unified channel
+  REFILL: 'treasury_refill', // $ASDF → SOL for fee payer
 };
 
 // Proof/record types for transparency
 const PROOF_TYPE = {
-  BURN_BATCH: 'burn_batch',           // Batched burn transaction
-  SWAP_TO_ASDF: 'swap_to_asdf',       // Token → $ASDF swap
-  TREASURY_SWAP: 'treasury_swap',     // $ASDF → SOL for operations
+  BURN_BATCH: 'burn_batch', // Batched burn transaction
+  SWAP_TO_ASDF: 'swap_to_asdf', // Token → $ASDF swap
+  TREASURY_SWAP: 'treasury_swap', // $ASDF → SOL for operations
 };
 
 /**
@@ -124,7 +124,7 @@ function createRevenueEvent({
       symbol: tokenSymbol,
       amount: inputAmount,
     },
-    burns: burns.map(b => ({
+    burns: burns.map((b) => ({
       type: b.type,
       mint: b.mint,
       amount: b.amount,
@@ -162,7 +162,7 @@ function calculateFlowDistribution(amount, ecosystemBurnPct = 0, burnRatio = 0.7
     totals: {
       burned: ecosystemBurn + burnFromSwap,
       treasury: treasuryRetain,
-      burnPercent: ((ecosystemBurn + burnFromSwap) / amount * 100).toFixed(1),
+      burnPercent: (((ecosystemBurn + burnFromSwap) / amount) * 100).toFixed(1),
     },
   };
 }

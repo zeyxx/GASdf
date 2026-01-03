@@ -61,7 +61,10 @@ const memoryStore = {
     }
 
     if (deleted > 0) {
-      logger.debug('REDIS', `Memory store cleanup: removed ${deleted} expired entries, ${this.data.size} remaining`);
+      logger.debug(
+        'REDIS',
+        `Memory store cleanup: removed ${deleted} expired entries, ${this.data.size} remaining`
+      );
     }
   },
 };
@@ -227,11 +230,7 @@ function getMemoryStatsData() {
   for (const [key, item] of memoryStore.data) {
     // Only sync stats, pending amounts, and wallet burns
     // Skip quotes, rate limits, etc. as they're ephemeral
-    if (
-      key.startsWith('stats:') ||
-      key.startsWith('pending:') ||
-      key.startsWith('burn:wallet:')
-    ) {
+    if (key.startsWith('stats:') || key.startsWith('pending:') || key.startsWith('burn:wallet:')) {
       // Check if not expired
       if (!item.expiry || Date.now() <= item.expiry) {
         statsData[key] = item.value;
@@ -249,11 +248,7 @@ function clearMemoryStats() {
   const keysToDelete = [];
 
   for (const [key] of memoryStore.data) {
-    if (
-      key.startsWith('stats:') ||
-      key.startsWith('pending:') ||
-      key.startsWith('burn:wallet:')
-    ) {
+    if (key.startsWith('stats:') || key.startsWith('pending:') || key.startsWith('burn:wallet:')) {
       keysToDelete.push(key);
     }
   }
@@ -479,7 +474,7 @@ async function getTreasuryHistory(limit = 20) {
   return withRedis(
     async (redis) => {
       const history = await redis.lRange(`${KEY_PREFIX}treasury:history`, 0, limit - 1);
-      return history.map(h => JSON.parse(h));
+      return history.map((h) => JSON.parse(h));
     },
     () => []
   );
@@ -552,7 +547,7 @@ async function claimTransactionSlot(txHash) {
       // Returns 'OK' if set, null if key already exists
       const result = await redis.set(key, Date.now().toString(), {
         NX: true,
-        EX: TX_HASH_TTL_SECONDS
+        EX: TX_HASH_TTL_SECONDS,
       });
       return { claimed: result === 'OK' };
     },
@@ -647,7 +642,7 @@ async function appendAuditLog(events) {
 
   return withRedis(
     async (redis) => {
-      const serialized = events.map(e => JSON.stringify(e));
+      const serialized = events.map((e) => JSON.stringify(e));
       await redis.lPush(AUDIT_KEY, ...serialized);
       await redis.lTrim(AUDIT_KEY, 0, MAX_AUDIT_ENTRIES - 1);
       await redis.expire(AUDIT_KEY, AUDIT_TTL_SECONDS);
@@ -665,7 +660,7 @@ async function getAuditLog(limit = 100, offset = 0) {
   return withRedis(
     async (redis) => {
       const entries = await redis.lRange(AUDIT_KEY, offset, offset + limit - 1);
-      return entries.map(e => JSON.parse(e));
+      return entries.map((e) => JSON.parse(e));
     },
     () => []
   );
@@ -680,8 +675,8 @@ async function searchAuditLog(eventType, limit = 100) {
       // Get all entries and filter (not efficient for large logs, but simple)
       const entries = await redis.lRange(AUDIT_KEY, 0, 999);
       return entries
-        .map(e => JSON.parse(e))
-        .filter(e => e.type === eventType)
+        .map((e) => JSON.parse(e))
+        .filter((e) => e.type === eventType)
         .slice(0, limit);
     },
     () => []
@@ -755,7 +750,9 @@ async function getBurnLeaderboard(limit = 50) {
   return withRedis(
     async (redis) => {
       // Get top wallets with scores
-      const results = await redis.zRangeWithScores(`${KEY_PREFIX}burn:leaderboard`, 0, limit - 1, { REV: true });
+      const results = await redis.zRangeWithScores(`${KEY_PREFIX}burn:leaderboard`, 0, limit - 1, {
+        REV: true,
+      });
       return results.map((entry, index) => ({
         rank: index + 1,
         wallet: entry.value,
@@ -845,7 +842,7 @@ async function getBurnProofs(limit = 50) {
         redis.get(`${KEY_PREFIX}burn:proof:count`),
       ]);
       return {
-        proofs: proofs.map(p => JSON.parse(p)),
+        proofs: proofs.map((p) => JSON.parse(p)),
         totalCount: parseInt(totalCount) || 0,
       };
     },
@@ -1047,7 +1044,11 @@ async function withLock(lockName, fn, ttlSeconds = 60) {
   const token = await acquireLock(lockName, ttlSeconds);
 
   if (!token) {
-    return { success: false, error: 'LOCK_HELD', message: `Lock ${lockName} is held by another process` };
+    return {
+      success: false,
+      error: 'LOCK_HELD',
+      message: `Lock ${lockName} is held by another process`,
+    };
   }
 
   try {
@@ -1198,10 +1199,7 @@ async function calculateVelocityBasedBuffer(bufferHours = 2, minBufferLamports =
 
   // Calculate required buffer: (txPerHour × avgCost) × bufferHours
   const hourlyBurn = velocity.txPerHour * velocity.avgCost;
-  const requiredBuffer = Math.max(
-    minBufferLamports,
-    Math.ceil(hourlyBurn * bufferHours)
-  );
+  const requiredBuffer = Math.max(minBufferLamports, Math.ceil(hourlyBurn * bufferHours));
 
   // Target is 100x the required buffer (~1 week runway at steady state)
   // Minimizes refill frequency → less gas wasted on refill tx

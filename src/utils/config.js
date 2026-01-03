@@ -83,9 +83,11 @@ const config = {
   FEE_PAYER_KEYS: process.env.FEE_PAYER_KEYS?.split(',').filter(Boolean) || [],
 
   // $ASDF token mint
-  ASDF_MINT: process.env.ASDF_MINT || (IS_DEV
-    ? 'ASdfDevnetFakeMintAddress1111111111111'
-    : '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump'),
+  ASDF_MINT:
+    process.env.ASDF_MINT ||
+    (IS_DEV
+      ? 'ASdfDevnetFakeMintAddress1111111111111'
+      : '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump'),
 
   // Wrapped SOL mint (same on all networks)
   WSOL_MINT: 'So11111111111111111111111111111111111111112',
@@ -193,7 +195,9 @@ function validateConfig() {
 
   // Validate fee payer private key format
   if (config.FEE_PAYER_PRIVATE_KEY && !PRIVATE_KEY_REGEX.test(config.FEE_PAYER_PRIVATE_KEY)) {
-    errors.push('FEE_PAYER_PRIVATE_KEY must be a valid base58 encoded private key (64-88 characters)');
+    errors.push(
+      'FEE_PAYER_PRIVATE_KEY must be a valid base58 encoded private key (64-88 characters)'
+    );
   }
 
   // Validate multi fee payer keys format (Phase 2)
@@ -212,9 +216,10 @@ function validateConfig() {
     }
 
     // Check for placeholder values
-    const isPlaceholder = config.ASDF_MINT.includes('evnet') ||
-                         config.ASDF_MINT.includes('FakeMint') ||
-                         config.ASDF_MINT.includes('Devnet');
+    const isPlaceholder =
+      config.ASDF_MINT.includes('evnet') ||
+      config.ASDF_MINT.includes('FakeMint') ||
+      config.ASDF_MINT.includes('Devnet');
 
     if (isPlaceholder) {
       if (IS_PROD) {
@@ -246,7 +251,9 @@ function validateConfig() {
   // Jupiter API key required in production (lite-api deprecated Jan 31, 2026)
   if (!config.JUPITER_API_KEY) {
     if (IS_PROD) {
-      errors.push('JUPITER_API_KEY required - lite-api deprecated Jan 31, 2026 (get key at portal.jup.ag)');
+      errors.push(
+        'JUPITER_API_KEY required - lite-api deprecated Jan 31, 2026 (get key at portal.jup.ag)'
+      );
     } else {
       warnings.push('JUPITER_API_KEY not set - lite-api deprecated, get key at portal.jup.ag');
     }

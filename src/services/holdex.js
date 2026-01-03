@@ -84,7 +84,16 @@ const HOLDEX_TIMEOUT = 5000; // 5 seconds
 const ACCEPTED_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze']);
 
 // All valid tier names
-const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Rust']);
+const VALID_TIERS = new Set([
+  'Diamond',
+  'Platinum',
+  'Gold',
+  'Silver',
+  'Bronze',
+  'Copper',
+  'Iron',
+  'Rust',
+]);
 
 /**
  * Get metal rank info from K-score
@@ -93,14 +102,14 @@ const VALID_TIERS = new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 
  * @returns {{tier: string, icon: string, level: number}}
  */
 function getKRank(score) {
-  if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 };  // A1 [90-99], 100 = native
+  if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 }; // A1 [90-99], 100 = native
   if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 7 }; // A2 [80-89]
-  if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 };     // A3 [70-79]
-  if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 };   // B1 [60-69]
-  if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 };   // B2 [50-59]
-  if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 };   // B3 [40-49]
-  if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 };     // C  [20-39]
-  return { tier: 'Rust', icon: '🔩', level: 1 };                      // D  [0-19]
+  if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 }; // A3 [70-79]
+  if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 }; // B1 [60-69]
+  if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 }; // B2 [50-59]
+  if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 }; // B3 [40-49]
+  if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 }; // C  [20-39]
+  return { tier: 'Rust', icon: '🔩', level: 1 }; // D  [0-19]
 }
 
 /**
@@ -135,21 +144,37 @@ function getCreditRating(kScore, trajectory = null) {
   // Grade mapping
   let grade, label, risk;
   if (adjustedScore >= 90) {
-    grade = 'A1'; label = 'Prime Quality'; risk = 'minimal';
+    grade = 'A1';
+    label = 'Prime Quality';
+    risk = 'minimal';
   } else if (adjustedScore >= 80) {
-    grade = 'A2'; label = 'Excellent'; risk = 'very_low';
+    grade = 'A2';
+    label = 'Excellent';
+    risk = 'very_low';
   } else if (adjustedScore >= 70) {
-    grade = 'A3'; label = 'Good'; risk = 'low';
+    grade = 'A3';
+    label = 'Good';
+    risk = 'low';
   } else if (adjustedScore >= 60) {
-    grade = 'B1'; label = 'Fair'; risk = 'moderate';
+    grade = 'B1';
+    label = 'Fair';
+    risk = 'moderate';
   } else if (adjustedScore >= 50) {
-    grade = 'B2'; label = 'Speculative'; risk = 'high';
+    grade = 'B2';
+    label = 'Speculative';
+    risk = 'high';
   } else if (adjustedScore >= 40) {
-    grade = 'B3'; label = 'Very Speculative'; risk = 'very_high';
+    grade = 'B3';
+    label = 'Very Speculative';
+    risk = 'very_high';
   } else if (adjustedScore >= 20) {
-    grade = 'C'; label = 'Substantial Risk'; risk = 'severe';
+    grade = 'C';
+    label = 'Substantial Risk';
+    risk = 'severe';
   } else {
-    grade = 'D'; label = 'Default'; risk = 'extreme';
+    grade = 'D';
+    label = 'Default';
+    risk = 'extreme';
   }
 
   // Outlook based on trajectory
@@ -272,7 +297,15 @@ async function getToken(mint) {
     logger.debug('HOLDEX', 'HOLDEX_URL not configured, skipping verification');
     const kRank = getKRank(0);
     const creditRating = getCreditRating(0);
-    return { tier: 'Rust', kScore: 0, kRank, creditRating, hasCommunityUpdate: false, cached: false, error: 'HOLDEX_URL not configured' };
+    return {
+      tier: 'Rust',
+      kScore: 0,
+      kRank,
+      creditRating,
+      hasCommunityUpdate: false,
+      cached: false,
+      error: 'HOLDEX_URL not configured',
+    };
   }
 
   try {
@@ -284,7 +317,7 @@ async function getToken(mint) {
       try {
         const res = await fetch(`${holdexUrl}/token/${mint}`, {
           signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
+          headers: { Accept: 'application/json' },
         });
         clearTimeout(timeout);
         return res;
@@ -315,27 +348,32 @@ async function getToken(mint) {
     // Use kRank from API if available, otherwise calculate locally
     const kRank = token.kRank || getKRank(kScore);
     const tier = VALID_TIERS.has(kRank.tier) ? kRank.tier : getKRank(kScore).tier;
-    const hasCommunityUpdate = token.hasCommunityUpdate === true || token.hascommunityupdate === true;
+    const hasCommunityUpdate =
+      token.hasCommunityUpdate === true || token.hascommunityupdate === true;
 
     // Use creditRating from API if available, otherwise calculate locally
     const creditRating = token.creditRating || getCreditRating(kScore);
 
     // Extract conviction data if available
-    const conviction = token.conviction ? {
-      score: token.conviction.score || 0,
-      accumulators: token.conviction.accumulators || 0,
-      holders: token.conviction.holders || 0,
-      reducers: token.conviction.reducers || 0,
-      extractors: token.conviction.extractors || 0,
-      analyzed: token.conviction.analyzed || 0,
-    } : (token.conviction_score ? {
-      score: token.conviction_score,
-      accumulators: token.conviction_accumulators || 0,
-      holders: token.conviction_holders || 0,
-      reducers: token.conviction_reducers || 0,
-      extractors: token.conviction_extractors || 0,
-      analyzed: token.conviction_analyzed || 0,
-    } : null);
+    const conviction = token.conviction
+      ? {
+          score: token.conviction.score || 0,
+          accumulators: token.conviction.accumulators || 0,
+          holders: token.conviction.holders || 0,
+          reducers: token.conviction.reducers || 0,
+          extractors: token.conviction.extractors || 0,
+          analyzed: token.conviction.analyzed || 0,
+        }
+      : token.conviction_score
+        ? {
+            score: token.conviction_score,
+            accumulators: token.conviction_accumulators || 0,
+            holders: token.conviction_holders || 0,
+            reducers: token.conviction_reducers || 0,
+            extractors: token.conviction_extractors || 0,
+            analyzed: token.conviction_analyzed || 0,
+          }
+        : null;
 
     // ==========================================================================
     // DUAL-BURN FLYWHEEL: Use HolDex burn data (source of truth) or calculate
@@ -369,13 +407,17 @@ async function getToken(mint) {
       // Non-pump.fun: Use HolDex data if available
       burnedPercent = token.burnedPercent;
       burnedAmount = token.burnedAmount || 0;
-      initialSupply = parseFloat(token.initialSupply) * Math.pow(10, token.decimals || 6) || PUMP_FUN_INITIAL_SUPPLY;
+      initialSupply =
+        parseFloat(token.initialSupply) * Math.pow(10, token.decimals || 6) ||
+        PUMP_FUN_INITIAL_SUPPLY;
       burnSource = 'holdex';
     } else if (token.burned_percent && token.burned_percent > 0) {
       // Alternative field names
       burnedPercent = token.burned_percent;
       burnedAmount = token.burned_amount || 0;
-      initialSupply = parseFloat(token.initial_supply) * Math.pow(10, token.decimals || 6) || PUMP_FUN_INITIAL_SUPPLY;
+      initialSupply =
+        parseFloat(token.initial_supply) * Math.pow(10, token.decimals || 6) ||
+        PUMP_FUN_INITIAL_SUPPLY;
       burnSource = 'holdex';
     } else if (currentSupply > 0 && currentSupply < PUMP_FUN_INITIAL_SUPPLY) {
       // Fallback: Calculate from pump.fun standard 1B initial supply
@@ -425,12 +467,18 @@ async function getToken(mint) {
     // Check if circuit breaker is open
     const isCircuitOpen = error.code === 'CIRCUIT_OPEN';
 
-    logger.warn('HOLDEX', isCircuitOpen ? 'Circuit breaker open, using fallback' : 'Token fetch failed, trying on-chain fallback', {
-      mint: mint.slice(0, 8),
-      error: error.message,
-      circuitOpen: isCircuitOpen,
-      circuitState: holdexBreaker.getStatus().state,
-    });
+    logger.warn(
+      'HOLDEX',
+      isCircuitOpen
+        ? 'Circuit breaker open, using fallback'
+        : 'Token fetch failed, trying on-chain fallback',
+      {
+        mint: mint.slice(0, 8),
+        error: error.message,
+        circuitOpen: isCircuitOpen,
+        circuitState: holdexBreaker.getStatus().state,
+      }
+    );
 
     // ==========================================================================
     // FALLBACK: On-chain is truth - get supply directly from Solana

@@ -176,16 +176,20 @@ describe('Distributed Locking', () => {
       let maxConcurrent = 0;
 
       const executeWithTracking = async () => {
-        return redis.withLock(lockName, async () => {
-          concurrentCount++;
-          maxConcurrent = Math.max(maxConcurrent, concurrentCount);
+        return redis.withLock(
+          lockName,
+          async () => {
+            concurrentCount++;
+            maxConcurrent = Math.max(maxConcurrent, concurrentCount);
 
-          // Simulate some work
-          await new Promise((resolve) => setTimeout(resolve, 50));
+            // Simulate some work
+            await new Promise((resolve) => setTimeout(resolve, 50));
 
-          concurrentCount--;
-          return 'done';
-        }, 10);
+            concurrentCount--;
+            return 'done';
+          },
+          10
+        );
       };
 
       // Launch multiple concurrent executions

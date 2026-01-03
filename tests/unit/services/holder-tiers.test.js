@@ -11,7 +11,7 @@ const GOLDEN_TREASURY_RATIO = 1 / PHI_CUBED; // ~23.6%
 jest.mock('../../../src/utils/config', () => ({
   ASDF_MINT: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump',
   IS_DEV: true,
-  TREASURY_RATIO: 1 / (1.618033988749 ** 3), // Pure Golden: 1/φ³ ≈ 23.6%
+  TREASURY_RATIO: 1 / 1.618033988749 ** 3, // Pure Golden: 1/φ³ ≈ 23.6%
 }));
 
 jest.mock('../../../src/utils/rpc', () => ({
@@ -83,9 +83,9 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     });
 
     it('should cap at 95% for shares above 1%', () => {
-      expect(calculateDiscountFromShare(0.1)).toBe(0.95);  // 10%
-      expect(calculateDiscountFromShare(0.5)).toBe(0.95);  // 50%
-      expect(calculateDiscountFromShare(1.0)).toBe(0.95);  // 100%
+      expect(calculateDiscountFromShare(0.1)).toBe(0.95); // 10%
+      expect(calculateDiscountFromShare(0.5)).toBe(0.95); // 50%
+      expect(calculateDiscountFromShare(1.0)).toBe(0.95); // 100%
     });
 
     it('should handle intermediate values correctly', () => {
@@ -164,7 +164,7 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
 
   describe('applyDiscount()', () => {
     const highBaseFee = 100000; // 100k lamports
-    const lowBaseFee = 10000;   // 10k lamports
+    const lowBaseFee = 10000; // 10k lamports
     const defaultTxCost = 5000;
 
     it('should return base fee for 0% discount (above break-even)', () => {
@@ -178,7 +178,7 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
 
     it('should apply 50% discount correctly', () => {
       // 100000 * 0.50 = 50000 > break-even (25000)
-      expect(applyDiscount(highBaseFee, 0.50, defaultTxCost)).toBe(50000);
+      expect(applyDiscount(highBaseFee, 0.5, defaultTxCost)).toBe(50000);
     });
 
     it('should floor at break-even when discount would go below', () => {
@@ -190,7 +190,7 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     it('should floor at break-even for any base fee below break-even', () => {
       const breakEven = calculateBreakEvenFee(defaultTxCost);
       expect(applyDiscount(lowBaseFee, 0, defaultTxCost)).toBe(breakEven);
-      expect(applyDiscount(lowBaseFee, 0.50, defaultTxCost)).toBe(breakEven);
+      expect(applyDiscount(lowBaseFee, 0.5, defaultTxCost)).toBe(breakEven);
     });
 
     it('should use custom txCost for break-even calculation', () => {
@@ -288,7 +288,7 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
 
     it('should have correct tier structure', () => {
       const tiers = getAllTiers();
-      const tierNames = tiers.map(t => t.name);
+      const tierNames = tiers.map((t) => t.name);
 
       expect(tierNames).toContain('WHALE');
       expect(tierNames).toContain('OG');
@@ -319,7 +319,7 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
 
     it('should have progressively higher discounts for higher shares', () => {
       const shares = [0.00001, 0.0001, 0.001, 0.01];
-      const discounts = shares.map(s => calculateDiscountFromShare(s));
+      const discounts = shares.map((s) => calculateDiscountFromShare(s));
 
       for (let i = 1; i < discounts.length; i++) {
         expect(discounts[i]).toBeGreaterThan(discounts[i - 1]);
@@ -373,8 +373,8 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
     it('should double effective share when supply halves', () => {
       const holding = 1_000_000; // 1M tokens
 
-      const share1B = holding / 1_000_000_000;    // 0.1%
-      const share500M = holding / 500_000_000;    // 0.2%
+      const share1B = holding / 1_000_000_000; // 0.1%
+      const share500M = holding / 500_000_000; // 0.2%
 
       expect(share500M).toBeCloseTo(share1B * 2, 10);
     });

@@ -103,9 +103,8 @@ router.get('/wallet/:address', async (req, res) => {
     ]);
 
     // Calculate contribution percentage
-    const contributionPercent = globalStats.burnTotal > 0
-      ? (walletStats.totalBurned / globalStats.burnTotal) * 100
-      : 0;
+    const contributionPercent =
+      globalStats.burnTotal > 0 ? (walletStats.totalBurned / globalStats.burnTotal) * 100 : 0;
 
     res.json({
       wallet: address,
@@ -117,9 +116,10 @@ router.get('/wallet/:address', async (req, res) => {
       contributionPercent: contributionPercent.toFixed(4),
       // CCM-aligned messaging
       impact: {
-        message: walletStats.totalBurned > 0
-          ? `You've contributed ${formatAsdf(walletStats.totalBurned)} to the burn`
-          : 'Start transacting to contribute to the burn',
+        message:
+          walletStats.totalBurned > 0
+            ? `You've contributed ${formatAsdf(walletStats.totalBurned)} to the burn`
+            : 'Start transacting to contribute to the burn',
         rankMessage: walletStats.rank
           ? `Rank #${walletStats.rank} of ${burnerCount} contributors`
           : 'Not yet ranked',
@@ -146,13 +146,14 @@ router.get('/leaderboard', async (req, res) => {
     ]);
 
     res.json({
-      leaderboard: leaderboard.map(entry => ({
+      leaderboard: leaderboard.map((entry) => ({
         ...entry,
         burnedFormatted: formatAsdf(entry.totalBurned),
         walletShort: `${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}`,
-        contributionPercent: globalStats.burnTotal > 0
-          ? ((entry.totalBurned / globalStats.burnTotal) * 100).toFixed(2)
-          : '0.00',
+        contributionPercent:
+          globalStats.burnTotal > 0
+            ? ((entry.totalBurned / globalStats.burnTotal) * 100).toFixed(2)
+            : '0.00',
       })),
       totalBurners: burnerCount,
       totalBurned: globalStats.burnTotal,
@@ -202,7 +203,7 @@ router.get('/burns', async (req, res) => {
     const { proofs, totalCount } = await redis.getBurnProofs(limit);
 
     res.json({
-      burns: proofs.map(proof => ({
+      burns: proofs.map((proof) => ({
         ...proof,
         amountFormatted: formatAsdf(proof.amountBurned),
         solFormatted: formatSol(proof.solAmount),

@@ -8,9 +8,9 @@ const { CircuitBreaker } = require('./circuit-breaker');
 const { withTimeout } = require('./fetch-timeout');
 
 // RPC operation timeouts (prevents hanging on slow/unresponsive RPC)
-const RPC_SIMULATION_TIMEOUT = 30_000;  // 30 seconds for simulation
-const RPC_SEND_TIMEOUT = 15_000;        // 15 seconds for send
-const RPC_QUERY_TIMEOUT = 10_000;       // 10 seconds for queries
+const RPC_SIMULATION_TIMEOUT = 30_000; // 30 seconds for simulation
+const RPC_SEND_TIMEOUT = 15_000; // 15 seconds for send
+const RPC_QUERY_TIMEOUT = 10_000; // 10 seconds for queries
 
 // =============================================================================
 // Rate Limit Tracking (Proactive backoff before 429)
@@ -19,25 +19,25 @@ const RPC_QUERY_TIMEOUT = 10_000;       // 10 seconds for queries
 class RateLimitTracker {
   constructor(endpointName) {
     this.endpointName = endpointName;
-    this.limit = null;           // x-ratelimit-limit-requests
-    this.remaining = null;       // x-ratelimit-remaining-requests
-    this.resetAt = null;         // When limit resets (timestamp)
+    this.limit = null; // x-ratelimit-limit-requests
+    this.remaining = null; // x-ratelimit-remaining-requests
+    this.resetAt = null; // When limit resets (timestamp)
     this.lastUpdated = 0;
 
     // Thresholds for proactive backoff
-    this.warningThreshold = 0.2;  // Start slowing at 20% remaining
+    this.warningThreshold = 0.2; // Start slowing at 20% remaining
     this.criticalThreshold = 0.05; // Heavy backoff at 5% remaining
 
     // 429 tracking (fallback when headers aren't available)
-    this.recent429s = [];         // Timestamps of recent 429 errors
-    this.consecutive429s = 0;     // Count of consecutive 429s
-    this.last429At = null;        // Last 429 timestamp
-    this.backoffUntil = null;     // Don't make requests until this time
-    this.requestsSince429 = 0;    // Successful requests since last 429
+    this.recent429s = []; // Timestamps of recent 429 errors
+    this.consecutive429s = 0; // Count of consecutive 429s
+    this.last429At = null; // Last 429 timestamp
+    this.backoffUntil = null; // Don't make requests until this time
+    this.requestsSince429 = 0; // Successful requests since last 429
 
     // 429 backoff configuration
-    this.baseBackoffMs = 1000;    // Start with 1 second
-    this.maxBackoffMs = 30000;    // Cap at 30 seconds
+    this.baseBackoffMs = 1000; // Start with 1 second
+    this.maxBackoffMs = 30000; // Cap at 30 seconds
     this.recoveryWindow = 60000; // Forget 429s after 60 seconds of success
   }
 
@@ -52,7 +52,7 @@ class RateLimitTracker {
     this.requestsSince429 = 0;
 
     // Clean old 429s (keep last 60 seconds)
-    this.recent429s = this.recent429s.filter(t => now - t < this.recoveryWindow);
+    this.recent429s = this.recent429s.filter((t) => now - t < this.recoveryWindow);
 
     // Calculate exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
     const backoffMs = Math.min(
@@ -96,18 +96,17 @@ class RateLimitTracker {
 
   update(headers) {
     // Helius rate limit headers (may not be present)
-    const limit = headers.get('x-ratelimit-limit-requests') ||
-                  headers.get('x-ratelimit-limit');
-    const remaining = headers.get('x-ratelimit-remaining-requests') ||
-                      headers.get('x-ratelimit-remaining');
-    const resetSeconds = headers.get('x-ratelimit-reset-requests') ||
-                         headers.get('x-ratelimit-reset');
+    const limit = headers.get('x-ratelimit-limit-requests') || headers.get('x-ratelimit-limit');
+    const remaining =
+      headers.get('x-ratelimit-remaining-requests') || headers.get('x-ratelimit-remaining');
+    const resetSeconds =
+      headers.get('x-ratelimit-reset-requests') || headers.get('x-ratelimit-reset');
 
     if (limit) this.limit = parseInt(limit, 10);
     if (remaining) this.remaining = parseInt(remaining, 10);
     if (resetSeconds) {
       const resetValue = parseFloat(resetSeconds);
-      this.resetAt = resetValue > 1e9 ? resetValue * 1000 : Date.now() + (resetValue * 1000);
+      this.resetAt = resetValue > 1e9 ? resetValue * 1000 : Date.now() + resetValue * 1000;
     }
 
     this.lastUpdated = Date.now();
@@ -179,8 +178,8 @@ class RateLimitTracker {
         return 1000;
       }
 
-      const backoffFactor = 1 - (percentRemaining / this.warningThreshold);
-      return Math.floor(100 + (backoffFactor * 400));
+      const backoffFactor = 1 - percentRemaining / this.warningThreshold;
+      return Math.floor(100 + backoffFactor * 400);
     }
 
     // Priority 3: Preventive slowdown if we've had recent 429s
@@ -237,7 +236,7 @@ function createRateLimitAwareFetch(endpointName) {
         isIn429Backoff: tracker.isIn429Backoff(),
         consecutive429s: tracker.consecutive429s,
       });
-      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
 
     // Make the actual request
@@ -285,13 +284,15 @@ class RpcEndpoint {
       resetTimeout: 15000, // 15 seconds
       isFailure: (error) => {
         const msg = error.message?.toLowerCase() || '';
-        return msg.includes('timeout') ||
-               msg.includes('econnrefused') ||
-               msg.includes('enotfound') ||
-               msg.includes('service unavailable') ||
-               msg.includes('429') ||
-               msg.includes('too many requests') ||
-               msg.includes('failed to fetch');
+        return (
+          msg.includes('timeout') ||
+          msg.includes('econnrefused') ||
+          msg.includes('enotfound') ||
+          msg.includes('service unavailable') ||
+          msg.includes('429') ||
+          msg.includes('too many requests') ||
+          msg.includes('failed to fetch')
+        );
       },
     });
   }
@@ -357,9 +358,10 @@ class RpcEndpoint {
   }
 
   getStatus() {
-    const successRate = this.health.totalRequests > 0
-      ? ((this.health.successfulRequests / this.health.totalRequests) * 100).toFixed(1)
-      : 0;
+    const successRate =
+      this.health.totalRequests > 0
+        ? ((this.health.successfulRequests / this.health.totalRequests) * 100).toFixed(1)
+        : 0;
 
     const status = {
       name: this.name,
@@ -397,9 +399,10 @@ class RpcPool {
     if (this.initialized) return;
 
     // Detect mainnet from config or explicit RPC_URL
-    const isMainnet = config.NETWORK === 'mainnet' ||
-                      config.USE_MAINNET ||
-                      (config.RPC_URL && config.RPC_URL.includes('mainnet'));
+    const isMainnet =
+      config.NETWORK === 'mainnet' ||
+      config.USE_MAINNET ||
+      (config.RPC_URL && config.RPC_URL.includes('mainnet'));
     const heliusKey = config.HELIUS_API_KEY;
 
     // Build endpoint list based on available config
@@ -441,7 +444,7 @@ class RpcPool {
     this.endpoints.sort((a, b) => a.priority - b.priority);
 
     logger.info('RPC_POOL', 'Initialized', {
-      endpoints: this.endpoints.map(e => e.name),
+      endpoints: this.endpoints.map((e) => e.name),
       primary: this.endpoints[0]?.name,
     });
 
@@ -449,7 +452,7 @@ class RpcPool {
   }
 
   getHealthyEndpoints() {
-    return this.endpoints.filter(e => e.isHealthy());
+    return this.endpoints.filter((e) => e.isHealthy());
   }
 
   getPrimaryEndpoint() {
@@ -521,11 +524,16 @@ class RpcPool {
     const primary = this.getPrimaryEndpoint();
 
     return {
-      status: healthyCount === 0 ? 'CRITICAL' : healthyCount < this.endpoints.length ? 'DEGRADED' : 'HEALTHY',
+      status:
+        healthyCount === 0
+          ? 'CRITICAL'
+          : healthyCount < this.endpoints.length
+            ? 'DEGRADED'
+            : 'HEALTHY',
       totalEndpoints: this.endpoints.length,
       healthyEndpoints: healthyCount,
       primary: primary?.name,
-      endpoints: this.endpoints.map(e => e.getStatus()),
+      endpoints: this.endpoints.map((e) => e.getStatus()),
     };
   }
 
@@ -544,12 +552,12 @@ const pool = new RpcPool();
 // =============================================================================
 
 const blockhashCache = {
-  data: null,        // { blockhash, lastValidBlockHeight }
-  fetchedAt: 0,      // Timestamp when fetched
-  ttlMs: 30_000,     // 30s TTL (blockhash valid ~60s, so 30s is safe)
+  data: null, // { blockhash, lastValidBlockHeight }
+  fetchedAt: 0, // Timestamp when fetched
+  ttlMs: 30_000, // 30s TTL (blockhash valid ~60s, so 30s is safe)
 
   isValid() {
-    return this.data && (Date.now() - this.fetchedAt) < this.ttlMs;
+    return this.data && Date.now() - this.fetchedAt < this.ttlMs;
   },
 
   set(blockhashInfo) {
@@ -616,30 +624,24 @@ function invalidateBlockhashCache() {
 }
 
 async function sendTransaction(signedTx) {
-  return pool.executeWithFailover(
-    async (conn) => {
-      const signature = await conn.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-        maxRetries: 3,
-      });
-      return signature;
-    },
-    'sendTransaction'
-  );
+  return pool.executeWithFailover(async (conn) => {
+    const signature = await conn.sendRawTransaction(signedTx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
+    });
+    return signature;
+  }, 'sendTransaction');
 }
 
 async function confirmTransaction(signature, blockhash, lastValidBlockHeight) {
-  return pool.executeWithFailover(
-    async (conn) => {
-      const result = await conn.confirmTransaction(
-        { signature, blockhash, lastValidBlockHeight },
-        'confirmed'
-      );
-      return result;
-    },
-    'confirmTransaction'
-  );
+  return pool.executeWithFailover(async (conn) => {
+    const result = await conn.confirmTransaction(
+      { signature, blockhash, lastValidBlockHeight },
+      'confirmed'
+    );
+    return result;
+  }, 'confirmTransaction');
 }
 
 /**
@@ -664,7 +666,8 @@ async function checkSignatureStatus(signature, maxRetries = 3, retryDelayMs = 10
         // Transaction found
         const status = result.value;
         return {
-          confirmed: status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized',
+          confirmed:
+            status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized',
           slot: status.slot,
           err: status.err,
           confirmationStatus: status.confirmationStatus,
@@ -673,7 +676,7 @@ async function checkSignatureStatus(signature, maxRetries = 3, retryDelayMs = 10
 
       // Not found yet, retry
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     } catch (error) {
       logger.debug('RPC', 'Signature status check failed', {
@@ -683,7 +686,7 @@ async function checkSignatureStatus(signature, maxRetries = 3, retryDelayMs = 10
       });
 
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
   }
@@ -692,10 +695,7 @@ async function checkSignatureStatus(signature, maxRetries = 3, retryDelayMs = 10
 }
 
 async function getBalance(pubkey) {
-  return pool.executeWithFailover(
-    async (conn) => conn.getBalance(pubkey),
-    'getBalance'
-  );
+  return pool.executeWithFailover(async (conn) => conn.getBalance(pubkey), 'getBalance');
 }
 
 /**
@@ -716,37 +716,31 @@ async function getMultipleBalances(pubkeys) {
     return new Map([[pubkeys[0].toBase58(), balance]]);
   }
 
-  return pool.executeWithFailover(
-    async (conn) => {
-      // Build batch RPC request using getMultipleAccounts
-      // This is more efficient than individual getBalance calls
-      const accounts = await conn.getMultipleAccountsInfo(pubkeys, 'confirmed');
+  return pool.executeWithFailover(async (conn) => {
+    // Build batch RPC request using getMultipleAccounts
+    // This is more efficient than individual getBalance calls
+    const accounts = await conn.getMultipleAccountsInfo(pubkeys, 'confirmed');
 
-      const results = new Map();
-      for (let i = 0; i < pubkeys.length; i++) {
-        const pubkey = pubkeys[i].toBase58();
-        const account = accounts[i];
-        // Account exists: return lamports. Account doesn't exist: 0
-        results.set(pubkey, account ? account.lamports : 0);
-      }
+    const results = new Map();
+    for (let i = 0; i < pubkeys.length; i++) {
+      const pubkey = pubkeys[i].toBase58();
+      const account = accounts[i];
+      // Account exists: return lamports. Account doesn't exist: 0
+      results.set(pubkey, account ? account.lamports : 0);
+    }
 
-      return results;
-    },
-    'getMultipleBalances'
-  );
+    return results;
+  }, 'getMultipleBalances');
 }
 
 async function getTokenBalance(pubkey, mint) {
-  return pool.executeWithFailover(
-    async (conn) => {
-      const tokenAccounts = await conn.getTokenAccountsByOwner(pubkey, { mint });
-      if (tokenAccounts.value.length === 0) return 0;
+  return pool.executeWithFailover(async (conn) => {
+    const tokenAccounts = await conn.getTokenAccountsByOwner(pubkey, { mint });
+    if (tokenAccounts.value.length === 0) return 0;
 
-      const balance = await conn.getTokenAccountBalance(tokenAccounts.value[0].pubkey);
-      return parseInt(balance.value.amount);
-    },
-    'getTokenBalance'
-  );
+    const balance = await conn.getTokenAccountBalance(tokenAccounts.value[0].pubkey);
+    return parseInt(balance.value.amount);
+  }, 'getTokenBalance');
 }
 
 async function isBlockhashValid(blockhash) {
@@ -766,15 +760,12 @@ async function simulateTransaction(signedTx) {
   try {
     // Wrap simulation with timeout to prevent hanging on slow/unresponsive RPC
     const result = await withTimeout(
-      pool.executeWithFailover(
-        async (conn) => {
-          return conn.simulateTransaction(signedTx, {
-            sigVerify: true,
-            commitment: 'confirmed',
-          });
-        },
-        'simulateTransaction'
-      ),
+      pool.executeWithFailover(async (conn) => {
+        return conn.simulateTransaction(signedTx, {
+          sigVerify: true,
+          commitment: 'confirmed',
+        });
+      }, 'simulateTransaction'),
       RPC_SIMULATION_TIMEOUT,
       'simulateTransaction'
     );
@@ -829,19 +820,16 @@ async function simulateWithBalanceCheck(signedTx, feePayerPubkey, expectedMaxSol
     // Simulate the transaction with timeout protection
     // Prevents hanging on slow/unresponsive RPC endpoints
     const result = await withTimeout(
-      pool.executeWithFailover(
-        async (c) => {
-          return c.simulateTransaction(signedTx, {
-            sigVerify: true,
-            commitment: 'confirmed',
-            accounts: {
-              encoding: 'base64',
-              addresses: [feePayerPubkey],
-            },
-          });
-        },
-        'simulateWithBalanceCheck'
-      ),
+      pool.executeWithFailover(async (c) => {
+        return c.simulateTransaction(signedTx, {
+          sigVerify: true,
+          commitment: 'confirmed',
+          accounts: {
+            encoding: 'base64',
+            addresses: [feePayerPubkey],
+          },
+        });
+      }, 'simulateWithBalanceCheck'),
       RPC_SIMULATION_TIMEOUT,
       'simulateWithBalanceCheck'
     );

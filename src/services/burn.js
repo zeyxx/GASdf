@@ -1,7 +1,4 @@
-const {
-  PublicKey,
-  Transaction,
-} = require('@solana/web3.js');
+const { PublicKey, Transaction } = require('@solana/web3.js');
 const {
   createBurnInstruction,
   getAssociatedTokenAddress,
@@ -46,7 +43,7 @@ const BURN_LOCK_TTL = 120; // 2 minutes max for burn operation
 //
 // This maximizes $ASDF deflation while keeping unified model for other tokens
 // TX costs: ~0.000005 SOL (~$0.001) per transaction
-const MIN_VALUE_USD = 0.50;
+const MIN_VALUE_USD = 0.5;
 
 // =============================================================================
 // VELOCITY-BASED REFILL (Behavioral Proof > Fixed Thresholds)
@@ -121,8 +118,11 @@ async function getTokenValueUsd(mint, amount, decimals) {
     }
 
     // For USDC/USDT, value is direct (1:1 with USD)
-    if (mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
-        mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') {  // USDT
+    if (
+      mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
+      mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+    ) {
+      // USDT
       return amount / Math.pow(10, decimals);
     }
 
@@ -133,7 +133,12 @@ async function getTokenValueUsd(mint, amount, decimals) {
     }
 
     // For other tokens, get quote to USDC
-    const quote = await jupiter.getQuote(mint, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', amount, 100);
+    const quote = await jupiter.getQuote(
+      mint,
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      amount,
+      100
+    );
     return parseInt(quote.outAmount) / 1_000_000;
   } catch (error) {
     logger.debug('BURN', 'Failed to get token value, estimating via SOL', {
@@ -176,9 +181,7 @@ async function checkFeePayerNeedsRefill() {
     const bufferCalc = await redis.calculateVelocityBasedBuffer(BUFFER_HOURS, MIN_BUFFER_LAMPORTS);
 
     const needsRefill = balance < bufferCalc.required;
-    const refillAmount = needsRefill
-      ? bufferCalc.target - balance
-      : 0;
+    const refillAmount = needsRefill ? bufferCalc.target - balance : 0;
 
     logger.debug('BURN', 'Fee payer balance check (velocity-based)', {
       balance: balanceSol.toFixed(4),
@@ -343,10 +346,9 @@ async function getTreasuryTokenBalances() {
     const connection = rpc.getConnection();
 
     // Get all token accounts owned by treasury
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-      treasury,
-      { programId: TOKEN_PROGRAM_ID }
-    );
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(treasury, {
+      programId: TOKEN_PROGRAM_ID,
+    });
 
     const balances = [];
     for (const { account, pubkey } of tokenAccounts.value) {
@@ -415,7 +417,7 @@ async function checkAndExecuteBurn() {
   if (refillCheck?.needsRefill) {
     logger.info('BURN', 'Fee payer needs refill, swapping $ASDF → SOL', {
       currentBalance: refillCheck.balanceSol.toFixed(4),
-      threshold: FEE_PAYER_REFILL_THRESHOLD_SOL,
+      threshold: LEGACY_REFILL_THRESHOLD_SOL,
     });
     await refillFeePayerFromAsdf();
   }
@@ -430,16 +432,20 @@ async function checkAndExecuteBurn() {
   // ==========================================================================
   // RACE CONDITION FIX: Distributed lock prevents concurrent burn executions
   // ==========================================================================
-  const lockResult = await redis.withLock(BURN_LOCK_NAME, async () => {
-    // Re-check balances after acquiring lock (double-check pattern)
-    const confirmedBalances = await getTreasuryTokenBalances();
-    if (confirmedBalances.length === 0) {
-      logger.debug('BURN', 'No token balances after lock acquired');
-      return null;
-    }
+  const lockResult = await redis.withLock(
+    BURN_LOCK_NAME,
+    async () => {
+      // Re-check balances after acquiring lock (double-check pattern)
+      const confirmedBalances = await getTreasuryTokenBalances();
+      if (confirmedBalances.length === 0) {
+        logger.debug('BURN', 'No token balances after lock acquired');
+        return null;
+      }
 
-    return executeBurnWithLock(confirmedBalances);
-  }, BURN_LOCK_TTL);
+      return executeBurnWithLock(confirmedBalances);
+    },
+    BURN_LOCK_TTL
+  );
 
   if (!lockResult.success) {
     if (lockResult.error === 'LOCK_HELD') {
@@ -500,7 +506,7 @@ async function executeBurnWithLock(tokenBalances) {
   if (pendingBurns.length > 0) {
     logger.info('BURN', 'Executing batched burns', {
       burnCount: pendingBurns.length,
-      tokens: pendingBurns.map(b => b.mint.slice(0, 8)),
+      tokens: pendingBurns.map((b) => b.mint.slice(0, 8)),
     });
 
     try {
@@ -510,7 +516,7 @@ async function executeBurnWithLock(tokenBalances) {
       if (batchResult.signature) {
         // Update burn stats
         const totalAsdfBurned = pendingBurns
-          .filter(b => b.type === 'asdf')
+          .filter((b) => b.type === 'asdf')
           .reduce((sum, b) => sum + b.amount, 0);
 
         if (totalAsdfBurned > 0) {
@@ -523,7 +529,7 @@ async function executeBurnWithLock(tokenBalances) {
           amountBurned: totalAsdfBurned,
           method: 'batch',
           burnCount: batchResult.burns,
-          tokens: pendingBurns.map(b => ({
+          tokens: pendingBurns.map((b) => ({
             mint: b.mint,
             amount: b.amount,
             type: b.type,
@@ -596,8 +602,8 @@ async function processTokenForBatch(token, pendingBurns) {
   // Default: Golden Ratio split (no ecosystem burn bonus for unverified tokens)
   let ecosystemBurnBonus = {
     ecosystemBurnPct: 0,
-    asdfBurnPct: config.BURN_RATIO,      // 76.4% (1 - 1/φ³)
-    treasuryPct: config.TREASURY_RATIO,  // 23.6% (1/φ³)
+    asdfBurnPct: config.BURN_RATIO, // 76.4% (1 - 1/φ³)
+    treasuryPct: config.TREASURY_RATIO, // 23.6% (1/φ³)
   };
   let tokenBurnedPercent = 0;
 
@@ -642,7 +648,6 @@ async function processTokenForBatch(token, pendingBurns) {
         model: 'purist',
       });
     }
-
   } else {
     // ==========================================================================
     // UNIFIED $ASDF MODEL: Everything flows through $ASDF
@@ -679,7 +684,10 @@ async function processTokenForBatch(token, pendingBurns) {
         swapSignatures.push(swapResult.signature);
 
         // Split received $ASDF using Golden Ratio
-        const { burnAmount, treasuryAmount } = calculateTreasurySplit(asdfReceived, config.BURN_RATIO);
+        const { burnAmount, treasuryAmount } = calculateTreasurySplit(
+          asdfReceived,
+          config.BURN_RATIO
+        );
 
         // 2a. Queue 76.4% for burn
         if (burnAmount > 0) {
@@ -719,9 +727,10 @@ async function processTokenForBatch(token, pendingBurns) {
     asdfBurned,
     ecosystemBurned,
     tokenBurnedPercent: tokenBurnedPercent > 0 ? tokenBurnedPercent.toFixed(1) + '%' : null,
-    ecosystemBurnBonus: ecosystemBurnBonus.ecosystemBurnPct > 0
-      ? (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%'
-      : null,
+    ecosystemBurnBonus:
+      ecosystemBurnBonus.ecosystemBurnPct > 0
+        ? (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%'
+        : null,
     swapsUsed: swapSignatures.length,
     pendingBurnsTotal: pendingBurns.length,
     model: isAsdf ? '100% burn' : 'unified (76.4% burn)',
@@ -732,9 +741,10 @@ async function processTokenForBatch(token, pendingBurns) {
     symbol,
     asdfBurned,
     ecosystemBurned,
-    asdfRetained: !isAsdf && asdfBurned > 0
-      ? Math.floor(asdfBurned * (1 - config.BURN_RATIO) / config.BURN_RATIO)
-      : 0,
+    asdfRetained:
+      !isAsdf && asdfBurned > 0
+        ? Math.floor((asdfBurned * (1 - config.BURN_RATIO)) / config.BURN_RATIO)
+        : 0,
     swapSignatures,
     swapsUsed: swapSignatures.length,
     batched: true,
@@ -866,7 +876,9 @@ async function swapTokenToSol(tokenMint, amount, feePayer) {
       }
 
       // Jito failed, fall back to regular RPC
-      logger.warn('BURN', 'Jito failed for SOL swap, falling back to RPC', { error: jitoResult.error });
+      logger.warn('BURN', 'Jito failed for SOL swap, falling back to RPC', {
+        error: jitoResult.error,
+      });
     }
 
     // Standard RPC submission (fallback or non-mainnet)
@@ -898,18 +910,10 @@ async function burnAsdf(amount) {
   const asdfMint = getAsdfMint();
 
   // Get fee payer's ASDF token account
-  const tokenAccount = await getAssociatedTokenAddress(
-    asdfMint,
-    feePayer.publicKey
-  );
+  const tokenAccount = await getAssociatedTokenAddress(asdfMint, feePayer.publicKey);
 
   // Create burn instruction
-  const burnIx = createBurnInstruction(
-    tokenAccount,
-    asdfMint,
-    feePayer.publicKey,
-    amount
-  );
+  const burnIx = createBurnInstruction(tokenAccount, asdfMint, feePayer.publicKey, amount);
 
   // Build and send transaction
   const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
@@ -963,12 +967,7 @@ async function batchBurnFromTreasury(burns) {
       const tokenMint = new PublicKey(burn.mint);
       const treasuryAta = await getAssociatedTokenAddress(tokenMint, treasury);
 
-      const burnIx = createBurnInstruction(
-        treasuryAta,
-        tokenMint,
-        treasury,
-        burn.amount
-      );
+      const burnIx = createBurnInstruction(treasuryAta, tokenMint, treasury, burn.amount);
 
       transaction.add(burnIx);
       burnCount++;
@@ -1014,10 +1013,7 @@ async function burnAsdfFromTreasury(amount) {
   const asdfMint = getAsdfMint();
 
   // Get treasury's ASDF token account
-  const treasuryAta = await getAssociatedTokenAddress(
-    asdfMint,
-    treasury
-  );
+  const treasuryAta = await getAssociatedTokenAddress(asdfMint, treasury);
 
   // Check if fee payer is the treasury (can burn directly)
   const feePayerIsTreasury = feePayer.publicKey.equals(treasury);
@@ -1034,12 +1030,7 @@ async function burnAsdfFromTreasury(amount) {
   }
 
   // Create burn instruction (treasury is fee payer, so we have authority)
-  const burnIx = createBurnInstruction(
-    treasuryAta,
-    asdfMint,
-    treasury,
-    amount
-  );
+  const burnIx = createBurnInstruction(treasuryAta, asdfMint, treasury, amount);
 
   // Build and send transaction
   const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();
@@ -1072,10 +1063,7 @@ async function burnTokenFromTreasury(mint, amount, feePayer) {
   const tokenMint = new PublicKey(mint);
 
   // Get treasury's token account for this mint
-  const treasuryAta = await getAssociatedTokenAddress(
-    tokenMint,
-    treasury
-  );
+  const treasuryAta = await getAssociatedTokenAddress(tokenMint, treasury);
 
   // Verify the token account exists and has sufficient balance
   try {
@@ -1099,12 +1087,7 @@ async function burnTokenFromTreasury(mint, amount, feePayer) {
   }
 
   // Create burn instruction (treasury is fee payer, so we have authority)
-  const burnIx = createBurnInstruction(
-    treasuryAta,
-    tokenMint,
-    treasury,
-    amount
-  );
+  const burnIx = createBurnInstruction(treasuryAta, tokenMint, treasury, amount);
 
   // Build and send transaction
   const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash();

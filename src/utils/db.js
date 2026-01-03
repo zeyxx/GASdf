@@ -27,8 +27,8 @@ const RECONNECT_BASE_DELAY = 1000;
 const dbCircuit = new CircuitBreaker({
   name: 'postgresql',
   failureThreshold: 3,
-  resetTimeout: 30000,         // Try to recover after 30s
-  halfOpenMaxRequests: 2,      // Allow 2 test requests in half-open
+  resetTimeout: 30000, // Try to recover after 30s
+  halfOpenMaxRequests: 2, // Allow 2 test requests in half-open
   isFailure: (error) => {
     // Don't count constraint violations or data errors as circuit failures
     const code = error.code || '';
@@ -50,8 +50,9 @@ async function initialize() {
   try {
     // Determine SSL config based on URL and environment
     // Render external connections require SSL with self-signed certs
-    const isRender = config.DATABASE_URL.includes('render.com') ||
-                     config.DATABASE_URL.includes('postgres.render.com');
+    const isRender =
+      config.DATABASE_URL.includes('render.com') ||
+      config.DATABASE_URL.includes('postgres.render.com');
 
     pool = new Pool({
       connectionString: config.DATABASE_URL,
@@ -202,26 +203,28 @@ function isTransientError(error) {
     'ETIMEDOUT',
     'EPIPE',
     'EAI_AGAIN',
-    '57P01',  // admin_shutdown
-    '57P02',  // crash_shutdown
-    '57P03',  // cannot_connect_now
-    '08000',  // connection_exception
-    '08003',  // connection_does_not_exist
-    '08006',  // connection_failure
-    '40001',  // serialization_failure
-    '40P01',  // deadlock_detected
+    '57P01', // admin_shutdown
+    '57P02', // crash_shutdown
+    '57P03', // cannot_connect_now
+    '08000', // connection_exception
+    '08003', // connection_does_not_exist
+    '08006', // connection_failure
+    '40001', // serialization_failure
+    '40P01', // deadlock_detected
   ];
 
-  return transientCodes.includes(error.code) ||
-         error.message?.includes('Connection terminated') ||
-         error.message?.includes('timeout') ||
-         error.message?.includes('ECONNRESET');
+  return (
+    transientCodes.includes(error.code) ||
+    error.message?.includes('Connection terminated') ||
+    error.message?.includes('timeout') ||
+    error.message?.includes('ECONNRESET')
+  );
 }
 
 /**
  * Sleep helper for backoff
  */
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Execute query with retry and circuit breaker protection
@@ -230,11 +233,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * @returns {Promise<any>} Query result or fallback
  */
 async function withDb(queryFn, options = {}) {
-  const {
-    retries = 2,
-    fallback = null,
-    operation = 'query',
-  } = options;
+  const { retries = 2, fallback = null, operation = 'query' } = options;
 
   // Check circuit breaker state
   if (!dbCircuit.canExecute()) {
@@ -254,7 +253,6 @@ async function withDb(queryFn, options = {}) {
       reconnectAttempts = 0; // Reset on success
       return result;
     } catch (error) {
-
       // Check if retryable
       if (isTransientError(error) && attempt < retries) {
         // Exponential backoff with jitter to prevent thundering herd
@@ -351,51 +349,55 @@ async function ping() {
  * Record a burn in the database
  */
 async function recordBurn(burn) {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       INSERT INTO burns (signature, swap_signature, amount_burned, sol_equivalent, treasury_amount, method, wallet)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (signature) DO NOTHING
       RETURNING *
     `;
-    const result = await p.query(query, [
-      burn.signature,
-      burn.swapSignature || null,
-      burn.amountBurned,
-      burn.solEquivalent || null,
-      burn.treasuryAmount || null,
-      burn.method || 'jupiter',
-      burn.wallet || null,
-    ]);
-    return result.rows[0] || null;
-  }, { operation: 'recordBurn', retries: 3 }); // Burns are critical, more retries
+      const result = await p.query(query, [
+        burn.signature,
+        burn.swapSignature || null,
+        burn.amountBurned,
+        burn.solEquivalent || null,
+        burn.treasuryAmount || null,
+        burn.method || 'jupiter',
+        burn.wallet || null,
+      ]);
+      return result.rows[0] || null;
+    },
+    { operation: 'recordBurn', retries: 3 }
+  ); // Burns are critical, more retries
 }
 
 /**
  * Get burn history with pagination
  */
 async function getBurnHistory(limit = 50, offset = 0) {
-  return withDb(async (p) => {
-    const [burns, countResult] = await Promise.all([
-      p.query(
-        'SELECT * FROM burns ORDER BY created_at DESC LIMIT $1 OFFSET $2',
-        [limit, offset]
-      ),
-      p.query('SELECT COUNT(*) FROM burns'),
-    ]);
-    return {
-      burns: burns.rows,
-      total: parseInt(countResult.rows[0].count),
-    };
-  }, { operation: 'getBurnHistory', fallback: { burns: [], total: 0 } });
+  return withDb(
+    async (p) => {
+      const [burns, countResult] = await Promise.all([
+        p.query('SELECT * FROM burns ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]),
+        p.query('SELECT COUNT(*) FROM burns'),
+      ]);
+      return {
+        burns: burns.rows,
+        total: parseInt(countResult.rows[0].count),
+      };
+    },
+    { operation: 'getBurnHistory', fallback: { burns: [], total: 0 } }
+  );
 }
 
 /**
  * Get burn statistics
  */
 async function getBurnStats() {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       SELECT
         COUNT(*) as total_burns,
         COALESCE(SUM(amount_burned), 0) as total_amount,
@@ -405,22 +407,27 @@ async function getBurnStats() {
         MAX(created_at) as last_burn
       FROM burns
     `;
-    const result = await p.query(query);
-    return result.rows[0];
-  }, { operation: 'getBurnStats' });
+      const result = await p.query(query);
+      return result.rows[0];
+    },
+    { operation: 'getBurnStats' }
+  );
 }
 
 /**
  * Get burns by wallet
  */
 async function getBurnsByWallet(wallet, limit = 50) {
-  return withDb(async (p) => {
-    const result = await p.query(
-      'SELECT * FROM burns WHERE wallet = $1 ORDER BY created_at DESC LIMIT $2',
-      [wallet, limit]
-    );
-    return result.rows;
-  }, { operation: 'getBurnsByWallet', fallback: [] });
+  return withDb(
+    async (p) => {
+      const result = await p.query(
+        'SELECT * FROM burns WHERE wallet = $1 ORDER BY created_at DESC LIMIT $2',
+        [wallet, limit]
+      );
+      return result.rows;
+    },
+    { operation: 'getBurnsByWallet', fallback: [] }
+  );
 }
 
 // =============================================================================
@@ -431,8 +438,9 @@ async function getBurnsByWallet(wallet, limit = 50) {
  * Record a transaction
  */
 async function recordTransaction(tx) {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       INSERT INTO transactions (quote_id, signature, user_wallet, payment_token, fee_amount, fee_sol_equivalent, status, ip_address)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (quote_id) DO UPDATE SET
@@ -441,26 +449,29 @@ async function recordTransaction(tx) {
         completed_at = CASE WHEN EXCLUDED.status IN ('confirmed', 'failed') THEN NOW() ELSE transactions.completed_at END
       RETURNING *
     `;
-    const result = await p.query(query, [
-      tx.quoteId,
-      tx.signature || null,
-      tx.userWallet,
-      tx.paymentToken,
-      tx.feeAmount,
-      tx.feeSolEquivalent || null,
-      tx.status || 'pending',
-      tx.ipAddress || null,
-    ]);
-    return result.rows[0] || null;
-  }, { operation: 'recordTransaction', retries: 3 }); // Transactions are critical
+      const result = await p.query(query, [
+        tx.quoteId,
+        tx.signature || null,
+        tx.userWallet,
+        tx.paymentToken,
+        tx.feeAmount,
+        tx.feeSolEquivalent || null,
+        tx.status || 'pending',
+        tx.ipAddress || null,
+      ]);
+      return result.rows[0] || null;
+    },
+    { operation: 'recordTransaction', retries: 3 }
+  ); // Transactions are critical
 }
 
 /**
  * Update transaction status
  */
 async function updateTransactionStatus(quoteId, status, signature = null, errorMessage = null) {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       UPDATE transactions
       SET status = $2,
           signature = COALESCE($3, signature),
@@ -469,39 +480,44 @@ async function updateTransactionStatus(quoteId, status, signature = null, errorM
       WHERE quote_id = $1
       RETURNING *
     `;
-    const result = await p.query(query, [quoteId, status, signature, errorMessage]);
-    return result.rows[0] || null;
-  }, { operation: 'updateTransactionStatus', retries: 3 });
+      const result = await p.query(query, [quoteId, status, signature, errorMessage]);
+      return result.rows[0] || null;
+    },
+    { operation: 'updateTransactionStatus', retries: 3 }
+  );
 }
 
 /**
  * Get transaction history
  */
 async function getTransactionHistory(limit = 50, offset = 0, status = null) {
-  return withDb(async (p) => {
-    let query = 'SELECT * FROM transactions';
-    let countQuery = 'SELECT COUNT(*) FROM transactions';
-    const params = [];
+  return withDb(
+    async (p) => {
+      let query = 'SELECT * FROM transactions';
+      let countQuery = 'SELECT COUNT(*) FROM transactions';
+      const params = [];
 
-    if (status) {
-      query += ' WHERE status = $1';
-      countQuery += ' WHERE status = $1';
-      params.push(status);
-    }
+      if (status) {
+        query += ' WHERE status = $1';
+        countQuery += ' WHERE status = $1';
+        params.push(status);
+      }
 
-    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+      query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
 
-    const [txs, countResult] = await Promise.all([
-      p.query(query, params),
-      p.query(countQuery, status ? [status] : []),
-    ]);
+      const [txs, countResult] = await Promise.all([
+        p.query(query, params),
+        p.query(countQuery, status ? [status] : []),
+      ]);
 
-    return {
-      transactions: txs.rows,
-      total: parseInt(countResult.rows[0].count),
-    };
-  }, { operation: 'getTransactionHistory', fallback: { transactions: [], total: 0 } });
+      return {
+        transactions: txs.rows,
+        total: parseInt(countResult.rows[0].count),
+      };
+    },
+    { operation: 'getTransactionHistory', fallback: { transactions: [], total: 0 } }
+  );
 }
 
 // =============================================================================
@@ -512,8 +528,9 @@ async function getTransactionHistory(limit = 50, offset = 0, status = null) {
  * Update token statistics
  */
 async function updateTokenStats(mint, stats) {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       INSERT INTO token_stats (mint, symbol, name, total_fees_collected, total_transactions, last_used, k_score)
       VALUES ($1, $2, $3, $4, 1, NOW(), $5)
       ON CONFLICT (mint) DO UPDATE SET
@@ -526,28 +543,33 @@ async function updateTokenStats(mint, stats) {
         updated_at = NOW()
       RETURNING *
     `;
-    const result = await p.query(query, [
-      mint,
-      stats.symbol || null,
-      stats.name || null,
-      stats.feeAmount || 0,
-      stats.kScore || 'UNKNOWN',
-    ]);
-    return result.rows[0] || null;
-  }, { operation: 'updateTokenStats' });
+      const result = await p.query(query, [
+        mint,
+        stats.symbol || null,
+        stats.name || null,
+        stats.feeAmount || 0,
+        stats.kScore || 'UNKNOWN',
+      ]);
+      return result.rows[0] || null;
+    },
+    { operation: 'updateTokenStats' }
+  );
 }
 
 /**
  * Get token leaderboard
  */
 async function getTokenLeaderboard(limit = 20) {
-  return withDb(async (p) => {
-    const result = await p.query(
-      'SELECT * FROM token_stats ORDER BY total_transactions DESC LIMIT $1',
-      [limit]
-    );
-    return result.rows;
-  }, { operation: 'getTokenLeaderboard', fallback: [] });
+  return withDb(
+    async (p) => {
+      const result = await p.query(
+        'SELECT * FROM token_stats ORDER BY total_transactions DESC LIMIT $1',
+        [limit]
+      );
+      return result.rows;
+    },
+    { operation: 'getTokenLeaderboard', fallback: [] }
+  );
 }
 
 // =============================================================================
@@ -558,51 +580,57 @@ async function getTokenLeaderboard(limit = 20) {
  * Add audit log entry
  */
 async function addAuditLog(event) {
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       INSERT INTO audit_log (event_type, event_data, wallet, ip_address, severity)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id
     `;
-    const result = await p.query(query, [
-      event.type,
-      JSON.stringify(event.data || {}),
-      event.wallet || null,
-      event.ipAddress || null,
-      event.severity || 'INFO',
-    ]);
-    return result.rows[0]?.id || null;
-  }, { operation: 'addAuditLog' }); // Audit logs are nice-to-have, no extra retries
+      const result = await p.query(query, [
+        event.type,
+        JSON.stringify(event.data || {}),
+        event.wallet || null,
+        event.ipAddress || null,
+        event.severity || 'INFO',
+      ]);
+      return result.rows[0]?.id || null;
+    },
+    { operation: 'addAuditLog' }
+  ); // Audit logs are nice-to-have, no extra retries
 }
 
 /**
  * Get audit logs
  */
 async function getAuditLogs(limit = 100, offset = 0, eventType = null) {
-  return withDb(async (p) => {
-    let query = 'SELECT * FROM audit_log';
-    let countQuery = 'SELECT COUNT(*) FROM audit_log';
-    const params = [];
+  return withDb(
+    async (p) => {
+      let query = 'SELECT * FROM audit_log';
+      let countQuery = 'SELECT COUNT(*) FROM audit_log';
+      const params = [];
 
-    if (eventType) {
-      query += ' WHERE event_type = $1';
-      countQuery += ' WHERE event_type = $1';
-      params.push(eventType);
-    }
+      if (eventType) {
+        query += ' WHERE event_type = $1';
+        countQuery += ' WHERE event_type = $1';
+        params.push(eventType);
+      }
 
-    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
+      query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
 
-    const [logs, countResult] = await Promise.all([
-      p.query(query, params),
-      p.query(countQuery, eventType ? [eventType] : []),
-    ]);
+      const [logs, countResult] = await Promise.all([
+        p.query(query, params),
+        p.query(countQuery, eventType ? [eventType] : []),
+      ]);
 
-    return {
-      logs: logs.rows,
-      total: parseInt(countResult.rows[0].count),
-    };
-  }, { operation: 'getAuditLogs', fallback: { logs: [], total: 0 } });
+      return {
+        logs: logs.rows,
+        total: parseInt(countResult.rows[0].count),
+      };
+    },
+    { operation: 'getAuditLogs', fallback: { logs: [], total: 0 } }
+  );
 }
 
 // =============================================================================
@@ -615,8 +643,9 @@ async function getAuditLogs(limit = 100, offset = 0, eventType = null) {
 async function updateDailyStats(stats) {
   const today = new Date().toISOString().split('T')[0];
 
-  return withDb(async (p) => {
-    const query = `
+  return withDb(
+    async (p) => {
+      const query = `
       INSERT INTO daily_stats (date, total_burns, total_transactions, unique_wallets, total_fees_sol, treasury_balance)
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (date) DO UPDATE SET
@@ -627,29 +656,31 @@ async function updateDailyStats(stats) {
         treasury_balance = EXCLUDED.treasury_balance
       RETURNING *
     `;
-    const result = await p.query(query, [
-      today,
-      stats.burns || 0,
-      stats.transactions || 0,
-      stats.uniqueWallets || 0,
-      stats.feesSol || 0,
-      stats.treasuryBalance || 0,
-    ]);
-    return result.rows[0] || null;
-  }, { operation: 'updateDailyStats' });
+      const result = await p.query(query, [
+        today,
+        stats.burns || 0,
+        stats.transactions || 0,
+        stats.uniqueWallets || 0,
+        stats.feesSol || 0,
+        stats.treasuryBalance || 0,
+      ]);
+      return result.rows[0] || null;
+    },
+    { operation: 'updateDailyStats' }
+  );
 }
 
 /**
  * Get daily stats for chart
  */
 async function getDailyStatsHistory(days = 30) {
-  return withDb(async (p) => {
-    const result = await p.query(
-      'SELECT * FROM daily_stats ORDER BY date DESC LIMIT $1',
-      [days]
-    );
-    return result.rows.reverse(); // Oldest first for charts
-  }, { operation: 'getDailyStatsHistory', fallback: [] });
+  return withDb(
+    async (p) => {
+      const result = await p.query('SELECT * FROM daily_stats ORDER BY date DESC LIMIT $1', [days]);
+      return result.rows.reverse(); // Oldest first for charts
+    },
+    { operation: 'getDailyStatsHistory', fallback: [] }
+  );
 }
 
 // =============================================================================
@@ -660,10 +691,11 @@ async function getDailyStatsHistory(days = 30) {
  * Get comprehensive analytics
  */
 async function getAnalytics() {
-  return withDb(async (p) => {
-    const [burns, txs, tokens, dailyStats] = await Promise.all([
-      getBurnStats(),
-      p.query(`
+  return withDb(
+    async (p) => {
+      const [burns, txs, tokens, dailyStats] = await Promise.all([
+        getBurnStats(),
+        p.query(`
         SELECT
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
@@ -671,17 +703,19 @@ async function getAnalytics() {
           COUNT(*) FILTER (WHERE status = 'pending') as pending
         FROM transactions
       `),
-      p.query('SELECT COUNT(*) FROM token_stats'),
-      p.query('SELECT * FROM daily_stats ORDER BY date DESC LIMIT 7'),
-    ]);
+        p.query('SELECT COUNT(*) FROM token_stats'),
+        p.query('SELECT * FROM daily_stats ORDER BY date DESC LIMIT 7'),
+      ]);
 
-    return {
-      burns,
-      transactions: txs.rows[0],
-      uniqueTokens: parseInt(tokens.rows[0].count),
-      weeklyStats: dailyStats.rows,
-    };
-  }, { operation: 'getAnalytics' });
+      return {
+        burns,
+        transactions: txs.rows[0],
+        uniqueTokens: parseInt(tokens.rows[0].count),
+        weeklyStats: dailyStats.rows,
+      };
+    },
+    { operation: 'getAnalytics' }
+  );
 }
 
 /**

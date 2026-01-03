@@ -94,7 +94,7 @@ class AnomalyDetector {
   _stddev(arr) {
     if (arr.length < 2) return 0;
     const mean = this._mean(arr);
-    const squaredDiffs = arr.map(x => Math.pow(x - mean, 2));
+    const squaredDiffs = arr.map((x) => Math.pow(x - mean, 2));
     return Math.sqrt(this._mean(squaredDiffs));
   }
 
@@ -109,7 +109,7 @@ class AnomalyDetector {
 
     const mean = this._mean(samples);
     const stddev = this._stddev(samples);
-    let threshold = mean + (stddev * BASELINE_CONFIG.STDDEV_MULTIPLIER);
+    let threshold = mean + stddev * BASELINE_CONFIG.STDDEV_MULTIPLIER;
 
     // Apply minimum floor if specified (prevents threshold from being too low)
     if (minFloor !== null) {
@@ -208,9 +208,7 @@ class AnomalyDetector {
     this.baseline.lastUpdateAt = Date.now();
 
     logger.info('ANOMALY', 'Thresholds updated from baseline', {
-      sampleCounts: Object.fromEntries(
-        Object.entries(s).map(([k, v]) => [k, v.length])
-      ),
+      sampleCounts: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.length])),
       newThresholds: this.baseline.thresholds,
     });
   }
@@ -250,7 +248,9 @@ class AnomalyDetector {
       isLearning: this.baseline.isLearning,
       isReady: this.baseline.isReady,
       startedAt: this.baseline.startedAt ? new Date(this.baseline.startedAt).toISOString() : null,
-      lastUpdateAt: this.baseline.lastUpdateAt ? new Date(this.baseline.lastUpdateAt).toISOString() : null,
+      lastUpdateAt: this.baseline.lastUpdateAt
+        ? new Date(this.baseline.lastUpdateAt).toISOString()
+        : null,
       sampleCounts: Object.fromEntries(
         Object.entries(this.baseline.samples).map(([k, v]) => [k, v.length])
       ),
@@ -269,7 +269,7 @@ class AnomalyDetector {
     this.startBaselineLearning();
 
     this.checkInterval = setInterval(() => {
-      this.runChecks().catch(err => {
+      this.runChecks().catch((err) => {
         logger.error('ANOMALY', 'Check failed', { error: err.message });
       });
     }, intervalMs);
@@ -335,11 +335,12 @@ class AnomalyDetector {
     // Check error rate
     const allCounts = auditService.getAllEventCounts(5);
     const successCount = allCounts[AUDIT_EVENTS.SUBMIT_SUCCESS] || 0;
-    const failureCount = (allCounts[AUDIT_EVENTS.SUBMIT_FAILED] || 0) +
-                         (allCounts[AUDIT_EVENTS.SUBMIT_REJECTED] || 0);
+    const failureCount =
+      (allCounts[AUDIT_EVENTS.SUBMIT_FAILED] || 0) + (allCounts[AUDIT_EVENTS.SUBMIT_REJECTED] || 0);
     const totalSubmits = successCount + failureCount;
 
-    if (totalSubmits > 10) { // Need minimum sample size
+    if (totalSubmits > 10) {
+      // Need minimum sample size
       const errorRate = (failureCount / totalSubmits) * 100;
 
       // Record sample for baseline learning
@@ -375,7 +376,7 @@ class AnomalyDetector {
 
         // Keep only last 5 minutes of history
         const cutoff = now - 5 * 60 * 1000;
-        const recentHistory = history.filter(h => h.timestamp >= cutoff);
+        const recentHistory = history.filter((h) => h.timestamp >= cutoff);
         this.payerBalanceHistory.set(payer.pubkey, recentHistory);
 
         // Check drain rate if we have enough history

@@ -36,10 +36,10 @@ const holdex = require('./holdex');
 // HolDex should return tier="Diamond" for these, but we also check locally
 // for performance (skip network call).
 const DIAMOND_TOKENS = new Set([
-  'So11111111111111111111111111111111111111112',   // SOL (native)
+  'So11111111111111111111111111111111111111112', // SOL (native)
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
-  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',  // mSOL
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
   'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', // jitoSOL
 ]);
 
@@ -175,13 +175,17 @@ function getDiamondTokensList() {
       tier: 'Diamond',
     },
     // $ASDF added dynamically if configured
-    ...(config.ASDF_MINT && !config.ASDF_MINT.includes('Devnet') ? [{
-      mint: config.ASDF_MINT,
-      symbol: 'ASDF',
-      name: '$ASDF',
-      decimals: 6,
-      tier: 'Diamond',
-    }] : []),
+    ...(config.ASDF_MINT && !config.ASDF_MINT.includes('Devnet')
+      ? [
+          {
+            mint: config.ASDF_MINT,
+            symbol: 'ASDF',
+            name: '$ASDF',
+            decimals: 6,
+            tier: 'Diamond',
+          },
+        ]
+      : []),
   ];
 }
 

@@ -56,7 +56,11 @@ jest.mock('../../../src/services/fee-payer-pool', () => ({
 }));
 
 // Get references to mocks
-const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
+const {
+  getAssociatedTokenAddress,
+  getAccount,
+  createAssociatedTokenAccountInstruction,
+} = require('@solana/spl-token');
 const config = require('../../../src/utils/config');
 const logger = require('../../../src/utils/logger');
 const rpc = require('../../../src/utils/rpc');
@@ -168,10 +172,7 @@ describe('Treasury ATA Manager', () => {
       const result = await treasuryAta.checkTreasuryAta('SomeToken');
 
       expect(result).toBeNull();
-      expect(logger.error).toHaveBeenCalledWith(
-        'TREASURY_ATA',
-        'Treasury address not configured'
-      );
+      expect(logger.error).toHaveBeenCalledWith('TREASURY_ATA', 'Treasury address not configured');
     });
 
     it('should log debug when ATA exists', async () => {
@@ -179,11 +180,7 @@ describe('Treasury ATA Manager', () => {
 
       await treasuryAta.checkTreasuryAta('TokenMint123');
 
-      expect(logger.debug).toHaveBeenCalledWith(
-        'TREASURY_ATA',
-        'ATA exists',
-        expect.any(Object)
-      );
+      expect(logger.debug).toHaveBeenCalledWith('TREASURY_ATA', 'ATA exists', expect.any(Object));
     });
 
     it('should log error on exception', async () => {
@@ -230,30 +227,22 @@ describe('Treasury ATA Manager', () => {
         throw new Error('No payer');
       });
 
-      await expect(treasuryAta.createTreasuryAta('SomeToken'))
-        .rejects.toThrow('Treasury address not configured');
+      await expect(treasuryAta.createTreasuryAta('SomeToken')).rejects.toThrow(
+        'Treasury address not configured'
+      );
     });
 
     it('should log creation info', async () => {
       await treasuryAta.createTreasuryAta('LogToken');
 
-      expect(logger.info).toHaveBeenCalledWith(
-        'TREASURY_ATA',
-        'Creating ATA',
-        expect.any(Object)
-      );
-      expect(logger.info).toHaveBeenCalledWith(
-        'TREASURY_ATA',
-        'ATA created',
-        expect.any(Object)
-      );
+      expect(logger.info).toHaveBeenCalledWith('TREASURY_ATA', 'Creating ATA', expect.any(Object));
+      expect(logger.info).toHaveBeenCalledWith('TREASURY_ATA', 'ATA created', expect.any(Object));
     });
 
     it('should handle transaction failure', async () => {
       mockConnection.sendRawTransaction.mockRejectedValue(new Error('TX failed'));
 
-      await expect(treasuryAta.createTreasuryAta('FailToken'))
-        .rejects.toThrow('TX failed');
+      await expect(treasuryAta.createTreasuryAta('FailToken')).rejects.toThrow('TX failed');
 
       expect(logger.error).toHaveBeenCalledWith(
         'TREASURY_ATA',
@@ -276,7 +265,7 @@ describe('Treasury ATA Manager', () => {
     it('should prevent concurrent creation attempts', async () => {
       // Slow down the first creation
       mockConnection.sendRawTransaction.mockImplementation(async () => {
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 100));
         return 'tx-sig';
       });
 
@@ -351,7 +340,9 @@ describe('Treasury ATA Manager', () => {
     });
 
     it('should return null for native SOL address', async () => {
-      const result = await treasuryAta.ensureTreasuryAta('So11111111111111111111111111111111111111112');
+      const result = await treasuryAta.ensureTreasuryAta(
+        'So11111111111111111111111111111111111111112'
+      );
 
       expect(result).toBeNull();
     });
@@ -424,7 +415,9 @@ describe('Treasury ATA Manager', () => {
     });
 
     it('should return native info for SOL address', async () => {
-      const result = await treasuryAta.getTreasuryAtaInfo('So11111111111111111111111111111111111111112');
+      const result = await treasuryAta.getTreasuryAtaInfo(
+        'So11111111111111111111111111111111111111112'
+      );
 
       expect(result.isNative).toBe(true);
     });

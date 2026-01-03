@@ -97,9 +97,9 @@ jest.mock('../../../src/services/jupiter', () => ({
   getTokenToSolQuote: jest.fn().mockResolvedValue({ outAmount: '500000000' }), // 0.5 SOL
   getTokenToAsdfQuote: jest.fn().mockResolvedValue({ outAmount: '800000' }),
   TOKEN_INFO: {
-    'So11111111111111111111111111111111111111112': { symbol: 'SOL', decimals: 9 },
-    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { symbol: 'USDC', decimals: 6 },
-    'AsdfMint111111111111111111111111111111111111': { symbol: '$ASDF', decimals: 6 },
+    So11111111111111111111111111111111111111112: { symbol: 'SOL', decimals: 9 },
+    EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: { symbol: 'USDC', decimals: 6 },
+    AsdfMint111111111111111111111111111111111111: { symbol: '$ASDF', decimals: 6 },
   },
 }));
 
@@ -264,11 +264,7 @@ describe('Burn Service', () => {
 
       await burnService.checkAndExecuteBurn();
 
-      expect(redis.withLock).toHaveBeenCalledWith(
-        'burn-worker',
-        expect.any(Function),
-        120
-      );
+      expect(redis.withLock).toHaveBeenCalledWith('burn-worker', expect.any(Function), 120);
     });
 
     it('should return null when lock is already held', async () => {
@@ -500,11 +496,9 @@ describe('Burn Service', () => {
     it('should log worker start', () => {
       burnService.startBurnWorker(60000);
 
-      expect(logger.info).toHaveBeenCalledWith(
-        'BURN',
-        'Burn worker started',
-        { intervalMs: 60000 }
-      );
+      expect(logger.info).toHaveBeenCalledWith('BURN', 'Burn worker started', {
+        intervalMs: 60000,
+      });
     });
 
     it('should schedule initial check after 10 seconds', () => {

@@ -43,7 +43,7 @@ function start() {
 
   // Initial sync after startup delay (let other services initialize)
   setTimeout(() => {
-    syncRedisToPostgres().catch(err => {
+    syncRedisToPostgres().catch((err) => {
       logger.error('DATA_SYNC', 'Initial sync failed', { error: err.message });
     });
   }, 10000);
@@ -176,7 +176,7 @@ async function syncMemoryToRedis(memoryData) {
             logger.debug('DATA_SYNC', `Synced stat: ${key}`, {
               existing: existingVal,
               memory: memoryVal,
-              new: existingVal + memoryVal
+              new: existingVal + memoryVal,
             });
           }
         } else if (key.startsWith('pending:')) {
