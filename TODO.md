@@ -25,7 +25,8 @@
 - [x] data-sync.js tests (7% → 94% coverage)
 - [x] db.js tests (21% → 73% coverage)
 - [x] redis.js tests (49% → 59% coverage)
-- [x] 1221 tests passing, 73% overall coverage
+- [x] rpc.js tests (51% → 60% coverage)
+- [x] 1232 tests passing, 74% overall coverage
 
 ## Next Steps
 
