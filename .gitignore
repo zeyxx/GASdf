@@ -2,7 +2,10 @@ node_modules/
 .env
 .DS_Store
 *.log
-.claude/
+# Claude Code (keep commands, ignore local settings)
+.claude/settings.local.json
+.claude/DEV_BACKLOG.md
+!.claude/commands/
 
 # Wallet keys
 .keys/
