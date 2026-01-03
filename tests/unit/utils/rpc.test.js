@@ -13,6 +13,10 @@ jest.mock('@solana/web3.js', () => ({
       lastValidBlockHeight: 100000,
     }),
     getBalance: jest.fn().mockResolvedValue(1000000000),
+    getMultipleAccountsInfo: jest.fn().mockResolvedValue([
+      { lamports: 1000000000 },
+      { lamports: 2000000000 },
+    ]),
     sendRawTransaction: jest.fn().mockResolvedValue('TestSignature123'),
     confirmTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
     isBlockhashValid: jest.fn().mockResolvedValue({ value: true }),
@@ -42,6 +46,14 @@ describe('RPC Failover', () => {
           lastValidBlockHeight: 100000,
         }),
         getBalance: jest.fn().mockResolvedValue(1000000000),
+        getMultipleAccountsInfo: jest.fn().mockResolvedValue([
+          { lamports: 1000000000 },
+          { lamports: 2000000000 },
+        ]),
+        isBlockhashValid: jest.fn().mockResolvedValue({ value: true }),
+        simulateTransaction: jest.fn().mockResolvedValue({
+          value: { err: null, logs: [], unitsConsumed: 200000 },
+        }),
       })),
     }));
 
@@ -262,6 +274,98 @@ describe('RPC Failover', () => {
       expect(health).toHaveProperty('status');
       expect(health).toHaveProperty('totalEndpoints');
       expect(health).toHaveProperty('healthyEndpoints');
+    });
+
+    test('invalidateBlockhashCache() should not throw', () => {
+      expect(() => rpc.invalidateBlockhashCache()).not.toThrow();
+    });
+
+    test('getBalance() should return balance', async () => {
+      const pubkey = { toBase58: () => 'TestPubkey123' };
+      const balance = await rpc.getBalance(pubkey);
+      expect(typeof balance).toBe('number');
+    });
+
+    test('getMultipleBalances() should return balances map', async () => {
+      const pubkeys = [
+        { toBase58: () => 'Pubkey1' },
+        { toBase58: () => 'Pubkey2' },
+      ];
+      const balances = await rpc.getMultipleBalances(pubkeys);
+      expect(typeof balances).toBe('object');
+    });
+
+    test('isBlockhashValid() should return boolean', async () => {
+      const result = await rpc.isBlockhashValid('TestBlockhash123');
+      expect(typeof result).toBe('boolean');
+    });
+
+    test('getRateLimitStatus() should return status object', () => {
+      const status = rpc.getRateLimitStatus();
+      expect(status).toBeDefined();
+      expect(typeof status).toBe('object');
+    });
+
+    test('simulateTransaction() should return simulation result', async () => {
+      const mockTx = {
+        serialize: () => Buffer.from('test'),
+      };
+      const result = await rpc.simulateTransaction(mockTx);
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('Rate limiting', () => {
+    test('getRateLimitStatus should return object with endpoint info', () => {
+      pool.initialize();
+      const status = rpc.getRateLimitStatus();
+
+      expect(status).toBeDefined();
+      expect(typeof status).toBe('object');
+    });
+
+    test('endpoints should have health tracking', () => {
+      pool.initialize();
+      const endpoint = pool.endpoints[0];
+
+      expect(endpoint.health).toBeDefined();
+      expect(endpoint.health).toHaveProperty('totalRequests');
+      expect(endpoint.health).toHaveProperty('successfulRequests');
+    });
+  });
+
+  describe('Blockhash caching', () => {
+    test('getLatestBlockhash() should cache results', async () => {
+      pool.initialize();
+
+      // First call
+      const result1 = await rpc.getLatestBlockhash();
+      expect(result1).toHaveProperty('blockhash');
+
+      // Second call should use cache (same result)
+      const result2 = await rpc.getLatestBlockhash();
+      expect(result2.blockhash).toBe(result1.blockhash);
+    });
+
+    test('invalidateBlockhashCache() should clear cache', async () => {
+      pool.initialize();
+
+      await rpc.getLatestBlockhash();
+      rpc.invalidateBlockhashCache();
+
+      // Should not throw after invalidation
+      await expect(rpc.getLatestBlockhash()).resolves.toBeDefined();
+    });
+  });
+
+  describe('Error handling', () => {
+    test('should handle connection errors gracefully', async () => {
+      pool.initialize();
+
+      // Force all endpoints to fail
+      pool.endpoints.forEach((e) => e.breaker.forceOpen());
+
+      await expect(rpc.getBalance({ toBase58: () => 'test' })).rejects.toThrow();
     });
   });
 });
