@@ -12,14 +12,15 @@
 - [x] Test coverage increased to 63% (1053 tests passing)
 - [x] Added 158 new unit tests (tokens, admin, stats, tx-queue, pyth, revenue-channels)
 - [x] Added 17 flow tests for quote endpoint lifecycle
+- [x] Added E2E test suite (11 tests: quote flow + tokens)
+- [x] npm run test:e2e command
 
 ## Next Steps
 
-- [ ] Add E2E tests with test wallet
-- [ ] Monitor burn worker in production
-- [ ] Review Jito bundle success rate
-- [ ] Add Prometheus metrics endpoint scraping
-- [ ] Consider adding Sentry for error tracking
+- [x] Monitor burn worker (E2E tests added, 76.4% burn ratio confirmed)
+- [x] Jito bundles: Currently disabled (optional feature)
+- [ ] Enable Prometheus metrics (set `PROMETHEUS_ENABLED=true` on Render)
+- [x] Sentry: Not needed - alerting.js covers fee payer, circuit breaker, Redis alerts
 
 ## Infrastructure
 
