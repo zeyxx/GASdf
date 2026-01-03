@@ -3,14 +3,17 @@
 Check health and metrics for all GASdf services.
 
 ```bash
-echo "=== API Health ==="
-curl -s https://gasdf-43r8.onrender.com/health | jq '{status, uptime: .uptime, redis: .redis.connected, version: .version}'
+# Quick health check
+curl -s https://gasdf-43r8.onrender.com/health | jq '{status, version, feePayer: .checks.feePayer.summary}'
 
-echo -e "\n=== Stats ==="
-curl -s https://gasdf-43r8.onrender.com/stats | jq '{totalBurned: .totalBurned, transactions: .transactions, lastBurn: .lastBurn}'
+# Burn stats
+curl -s https://gasdf-43r8.onrender.com/stats | jq '{totalBurned: .burnedFormatted, transactions: .totalTransactions, burnRatio: .treasury.burnRatio}'
+```
 
-echo -e "\n=== Treasury ==="
-curl -s https://gasdf-43r8.onrender.com/stats/treasury | jq '{balance: .balance, pendingBurns: .pendingBurns}'
+## Full Burn Worker Monitor
+
+```bash
+node scripts/e2e/test-burn-worker.js
 ```
 
 ## Endpoints
