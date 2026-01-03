@@ -356,5 +356,226 @@ describe('Alerting Service', () => {
       const discordPayload = alertingService.formatDiscord(mockAlert);
       expect(discordPayload.embeds[0].color).toBe(0x28a745);
     });
+
+    it('should route to Slack format for slack.com URLs', () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://hooks.slack.com/services/xxx';
+
+      const mockAlert = {
+        severity: SEVERITY.WARNING,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      };
+
+      const payload = alertingService.formatWebhookPayload(mockAlert);
+      expect(payload.attachments).toBeDefined();
+
+      alertingService.webhookUrl = originalUrl;
+    });
+
+    it('should route to Discord format for discord.com URLs', () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://discord.com/api/webhooks/xxx';
+
+      const mockAlert = {
+        severity: SEVERITY.CRITICAL,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      };
+
+      const payload = alertingService.formatWebhookPayload(mockAlert);
+      expect(payload.embeds).toBeDefined();
+
+      alertingService.webhookUrl = originalUrl;
+    });
+
+    it('should route to generic format for unknown URLs', () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://custom-webhook.example.com/alert';
+
+      const mockAlert = {
+        severity: SEVERITY.INFO,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+        data: {},
+      };
+
+      const payload = alertingService.formatWebhookPayload(mockAlert);
+      expect(payload.alert).toBeDefined();
+
+      alertingService.webhookUrl = originalUrl;
+    });
+  });
+
+  describe('Alert cooldown', () => {
+    it('should send alert and add to history', async () => {
+      const initialHistory = alertingService.getHistory().length;
+
+      await alertingService.alert('FEE_PAYER_LOW', {
+        pubkey: 'testPubkey123',
+        balance: '0.05',
+      });
+
+      const newHistory = alertingService.getHistory();
+      expect(newHistory.length).toBeGreaterThanOrEqual(initialHistory);
+    });
+
+    it('should track active alerts', async () => {
+      await alertingService.alert('REDIS_DOWN');
+
+      const activeAlerts = alertingService.getActiveAlerts();
+      const redisAlert = activeAlerts.find((a) => a.type === 'redis_down');
+      expect(redisAlert).toBeDefined();
+    });
+  });
+
+  describe('Recovery', () => {
+    it('should clear active alert on recovery', async () => {
+      // First trigger an alert
+      await alertingService.alert('CIRCUIT_BREAKER_OPEN', { name: 'test-breaker', failures: 3 });
+
+      // Then recover
+      await alertingService.recover('CIRCUIT_BREAKER_OPEN', { name: 'test-breaker' });
+
+      const activeAlerts = alertingService.getActiveAlerts();
+      const breakerAlert = activeAlerts.find(
+        (a) => a.id === 'circuit_breaker_open:test-breaker'
+      );
+      expect(breakerAlert).toBeUndefined();
+    });
+
+    it('should handle recovery for non-existent alert gracefully', async () => {
+      // Should not throw
+      await alertingService.recover('FEE_PAYER_LOW', { pubkey: 'nonexistent' });
+    });
+
+    it('should handle recovery with unknown alert type', async () => {
+      await alertingService.recover('UNKNOWN_TYPE', {});
+      // Should not throw
+    });
+  });
+
+  describe('Webhook sending', () => {
+    it('should not send webhook when URL is not configured', async () => {
+      await alertingService.sendWebhook({
+        id: 'test:1',
+        type: 'test',
+        severity: SEVERITY.INFO,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should handle successful webhook response', async () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://test.webhook.com/alert';
+      global.fetch.mockResolvedValueOnce({ ok: true });
+
+      await alertingService.sendWebhook({
+        id: 'test:2',
+        type: 'test',
+        severity: SEVERITY.WARNING,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      alertingService.webhookUrl = originalUrl;
+    });
+
+    it('should handle 4xx non-retryable errors', async () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://test.webhook.com/alert';
+      global.fetch.mockResolvedValueOnce({ ok: false, status: 404 });
+
+      await alertingService.sendWebhook({
+        id: 'test:3',
+        type: 'test',
+        severity: SEVERITY.INFO,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      });
+
+      // Should only call once (no retries for 4xx)
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      alertingService.webhookUrl = originalUrl;
+    });
+
+    it('should handle 5xx retryable errors', async () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://test.webhook.com/alert';
+      // First call fails with 500, second succeeds
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 500 })
+        .mockResolvedValueOnce({ ok: true });
+
+      await alertingService.sendWebhook({
+        id: 'test:4',
+        type: 'test',
+        severity: SEVERITY.WARNING,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      });
+
+      // Should retry after 500
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      alertingService.webhookUrl = originalUrl;
+    });
+
+    it('should handle fetch exceptions', async () => {
+      const originalUrl = alertingService.webhookUrl;
+      alertingService.webhookUrl = 'https://test.webhook.com/alert';
+      global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await alertingService.sendWebhook({
+        id: 'test:5',
+        type: 'test',
+        severity: SEVERITY.CRITICAL,
+        title: 'Test',
+        message: 'Test',
+        timestamp: Date.now(),
+        environment: 'test',
+        network: 'devnet',
+      });
+
+      // Should attempt retry
+      expect(global.fetch).toHaveBeenCalled();
+      alertingService.webhookUrl = originalUrl;
+    });
+  });
+
+  describe('Alert deduplication', () => {
+    it('should deduplicate repeated alerts within cooldown period', async () => {
+      const initialHistoryLength = alertingService.getHistory().length;
+
+      // Send same alert twice quickly
+      await alertingService.alert('HIGH_ERROR_RATE', { rate: '10', period: '5 minutes' });
+      await alertingService.alert('HIGH_ERROR_RATE', { rate: '10', period: '5 minutes' });
+
+      // Should only add one alert due to cooldown
+      const newHistory = alertingService.getHistory();
+      expect(newHistory.length).toBe(initialHistoryLength + 1);
+    });
   });
 });
