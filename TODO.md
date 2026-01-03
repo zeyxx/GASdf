@@ -9,11 +9,15 @@
 - [x] db.js unit tests (42 tests)
 - [x] All lint warnings fixed (unused variables prefixed with `_`)
 - [x] 895 tests passing
-- [x] Test coverage increased to 63% (1053 tests passing)
+- [x] Test coverage increased to 63% (1073 tests passing)
 - [x] Added 158 new unit tests (tokens, admin, stats, tx-queue, pyth, revenue-channels)
 - [x] Added 17 flow tests for quote endpoint lifecycle
-- [x] Added E2E test suite (11 tests: quote flow + tokens)
+- [x] Added E2E test suite (20 tests: quote, tokens, burn worker, submit)
 - [x] npm run test:e2e command
+- [x] ARCHITECTURE.md for developer onboarding
+- [x] MONITORING.md with Grafana Cloud setup guide
+- [x] validator.js security tests (52% → 81% coverage)
+- [x] k6 load test script
 
 ## Next Steps
 
@@ -21,6 +25,7 @@
 - [x] Jito bundles: Currently disabled (optional feature)
 - [x] Prometheus metrics enabled (requires `x-metrics-key` header)
 - [x] Sentry: Not needed - alerting.js covers fee payer, circuit breaker, Redis alerts
+- [ ] Deploy Prometheus scraper (guide in docs/MONITORING.md)
 
 ## Infrastructure
 
