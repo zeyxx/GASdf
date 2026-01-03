@@ -1069,8 +1069,8 @@ async function getVelocityMetrics() {
       let totalCost = 0;
       for (let i = 0; i < bucketsToCheck; i++) {
         const bucket = currentBucket - i;
-        const count = parseInt(memoryStore.get(`velocity:count:${bucket}`)) || 0;
-        const cost = parseInt(memoryStore.get(`velocity:cost:${bucket}`)) || 0;
+        const count = parseInt(memoryStore.get(`${KEY_PREFIX}velocity:count:${bucket}`)) || 0;
+        const cost = parseInt(memoryStore.get(`${KEY_PREFIX}velocity:cost:${bucket}`)) || 0;
         totalTx += count;
         totalCost += cost;
       }
