@@ -2631,16 +2631,28 @@
     // WALLET MODAL
     // ═══════════════════════════════════════════════════════════
     function openWalletModal() {
-      // Check wallet availability
-      document.getElementById('phantomNotInstalled').style.display = window.solana ? 'none' : 'inline';
-      document.getElementById('solflareNotInstalled').style.display = window.solflare ? 'none' : 'inline';
-      document.getElementById('backpackNotInstalled').style.display = window.backpack ? 'none' : 'inline';
+      console.log('openWalletModal called');
+      try {
+        // Check wallet availability
+        const hasPhantom = !!window.solana;
+        const hasSolflare = !!window.solflare;
+        const hasBackpack = !!window.backpack;
+        console.log('Wallets detected:', { phantom: hasPhantom, solflare: hasSolflare, backpack: hasBackpack });
 
-      document.getElementById('phantomOption').disabled = !window.solana;
-      document.getElementById('solflareOption').disabled = !window.solflare;
-      document.getElementById('backpackOption').disabled = !window.backpack;
+        document.getElementById('phantomNotInstalled').style.display = hasPhantom ? 'none' : 'inline';
+        document.getElementById('solflareNotInstalled').style.display = hasSolflare ? 'none' : 'inline';
+        document.getElementById('backpackNotInstalled').style.display = hasBackpack ? 'none' : 'inline';
 
-      document.getElementById('walletModal').classList.add('open');
+        document.getElementById('phantomOption').disabled = !hasPhantom;
+        document.getElementById('solflareOption').disabled = !hasSolflare;
+        document.getElementById('backpackOption').disabled = !hasBackpack;
+
+        document.getElementById('walletModal').classList.add('open');
+        console.log('Modal opened');
+      } catch (err) {
+        console.error('openWalletModal error:', err);
+        alert('Error opening wallet modal: ' + err.message);
+      }
     }
 
     function closeWalletModal(event) {
