@@ -2515,8 +2515,9 @@
           t.hasCommunityUpdate === true
         );
 
-        // Update tokens count - verified tokens only
-        document.getElementById('tokensAccepted').textContent = validTokens.length;
+        // Update tokens count - verified tokens only (element may not exist)
+        const tokensCountEl = document.getElementById('tokensAccepted');
+        if (tokensCountEl) tokensCountEl.textContent = validTokens.length;
 
         // Sort for categories
         const trending = [...validTokens]
@@ -2539,9 +2540,11 @@
 
       } catch (err) {
         console.error('Failed to fetch HolDex tokens:', err);
-        document.getElementById('tokensAccepted').textContent = '0';
+        const tokensCountEl = document.getElementById('tokensAccepted');
+        if (tokensCountEl) tokensCountEl.textContent = '0';
         ['trendingTokens', 'trustedTokens', 'newTokens'].forEach(id => {
-          document.getElementById(id).innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
         });
       }
     }
