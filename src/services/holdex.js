@@ -315,9 +315,14 @@ async function getToken(mint) {
       const timeout = setTimeout(() => controller.abort(), HOLDEX_TIMEOUT);
 
       try {
+        const headers = { Accept: 'application/json' };
+        // Add API key authentication if configured
+        if (config.HOLDEX_API_KEY) {
+          headers['x-api-key'] = config.HOLDEX_API_KEY;
+        }
         const res = await fetch(`${holdexUrl}/token/${mint}`, {
           signal: controller.signal,
-          headers: { Accept: 'application/json' },
+          headers,
         });
         clearTimeout(timeout);
         return res;
@@ -600,6 +605,46 @@ function getCacheStats() {
 }
 
 /**
+ * Fetch all tokens from HolDex (for frontend proxy)
+ * @param {number} limit - Maximum tokens to return
+ * @returns {Promise<{success: boolean, tokens?: Array, error?: string}>}
+ */
+async function getAllTokens(limit = 100) {
+  const holdexUrl = config.HOLDEX_URL;
+  if (!holdexUrl) {
+    return { success: false, error: 'HOLDEX_URL not configured' };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HOLDEX_TIMEOUT);
+
+    const headers = { Accept: 'application/json' };
+    if (config.HOLDEX_API_KEY) {
+      headers['x-api-key'] = config.HOLDEX_API_KEY;
+    }
+
+    const res = await fetch(`${holdexUrl}/tokens?limit=${limit}`, {
+      signal: controller.signal,
+      headers,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      logger.warn('HOLDEX', 'getAllTokens failed', { status: res.status, error: errorText });
+      return { success: false, error: `HolDex returned ${res.status}` };
+    }
+
+    const data = await res.json();
+    return { success: true, tokens: data.tokens || [] };
+  } catch (err) {
+    logger.error('HOLDEX', 'getAllTokens error', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Get HolDex service status including circuit breaker
  */
 function getStatus() {
@@ -609,6 +654,7 @@ function getStatus() {
   return {
     configured: !!config.HOLDEX_URL,
     url: config.HOLDEX_URL ? config.HOLDEX_URL.replace(/\/token.*/, '') : null,
+    hasApiKey: !!config.HOLDEX_API_KEY,
     cache: cacheStats,
     circuitBreaker: {
       state: circuitStatus.state,
@@ -622,6 +668,7 @@ function getStatus() {
 
 module.exports = {
   getToken,
+  getAllTokens, // For frontend proxy
   isTokenAccepted,
   getKRank,
   getCreditRating,

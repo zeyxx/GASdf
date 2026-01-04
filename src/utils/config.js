@@ -147,7 +147,8 @@ const config = {
   JUPITER_API_KEY: process.env.JUPITER_API_KEY,
 
   // HolDex - Community verification service ($ASDF ecosystem)
-  HOLDEX_URL: process.env.HOLDEX_URL,
+  HOLDEX_URL: process.env.HOLDEX_URL || 'https://holdex-api.onrender.com/api',
+  HOLDEX_API_KEY: process.env.HOLDEX_API_KEY,
 
   // Minimum K-score for token acceptance (0-100)
   // K-score = (accumulators + maintained) / total_holders
