@@ -11,7 +11,7 @@ const securityHeaders = helmet({
     : {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'], // Three.js CDN
           scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
