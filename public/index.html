@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>GASdf - Pay Gas With Any Token | Solana</title>
-  <meta name="description" content="No SOL? No problem. Pay Solana gas fees with any token. All fees become $asdfasdfa and burn forever.">
+  <title>$asdfasdfa - Unified Ecosystem | GASdf + HolDex + E-Score</title>
+  <meta name="description" content="Pay gas with any token. Verify token conviction. Earn engagement rewards. All burns feed the eternal flywheel.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
+      /* Golden Ratio System */
       --phi: 1.618033988749;
+      --phi-inv: 0.618033988749;
+      --phi-sq: 2.618033988749;
+      --phi-inv-sq: 0.381966011250;
+
+      /* Fibonacci Spacing (8, 13, 21, 34, 55, 89, 144) */
       --space-xs: 8px;
       --space-sm: 13px;
       --space-md: 21px;
@@ -19,6 +25,8 @@
       --space-xl: 55px;
       --space-2xl: 89px;
       --space-3xl: 144px;
+
+      /* Typography Scale (Fibonacci-based) */
       --text-xs: 13px;
       --text-sm: 15px;
       --text-md: 17px;
@@ -26,6 +34,8 @@
       --text-xl: 32px;
       --text-2xl: 44px;
       --text-3xl: 60px;
+
+      /* Color Palette */
       --white: #ffffff;
       --white-90: rgba(255,255,255,0.90);
       --white-70: rgba(255,255,255,0.70);
@@ -33,9 +43,30 @@
       --white-30: rgba(255,255,255,0.30);
       --white-10: rgba(255,255,255,0.10);
       --white-05: rgba(255,255,255,0.05);
+
+      /* Brand Colors */
       --gold: #c9a227;
       --gold-soft: rgba(201,162,39,0.12);
       --flame: #ff6b35;
+      --flame-soft: rgba(255,107,53,0.15);
+
+      /* Tier Colors */
+      --diamond: #b9f2ff;
+      --platinum: #e5e4e2;
+      --gold-tier: #ffd700;
+      --silver: #c0c0c0;
+      --bronze: #cd7f32;
+      --rust: #a55d35;
+
+      /* E-Score Dimensions */
+      --escore-hold: #4ecdc4;
+      --escore-burn: #ff6b35;
+      --escore-use: #9b59b6;
+      --escore-build: #3498db;
+      --escore-run: #2ecc71;
+      --escore-refer: #f39c12;
+      --escore-time: #e74c3c;
+
       --bg: #000000;
     }
 
@@ -62,7 +93,6 @@
 
     /* ================================================================
        SINGULARITY - Fixed CSS Black Hole
-       The space flows around it, but it stays fixed
        ================================================================ */
     .singularity {
       position: fixed;
@@ -122,23 +152,11 @@
       opacity: 0.8;
     }
 
-    .accretion-disk::before {
-      content: '';
-      position: absolute;
-      inset: 25px;
-      border-radius: 50%;
-      background:
-        linear-gradient(90deg, transparent 0%, rgba(255,200,100,0.15) 30%, rgba(201,162,39,0.2) 50%, rgba(255,200,100,0.15) 70%, transparent 100%);
-      background-size: 200% 100%;
-      animation: accretion-spin 12s linear infinite reverse;
-    }
-
     @keyframes accretion-spin {
       from { background-position: 0% 50%; }
       to { background-position: 200% 50%; }
     }
 
-    /* Gravitational lensing effect */
     .lensing {
       position: absolute;
       inset: -200px;
@@ -158,7 +176,7 @@
     }
 
     /* ================================================================
-       CONTENT
+       CONTENT LAYER
        ================================================================ */
     .content {
       position: relative;
@@ -185,12 +203,13 @@
 
     .container {
       width: 100%;
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
       position: relative;
       z-index: 1;
     }
 
+    /* Typography */
     .display-title {
       font-size: clamp(var(--text-2xl), 10vw, var(--text-3xl));
       font-weight: 200;
@@ -229,7 +248,9 @@
     .highlight { color: var(--gold); }
     .flame-text { color: var(--flame); }
 
-    /* Navigation */
+    /* ================================================================
+       NAVIGATION
+       ================================================================ */
     nav {
       position: fixed;
       top: 0;
@@ -244,30 +265,32 @@
       backdrop-filter: blur(30px);
     }
 
-    .logo { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0.05em; }
-    .logo span { color: var(--gold); }
-
-    .nav-progress { display: flex; align-items: center; gap: var(--space-sm); }
-    .progress-dots { display: flex; gap: 4px; }
-    .progress-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--white-10);
-      transition: all 0.4s;
-    }
-    .progress-dot.active { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
-    .progress-label { font-size: var(--text-xs); color: var(--gold); font-weight: 500; }
-
-    .nav-links { display: flex; gap: var(--space-xl); }
-    .nav-links a {
-      font-size: var(--text-xs);
+    .logo {
+      font-size: var(--text-sm);
       font-weight: 400;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    .logo .phi { color: var(--gold); font-style: italic; font-family: Georgia, serif; }
+
+    .nav-ecosystem {
+      display: flex;
+      gap: var(--space-lg);
+    }
+
+    .nav-pill {
+      font-size: var(--text-xs);
+      padding: var(--space-xs) var(--space-md);
+      border: 1px solid var(--white-10);
+      border-radius: 100px;
       color: var(--white-50);
       text-decoration: none;
-      transition: color 0.3s;
+      transition: all 0.3s;
     }
-    .nav-links a:hover { color: var(--white); }
+    .nav-pill:hover { border-color: var(--gold); color: var(--gold); }
+    .nav-pill.active { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
 
     .nav-cta {
       background: transparent;
@@ -282,7 +305,9 @@
     }
     .nav-cta:hover { background: var(--white); color: #000; }
 
-    /* Hero */
+    /* ================================================================
+       HERO SECTION
+       ================================================================ */
     #hero { text-align: center; padding-top: var(--space-3xl); }
 
     .hero-badge {
@@ -309,60 +334,39 @@
       50% { opacity: 0.6; transform: scale(0.9); }
     }
 
+    .hero-phi {
+      font-size: 120px;
+      font-style: italic;
+      font-family: 'Times New Roman', Georgia, serif;
+      color: var(--gold);
+      opacity: 0.7;
+      line-height: 1;
+      margin-bottom: var(--space-lg);
+      transition: all 0.5s;
+    }
+    .hero-phi:hover { opacity: 1; transform: scale(1.1); text-shadow: 0 0 60px var(--gold); }
+
     .hero-subtitle {
       font-size: var(--text-lg);
       font-weight: 300;
       color: var(--white-70);
-      max-width: 500px;
-      margin: var(--space-xl) auto var(--space-2xl);
+      max-width: 600px;
+      margin: var(--space-lg) auto var(--space-2xl);
       line-height: 1.7;
     }
 
-    .live-ticker {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-lg);
-      background: rgba(201,162,39,0.08);
-      border: 1px solid rgba(201,162,39,0.15);
-      border-radius: 100px;
-      font-size: var(--text-xs);
-      color: var(--gold);
-      margin-bottom: var(--space-xl);
-    }
-    .ticker-icon { animation: pulse 1.5s ease-in-out infinite; }
-
-    .hero-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-sm);
-      background: var(--gold);
-      color: #000;
-      border: none;
-      padding: var(--space-md) var(--space-2xl);
-      font-size: var(--text-sm);
-      font-weight: 500;
-      letter-spacing: 0.05em;
-      cursor: pointer;
-      transition: all 0.3s;
-      animation: cta-glow 2s ease-in-out infinite;
-    }
-    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
-
-    @keyframes cta-glow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(201,162,39,0.4); }
-      50% { box-shadow: 0 0 20px 5px rgba(201,162,39,0.2); }
-    }
-
     .hero-stats {
-      display: flex;
-      justify-content: center;
-      gap: var(--space-3xl);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-lg);
       margin-top: var(--space-2xl);
-      padding-top: var(--space-xl);
-      border-top: 1px solid var(--white-10);
+      padding: var(--space-lg);
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 8px;
     }
 
+    .stat-item { text-align: center; }
     .stat-value {
       font-size: var(--text-xl);
       font-weight: 200;
@@ -373,213 +377,847 @@
       color: var(--white-50);
       text-transform: uppercase;
       letter-spacing: 0.15em;
-      margin-top: var(--space-sm);
+      margin-top: var(--space-xs);
     }
 
-    .cta-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--gold);
-      text-decoration: none;
-      margin-top: var(--space-lg);
-      cursor: pointer;
-      transition: gap 0.3s;
-    }
-    .cta-secondary:hover { gap: var(--space-sm); }
-    .cta-secondary::after { content: '→'; transition: transform 0.3s; }
-    .cta-secondary:hover::after { transform: translateX(4px); }
-
-    /* Steps */
-    .section-header { text-align: center; margin-bottom: var(--space-2xl); }
-
-    .steps-vertical {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xl);
-      max-width: 500px;
-      margin: 0 auto;
+    /* ================================================================
+       ECOSYSTEM TRIAD
+       ================================================================ */
+    .triad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-lg);
+      margin-top: var(--space-xl);
     }
 
-    .step { display: flex; gap: var(--space-lg); align-items: flex-start; }
-    .step-number {
-      font-size: var(--text-2xl);
-      font-weight: 200;
-      color: var(--white-30);
-      line-height: 1;
-      min-width: 60px;
-    }
-    .step-title { font-size: var(--text-lg); font-weight: 400; margin-bottom: var(--space-xs); }
-    .step-desc { font-size: var(--text-sm); color: var(--white-70); line-height: 1.8; }
-
-    /* Cards */
-    .cards-row { display: flex; gap: var(--space-md); flex-wrap: wrap; justify-content: center; }
-    .card {
+    .triad-card {
       background: rgba(0,0,0,0.5);
       border: 1px solid var(--white-10);
       backdrop-filter: blur(10px);
       padding: var(--space-xl);
-      max-width: 320px;
+      text-align: center;
       transition: all 0.4s;
+      position: relative;
+      overflow: hidden;
     }
-    .card:hover { border-color: var(--gold-soft); transform: translateY(-5px); }
-    .card-icon { font-size: var(--text-lg); margin-bottom: var(--space-lg); opacity: 0.8; }
-    .card-title { font-size: var(--text-md); font-weight: 400; margin-bottom: var(--space-xs); }
-    .card-subtitle { font-size: var(--text-xs); color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-md); }
-    .card-body { font-size: var(--text-sm); color: var(--white-70); line-height: 1.8; }
 
-    /* Flywheel */
-    .flywheel-minimal { text-align: center; padding: var(--space-2xl) 0; }
-    .flywheel-icon { font-size: 80px; margin-bottom: var(--space-xl); opacity: 0.9; }
-    .flywheel-steps { display: flex; justify-content: center; gap: var(--space-lg); flex-wrap: wrap; margin-bottom: var(--space-xl); }
-    .flywheel-step {
+    .triad-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .triad-card:hover {
+      border-color: var(--gold-soft);
+      transform: translateY(-5px);
+    }
+    .triad-card:hover::before { opacity: 1; }
+
+    .triad-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-lg);
+    }
+
+    .triad-name {
+      font-size: var(--text-md);
+      font-weight: 500;
+      margin-bottom: var(--space-xs);
+    }
+
+    .triad-tagline {
+      font-size: var(--text-xs);
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: var(--space-md);
+    }
+
+    .triad-desc {
       font-size: var(--text-sm);
       color: var(--white-70);
+      line-height: 1.6;
+    }
+
+    /* ================================================================
+       DUAL BURN FLYWHEEL
+       ================================================================ */
+    .flywheel-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--space-2xl) 0;
+    }
+
+    .flywheel-visual {
+      position: relative;
+      width: 350px;
+      height: 350px;
+      margin: var(--space-xl) 0;
+    }
+
+    .flywheel-ring {
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--white-10);
+      border-radius: 50%;
+      animation: flywheel-rotate 20s linear infinite;
+    }
+
+    .flywheel-ring::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 15px var(--gold);
+    }
+
+    @keyframes flywheel-rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .flywheel-center {
+      position: absolute;
+      inset: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid var(--gold-soft);
+      border-radius: 50%;
+    }
+
+    .flywheel-center .flame { font-size: 48px; }
+    .flywheel-center .rate {
+      font-size: var(--text-xl);
+      font-weight: 200;
+      color: var(--flame);
+      margin-top: var(--space-sm);
+    }
+
+    .flywheel-nodes {
+      position: absolute;
+      inset: 0;
+    }
+
+    .flywheel-node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .flywheel-node-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg);
+      border: 1px solid var(--white-30);
+      border-radius: 50%;
       display: flex;
       align-items: center;
-      gap: var(--space-sm);
-    }
-    .flywheel-step::after { content: '→'; color: var(--white-30); margin-left: var(--space-sm); }
-    .flywheel-step:last-child::after { content: ''; }
-
-    /* Tiers */
-    .token-stats {
-      display: flex;
       justify-content: center;
-      gap: var(--space-xl);
-      margin-top: var(--space-xl);
-      padding: var(--space-md) var(--space-xl);
-      background: rgba(255,255,255,0.03);
-      border-radius: 8px;
-      border: 1px solid var(--white-10);
-    }
-    .token-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .token-stat-value { font-size: var(--text-lg); font-weight: 400; font-variant-numeric: tabular-nums; }
-    .token-stat-label { font-size: var(--text-xs); color: var(--white-50); text-transform: uppercase; letter-spacing: 0.1em; }
-
-    .tiers-linear { display: flex; justify-content: center; gap: var(--space-xl); flex-wrap: wrap; margin: var(--space-xl) 0; }
-    .tier {
-      text-align: center;
-      padding: var(--space-lg);
-      min-width: 100px;
-      border: 1px solid transparent;
-      border-radius: 8px;
+      font-size: 20px;
+      margin-bottom: var(--space-xs);
       transition: all 0.3s;
-      cursor: pointer;
     }
-    .tier:hover { transform: translateY(-5px); }
-    .tier-emoji { font-size: var(--text-xl); margin-bottom: var(--space-sm); display: inline-block; transition: transform 0.3s; }
-    .tier:hover .tier-emoji { transform: scale(1.3); }
-    .tier-name { font-size: var(--text-xs); font-weight: 400; color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-xs); }
-    .tier-discount { font-size: var(--text-lg); font-weight: 300; color: var(--gold); }
-    .tier-tokens { font-size: var(--text-xs); color: var(--white-70); margin-top: var(--space-xs); }
-    .tier-usd { font-size: 11px; color: var(--white-30); margin-top: 4px; }
 
-    .tier[data-tier="diamond"]:hover { border-color: rgba(185,242,255,0.3); background: rgba(185,242,255,0.05); }
-    .tier[data-tier="diamond"] .tier-discount { color: #b9f2ff; }
-    .tier[data-tier="platinum"]:hover { border-color: rgba(229,228,226,0.3); background: rgba(229,228,226,0.05); }
-    .tier[data-tier="platinum"] .tier-discount { color: #e5e4e2; }
-    .tier[data-tier="gold"]:hover { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.05); }
-    .tier[data-tier="gold"] .tier-discount { color: #ffd700; }
-    .tier[data-tier="silver"]:hover { border-color: rgba(192,192,192,0.3); background: rgba(192,192,192,0.05); }
-    .tier[data-tier="silver"] .tier-discount { color: #c0c0c0; }
-    .tier[data-tier="bronze"]:hover { border-color: rgba(205,127,50,0.3); background: rgba(205,127,50,0.05); }
-    .tier[data-tier="bronze"] .tier-discount { color: #cd7f32; }
-
-    .tier-note { text-align: center; font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-lg); }
-    .tier-footer { text-align: center; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--white-10); }
-    .tier-footer a { color: var(--gold); text-decoration: none; }
-    .tier-update-time { font-size: var(--text-xs); color: var(--white-30); }
-
-    /* Phi */
-    .phi-hero { text-align: center; }
-    .phi-symbol {
-      font-size: 160px;
-      font-style: italic;
-      font-family: 'Times New Roman', Georgia, serif;
-      color: var(--gold);
-      opacity: 0.6;
-      line-height: 1;
-      cursor: pointer;
-      transition: all 0.5s;
+    .flywheel-node:hover .flywheel-node-icon {
+      border-color: var(--gold);
+      transform: scale(1.1);
     }
-    .phi-symbol:hover { opacity: 1; transform: rotate(360deg) scale(1.1); text-shadow: 0 0 60px var(--gold); }
-    .phi-value {
-      font-size: var(--text-sm);
-      color: var(--white-30);
-      font-family: 'SF Mono', monospace;
+
+    .flywheel-node-label {
+      font-size: var(--text-xs);
+      color: var(--white-70);
+      white-space: nowrap;
+    }
+
+    /* Node positions (golden ratio angles) */
+    .flywheel-node:nth-child(1) { top: 0; left: 50%; transform: translateX(-50%); }
+    .flywheel-node:nth-child(2) { top: 25%; right: 0; }
+    .flywheel-node:nth-child(3) { bottom: 25%; right: 0; }
+    .flywheel-node:nth-child(4) { bottom: 0; left: 50%; transform: translateX(-50%); }
+    .flywheel-node:nth-child(5) { bottom: 25%; left: 0; }
+    .flywheel-node:nth-child(6) { top: 25%; left: 0; }
+
+    .flywheel-splits {
+      display: flex;
+      gap: var(--space-2xl);
+      margin-top: var(--space-xl);
+    }
+
+    .split-item {
+      text-align: center;
+    }
+
+    .split-value {
+      font-size: var(--text-lg);
+      font-weight: 300;
+    }
+
+    .split-label {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      margin-top: var(--space-xs);
+    }
+
+    /* ================================================================
+       K-SCORE TIERS
+       ================================================================ */
+    .kscore-container {
+      width: 100%;
+    }
+
+    .kscore-bar {
+      height: 6px;
+      background: linear-gradient(90deg,
+        var(--rust) 0%,
+        var(--bronze) 20%,
+        var(--silver) 40%,
+        var(--gold-tier) 60%,
+        var(--platinum) 80%,
+        var(--diamond) 100%
+      );
+      border-radius: 3px;
+      margin: var(--space-xl) 0;
+      position: relative;
+    }
+
+    .kscore-cursor {
+      position: absolute;
+      top: -8px;
+      width: 20px;
+      height: 20px;
+      background: var(--white);
+      border: 2px solid var(--gold);
+      border-radius: 50%;
+      transform: translateX(-50%);
+      transition: left 0.5s ease-out;
+      box-shadow: 0 0 15px var(--gold);
+    }
+
+    .kscore-tiers {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .kscore-tier {
+      text-align: center;
+      padding: var(--space-md);
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .kscore-tier:hover {
+      transform: translateY(-3px);
+    }
+
+    .kscore-tier-icon {
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-xs);
+    }
+
+    .kscore-tier-name {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-top: var(--space-md);
     }
 
-    .formulas { display: flex; flex-direction: column; gap: var(--space-lg); max-width: 500px; margin: var(--space-2xl) auto 0; }
-    .formula {
+    .kscore-tier-range {
+      font-size: 11px;
+      color: var(--white-30);
+      margin-top: 2px;
+    }
+
+    /* ================================================================
+       E-SCORE RADAR
+       ================================================================ */
+    .escore-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2xl);
+      align-items: center;
+    }
+
+    .escore-radar {
+      width: 300px;
+      height: 300px;
+      position: relative;
+    }
+
+    .escore-radar svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .escore-dimensions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .escore-dim {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--white-05);
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+
+    .escore-dim:hover {
+      background: var(--white-10);
+    }
+
+    .escore-dim-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .escore-dim-name {
+      font-size: var(--text-sm);
+      font-weight: 400;
+      flex: 1;
+    }
+
+    .escore-dim-weight {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      font-family: 'SF Mono', monospace;
+    }
+
+    .escore-dim-bar {
+      width: 60px;
+      height: 4px;
+      background: var(--white-10);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .escore-dim-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease-out;
+    }
+
+    /* ================================================================
+       COMBINED DISCOUNT DISPLAY
+       ================================================================ */
+    .discount-compare {
+      display: flex;
+      gap: var(--space-lg);
+      padding: var(--space-xl);
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 8px;
+      margin-top: var(--space-xl);
+    }
+
+    .discount-option {
+      flex: 1;
       padding: var(--space-lg);
-      border-left: 1px solid var(--white-10);
-      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      text-align: center;
+      transition: all 0.3s;
     }
-    .formula-label { font-size: var(--text-xs); font-weight: 400; color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-sm); }
-    .formula-code { font-family: 'SF Mono', monospace; font-size: var(--text-sm); color: var(--white-70); }
-    .formula-result { font-size: var(--text-lg); font-weight: 300; margin-top: var(--space-sm); }
 
-    /* CTA */
-    .cta-minimal { text-align: center; max-width: 500px; margin: 0 auto; }
-    .cta-buttons { display: flex; gap: var(--space-md); justify-content: center; margin-top: var(--space-xl); }
-    .cta-btn-primary {
-      background: var(--gold);
-      color: #000;
-      border: none;
-      padding: var(--space-md) var(--space-2xl);
+    .discount-option.active {
+      background: var(--gold-soft);
+      border: 1px solid var(--gold);
+    }
+
+    .discount-option.inactive {
+      opacity: 0.5;
+    }
+
+    .discount-source {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .discount-value {
+      font-size: var(--text-2xl);
+      font-weight: 200;
+      color: var(--gold);
+    }
+
+    .discount-badge {
+      font-size: var(--text-xs);
+      color: var(--gold);
+      margin-top: var(--space-sm);
+    }
+
+    /* ================================================================
+       PHI FORMULAS
+       ================================================================ */
+    .formulas-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-lg);
+      margin-top: var(--space-xl);
+    }
+
+    .formula-card {
+      padding: var(--space-lg);
+      border-left: 2px solid var(--white-10);
+      background: rgba(0,0,0,0.3);
+      transition: all 0.3s;
+    }
+
+    .formula-card:hover {
+      border-left-color: var(--gold);
+    }
+
+    .formula-label {
+      font-size: var(--text-xs);
+      font-weight: 400;
+      color: var(--white-50);
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .formula-code {
+      font-family: 'SF Mono', 'Monaco', monospace;
+      font-size: var(--text-sm);
+      color: var(--white-70);
+    }
+
+    .formula-result {
+      font-size: var(--text-lg);
+      font-weight: 300;
+      margin-top: var(--space-sm);
+    }
+
+    /* ================================================================
+       CTA SECTION
+       ================================================================ */
+    .cta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-md);
+      margin-top: var(--space-xl);
+    }
+
+    .cta-btn {
+      padding: var(--space-lg) var(--space-xl);
       font-size: var(--text-sm);
       font-weight: 500;
       letter-spacing: 0.05em;
       cursor: pointer;
       transition: all 0.3s;
+      text-align: center;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
     }
-    .cta-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
+
+    .cta-btn-primary {
+      background: var(--gold);
+      color: #000;
+      border: none;
+    }
+    .cta-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(201,162,39,0.4);
+    }
+
     .cta-btn-secondary {
       background: transparent;
       color: var(--white-70);
       border: 1px solid var(--white-30);
-      padding: var(--space-md) var(--space-2xl);
-      font-size: var(--text-sm);
-      text-decoration: none;
-      cursor: pointer;
-      transition: all 0.3s;
     }
-    .cta-btn-secondary:hover { border-color: var(--white); color: var(--white); }
+    .cta-btn-secondary:hover {
+      border-color: var(--white);
+      color: var(--white);
+    }
 
-    /* Footer */
+    /* ================================================================
+       FOOTER
+       ================================================================ */
     footer {
       padding: var(--space-2xl) var(--space-lg);
       text-align: center;
       border-top: 1px solid var(--white-10);
       background: rgba(0,0,0,0.5);
     }
-    .footer-links { display: flex; justify-content: center; gap: var(--space-2xl); margin-bottom: var(--space-lg); }
-    .footer-links a { font-size: var(--text-xs); color: var(--white-30); text-decoration: none; letter-spacing: 0.1em; transition: color 0.3s; }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-2xl);
+      margin-bottom: var(--space-lg);
+    }
+
+    .footer-links a {
+      font-size: var(--text-xs);
+      color: var(--white-30);
+      text-decoration: none;
+      letter-spacing: 0.1em;
+      transition: color 0.3s;
+    }
+
     .footer-links a:hover { color: var(--white); }
-    .footer-copy { font-size: var(--text-xs); color: var(--white-30); }
 
-    /* Tooltip */
-    .tooltip-trigger { border-bottom: 1px dotted var(--white-30); cursor: help; }
+    .footer-copy {
+      font-size: var(--text-xs);
+      color: var(--white-30);
+    }
 
-    /* Reveal animation */
-    .reveal { opacity: 0; transform: translateY(15px); transition: opacity 0.8s ease, transform 0.8s ease; }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
+    /* ================================================================
+       ANIMATIONS
+       ================================================================ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(15px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
-    /* Responsive */
+    /* ================================================================
+       RESPONSIVE
+       ================================================================ */
     @media (max-width: 768px) {
       section { padding: var(--space-2xl) var(--space-md); }
-      .hero-stats { flex-direction: column; gap: var(--space-xl); }
-      .nav-links, .nav-progress { display: none; }
-      .cards-row { flex-direction: column; align-items: center; }
-      .tiers-linear { gap: var(--space-md); }
-      .tier { min-width: 80px; padding: var(--space-md); }
-      .token-stats { flex-wrap: wrap; gap: var(--space-md); }
-      .cta-buttons { flex-direction: column; }
-      .black-hole { width: 220px; height: 220px; }
+
+      .triad-grid { grid-template-columns: 1fr; }
+      .escore-section { grid-template-columns: 1fr; }
+      .formulas-grid { grid-template-columns: 1fr; }
+      .cta-grid { grid-template-columns: 1fr; }
+      .hero-stats { grid-template-columns: 1fr; }
+
+      .nav-ecosystem { display: none; }
+
+      .flywheel-visual { width: 280px; height: 280px; }
+      .flywheel-center { inset: 40px; }
+
+      .discount-compare { flex-direction: column; }
+
+      .kscore-tiers { flex-wrap: wrap; justify-content: center; }
+    }
+
+    /* ================================================================
+       PROGRESS NAVIGATION - Solana Culture Edition
+       ================================================================ */
+    .progress-nav {
+      position: fixed;
+      right: var(--space-md);
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .progress-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--white-20);
+      border: 1px solid var(--white-30);
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .progress-dot:hover {
+      background: var(--white-50);
+      transform: scale(1.3);
+    }
+
+    .progress-dot.active {
+      background: var(--gold);
+      border-color: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    .progress-label {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      opacity: 0.9;
+    }
+
+    @media (max-width: 768px) {
+      .progress-nav { display: none; }
+    }
+
+    /* ================================================================
+       VALUE PROPOSITION - For Everyone
+       ================================================================ */
+    #value {
+      min-height: auto;
+      padding: var(--space-3xl) var(--space-lg);
+    }
+
+    .value-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-lg);
+      max-width: 1100px;
+      margin: var(--space-xl) auto 0;
+    }
+
+    .value-card {
+      padding: var(--space-xl);
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 12px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .value-card:hover {
+      border-color: var(--gold);
+      background: var(--gold-soft);
+      transform: translateY(-4px);
+    }
+
+    .value-icon {
+      font-size: 32px;
+      margin-bottom: var(--space-md);
+    }
+
+    .value-title {
+      font-size: var(--text-md);
+      font-weight: 500;
+      color: var(--white);
+      margin-bottom: var(--space-sm);
+    }
+
+    .value-desc {
+      font-size: var(--text-sm);
+      color: var(--white-70);
+      line-height: 1.6;
+    }
+
+    .value-highlight {
+      display: inline-block;
+      margin-top: var(--space-md);
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--white-10);
+      border-radius: 4px;
+      font-size: var(--text-xs);
+      color: var(--gold);
+      font-weight: 500;
+    }
+
+    @media (max-width: 900px) {
+      .value-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 500px) {
+      .value-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ================================================================
+       5 MINI APPS - Try It Section
+       ================================================================ */
+    #try { padding: var(--space-3xl) 0; }
+
+    .apps-tabs {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-xl);
+      flex-wrap: wrap;
+    }
+
+    .app-tab {
+      padding: var(--space-sm) var(--space-lg);
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 8px;
+      color: var(--white-70);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .app-tab:hover {
+      background: var(--white-10);
+      color: var(--white);
+    }
+
+    .app-tab.active {
+      background: var(--gold-soft);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .app-panels {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    .app-panel {
+      display: none;
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 16px;
+      padding: var(--space-xl);
+    }
+
+    .app-panel.active { display: block; }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .app-header h3 {
+      font-size: var(--text-lg);
+      font-weight: 500;
+      margin-bottom: var(--space-xs);
+    }
+
+    .app-header p {
+      color: var(--white-50);
+      font-size: var(--text-sm);
+    }
+
+    .app-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .form-group label {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    .form-row .form-group { flex: 1; }
+
+    .form-input, .form-select, .form-textarea {
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 8px;
+      padding: var(--space-sm) var(--space-md);
+      color: var(--white);
+      font-size: var(--text-md);
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    .form-textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .form-select { cursor: pointer; }
+
+    .empty-count, .reclaim-amount {
+      font-size: var(--text-xl);
+      font-weight: 500;
+      color: var(--white);
+    }
+
+    .reclaim-amount { color: var(--gold); }
+
+    .app-btn {
+      background: var(--gold);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: var(--space-md) var(--space-lg);
+      font-size: var(--text-md);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: var(--space-sm);
+    }
+
+    .app-btn:hover:not(:disabled) {
+      background: #d4ab2a;
+      transform: translateY(-1px);
+    }
+
+    .app-btn:disabled {
+      background: var(--white-20);
+      color: var(--white-50);
+      cursor: not-allowed;
+    }
+
+    .app-status {
+      margin-top: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: 8px;
+      font-size: var(--text-sm);
+      text-align: center;
+      min-height: 20px;
+    }
+
+    .app-status.success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+
+    .app-status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+
+    .app-status.pending {
+      background: rgba(201, 162, 39, 0.1);
+      border: 1px solid rgba(201, 162, 39, 0.3);
+      color: var(--gold);
     }
   </style>
 </head>
@@ -587,7 +1225,7 @@
   <!-- Three.js Space -->
   <div id="space-container"></div>
 
-  <!-- CSS Singularity - Fixed in background -->
+  <!-- CSS Singularity -->
   <div class="singularity">
     <div class="black-hole" id="blackHole">
       <div class="lensing"></div>
@@ -597,274 +1235,694 @@
     </div>
   </div>
 
+  <!-- Progress Navigation -->
+  <div class="progress-nav">
+    <span class="progress-label">start</span>
+    <div class="progress-dot active" data-section="hero" title="Overview"></div>
+    <div class="progress-dot" data-section="value" title="Value"></div>
+    <div class="progress-dot" data-section="try" title="Try It"></div>
+    <div class="progress-dot" data-section="ecosystem" title="Ecosystem"></div>
+    <div class="progress-dot" data-section="flywheel" title="Flywheel"></div>
+    <div class="progress-dot" data-section="kscore" title="K-Score"></div>
+    <div class="progress-dot" data-section="escore" title="E-Score"></div>
+    <div class="progress-dot" data-section="cta" title="Start"></div>
+  </div>
+
   <nav>
-    <div class="logo">GAS<span>df</span></div>
-    <div class="nav-progress">
-      <div class="progress-dots">
-        <span class="progress-dot active" data-section="hero"></span>
-        <span class="progress-dot" data-section="how"></span>
-        <span class="progress-dot" data-section="flywheel"></span>
-        <span class="progress-dot" data-section="tiers"></span>
-        <span class="progress-dot" data-section="phi"></span>
-      </div>
-      <span class="progress-label">Explorer</span>
+    <div class="logo"><span class="phi">&phi;</span> $asdfasdfa</div>
+    <div class="nav-ecosystem">
+      <a href="#value" class="nav-pill active">Why</a>
+      <a href="#try" class="nav-pill">Try It</a>
+      <a href="#ecosystem" class="nav-pill">How</a>
+      <a href="#kscore" class="nav-pill">K-Score</a>
     </div>
-    <div class="nav-links">
-      <a href="#how">Process</a>
-      <a href="#flywheel">Flywheel</a>
-      <a href="#tiers">Tiers</a>
-      <a href="#phi">Mathematics</a>
-    </div>
-    <button class="nav-cta">LAUNCH</button>
+    <button class="nav-cta">Connect</button>
   </nav>
 
   <div class="content">
+    <!-- HERO -->
     <section id="hero">
       <div class="container">
-        <div class="hero-badge reveal">Live on Mainnet</div>
+        <div class="hero-badge reveal">Gasless Infrastructure</div>
+        <div class="hero-phi reveal">&phi;</div>
         <h1 class="display-title reveal">
-          Stuck without SOL?<br>
-          <span class="highlight">Not anymore.</span>
+          Pay gas with <span class="highlight">any token</span>
         </h1>
         <p class="hero-subtitle reveal">
-          Pay with <strong>any token you want</strong>.<br>
-          We turn it all into flames. <span class="tooltip-trigger"><span id="burnRateHero">76.4%</span> burned</span>. Forever.
+          Your users don't need SOL. They pay with whatever they have.<br>
+          All fees convert to <span class="flame-text">$asdfasdfa</span> and burn.
         </p>
 
-        <div class="live-ticker reveal">
-          <span class="ticker-icon">🔥</span>
-          <span id="liveTicker">Loading live burns...</span>
-        </div>
-
-        <button class="hero-cta reveal">BREAK FREE NOW</button>
-
         <div class="hero-stats reveal">
-          <div>
+          <div class="stat-item">
             <div class="stat-value flame-text" id="statBurned">—</div>
-            <div class="stat-label">Burned Forever</div>
+            <div class="stat-label">Burned</div>
           </div>
-          <div>
+          <div class="stat-item">
             <div class="stat-value" id="statTx">—</div>
             <div class="stat-label">Transactions</div>
           </div>
-          <div>
-            <div class="stat-value highlight" id="burnRateStat">76.4%</div>
-            <div class="stat-label">Burn Rate</div>
+          <div class="stat-item">
+            <div class="stat-value highlight" id="statUptime">—</div>
+            <div class="stat-label">Uptime</div>
           </div>
-        </div>
-
-        <div class="cta-secondary reveal" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
-          See how it works
         </div>
       </div>
     </section>
 
-    <section id="how">
+    <!-- VALUE PROPOSITION - Why It Matters for Everyone -->
+    <section id="value">
       <div class="container">
-        <div class="section-header">
-          <div class="label reveal">The Magic</div>
-          <h2 class="section-title reveal">How we turn <span class="highlight">anything</span> into fuel</h2>
-        </div>
-        <div class="steps-vertical">
-          <div class="step reveal">
-            <div class="step-number">01</div>
-            <div>
-              <div class="step-title">Pick <span class="highlight">YOUR</span> token</div>
-              <div class="step-desc">USDC, SOL, mSOL, or any Bronze+ verified token from HolDex</div>
+        <div class="label reveal">Why it matters</div>
+        <h2 class="section-title reveal">Value for <span class="highlight">everyone</span></h2>
+        <p class="section-subtitle reveal" style="text-align: center; max-width: 600px; margin: 0 auto; color: var(--white-70);">
+          GASdf isn't just for $asdfasdfa holders. Every participant in the ecosystem benefits.
+        </p>
+
+        <div class="value-grid">
+          <div class="value-card reveal">
+            <div class="value-icon">👤</div>
+            <div class="value-title">Users</div>
+            <div class="value-desc">
+              No SOL? No problem.<br>
+              Pay gas fees with any token you already hold.
             </div>
+            <div class="value-highlight">Zero friction</div>
           </div>
-          <div class="step reveal">
-            <div class="step-number">02</div>
-            <div>
-              <div class="step-title">We cover the SOL <span class="highlight">for you</span></div>
-              <div class="step-desc">GASdf fronts the network fee. You pay in your favorite token. Simple.</div>
+
+          <div class="value-card reveal">
+            <div class="value-icon">👨‍💻</div>
+            <div class="value-title">Developers</div>
+            <div class="value-desc">
+              One API call. Gasless UX for your users. Higher retention.
             </div>
+            <div class="value-highlight">Easy integration</div>
           </div>
-          <div class="step reveal">
-            <div class="step-number">03</div>
-            <div>
-              <div class="step-title">Swap → <span class="flame-text">🔥 Burn</span></div>
-              <div class="step-desc">Your payment becomes $asdfasdfa: <span class="highlight" id="burnRateStep">76.4%</span> burned, rest sustains operations</div>
+
+          <div class="value-card reveal">
+            <div class="value-icon">🪙</div>
+            <div class="value-title">Token Projects</div>
+            <div class="value-desc">
+              Get verified on HolDex. Your token becomes usable for gas payments.
             </div>
+            <div class="value-highlight">More utility</div>
           </div>
-        </div>
-        <div style="text-align: center;">
-          <div class="cta-secondary reveal" onclick="document.getElementById('flywheel').scrollIntoView({behavior:'smooth'})">
-            Understand the flywheel
+
+          <div class="value-card reveal">
+            <div class="value-icon">🔥</div>
+            <div class="value-title">$asdfasdfa Holders</div>
+            <div class="value-desc">
+              Fee discounts + every transaction burns supply. Deflationary by design.
+            </div>
+            <div class="value-highlight">Perpetual burn</div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- TRY IT - 5 Mini Apps -->
+    <section id="try">
+      <div class="container">
+        <div class="label reveal">Try it now</div>
+        <h2 class="section-title reveal">5 ways to <span class="highlight">test GASdf</span></h2>
+
+        <div class="apps-tabs reveal">
+          <button class="app-tab active" data-app="burn">🔥 Burn</button>
+          <button class="app-tab" data-app="clean">🧹 Clean</button>
+          <button class="app-tab" data-app="swap">🔄 Swap</button>
+          <button class="app-tab" data-app="message">💬 Message</button>
+          <button class="app-tab" data-app="send">📤 Send</button>
+        </div>
+
+        <div class="app-panels">
+          <!-- BURN -->
+          <div class="app-panel active" id="panel-burn">
+            <div class="app-header">
+              <h3>Burn Tokens</h3>
+              <p>Burn any token. Gas paid with that token.</p>
+            </div>
+            <div class="app-form">
+              <div class="form-group">
+                <label>Token to burn</label>
+                <select id="burn-token" class="form-select">
+                  <option value="">Connect wallet to see tokens</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Amount</label>
+                <input type="text" id="burn-amount" class="form-input" placeholder="0.00">
+              </div>
+              <button class="app-btn" id="burn-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="burn-status"></div>
+          </div>
+
+          <!-- CLEAN -->
+          <div class="app-panel" id="panel-clean">
+            <div class="app-header">
+              <h3>Clean Empty Accounts</h3>
+              <p>Close empty token accounts. Reclaim SOL rent.</p>
+            </div>
+            <div class="app-form">
+              <div class="form-group">
+                <label>Empty accounts found</label>
+                <div class="empty-count" id="clean-count">—</div>
+              </div>
+              <div class="form-group">
+                <label>SOL to reclaim</label>
+                <div class="reclaim-amount" id="clean-sol">— SOL</div>
+              </div>
+              <button class="app-btn" id="clean-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="clean-status"></div>
+          </div>
+
+          <!-- SWAP -->
+          <div class="app-panel" id="panel-swap">
+            <div class="app-header">
+              <h3>Swap via Jupiter</h3>
+              <p>Any amount. Gas paid with input token.</p>
+            </div>
+            <div class="app-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>From</label>
+                  <select id="swap-from" class="form-select">
+                    <option value="">Select token</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>To</label>
+                  <select id="swap-to" class="form-select">
+                    <option value="">Select token</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Amount</label>
+                <input type="text" id="swap-amount" class="form-input" placeholder="0.00">
+              </div>
+              <button class="app-btn" id="swap-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="swap-status"></div>
+          </div>
+
+          <!-- MESSAGE -->
+          <div class="app-panel" id="panel-message">
+            <div class="app-header">
+              <h3>Onchain Message</h3>
+              <p>Write a message to the blockchain. Forever.</p>
+            </div>
+            <div class="app-form">
+              <div class="form-group">
+                <label>Message (max 280 chars)</label>
+                <textarea id="msg-text" class="form-textarea" maxlength="280" placeholder="Your message here..."></textarea>
+              </div>
+              <div class="form-group">
+                <label>Pay gas with</label>
+                <select id="msg-token" class="form-select">
+                  <option value="">Select token</option>
+                </select>
+              </div>
+              <button class="app-btn" id="msg-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="msg-status"></div>
+          </div>
+
+          <!-- SEND -->
+          <div class="app-panel" id="panel-send">
+            <div class="app-header">
+              <h3>Send Tokens</h3>
+              <p>Send any token. Gas paid with that token.</p>
+            </div>
+            <div class="app-form">
+              <div class="form-group">
+                <label>Recipient</label>
+                <input type="text" id="send-to" class="form-input" placeholder="Wallet address...">
+              </div>
+              <div class="form-group">
+                <label>Token</label>
+                <select id="send-token" class="form-select">
+                  <option value="">Select token</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Amount</label>
+                <input type="text" id="send-amount" class="form-input" placeholder="0.00">
+              </div>
+              <button class="app-btn" id="send-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="send-status"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ECOSYSTEM TRIAD -->
+    <section id="ecosystem">
+      <div class="container">
+        <div class="label reveal">How it works</div>
+        <h2 class="section-title reveal">Three layers. <span class="highlight">One ecosystem.</span></h2>
+
+        <div class="triad-grid">
+          <div class="triad-card reveal" id="gasdf">
+            <div class="triad-icon">⛽</div>
+            <div class="triad-name">GASdf</div>
+            <div class="triad-tagline">Gasless Transactions</div>
+            <div class="triad-desc">
+              We front the SOL for network fees.<br>
+              Users pay with any token they hold.<br>
+              All fees → swap → $asdfasdfa → burn.
+            </div>
+          </div>
+          <div class="triad-card reveal">
+            <div class="triad-icon">📊</div>
+            <div class="triad-name">HolDex</div>
+            <div class="triad-tagline">Token Verification</div>
+            <div class="triad-desc">
+              K-Score measures holder conviction.<br>
+              Are they accumulating or selling?<br>
+              Only K ≥ 50 tokens accepted.
+            </div>
+          </div>
+          <div class="triad-card reveal">
+            <div class="triad-icon">⚡</div>
+            <div class="triad-name">E-Score</div>
+            <div class="triad-tagline">Engagement Rewards</div>
+            <div class="triad-desc">
+              7 dimensions: Hold, Burn, Use, Build...<br>
+              Higher engagement = lower fees.<br>
+              Up to 95% discount.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DUAL-BURN FLYWHEEL -->
     <section id="flywheel">
       <div class="container">
-        <div class="flywheel-minimal reveal">
-          <div class="flywheel-icon">🔥</div>
-          <h2 class="section-title">The Eternal <span class="highlight">Flywheel</span></h2>
-          <div class="flywheel-steps">
-            <span class="flywheel-step">Pay in anything</span>
-            <span class="flywheel-step">Swapped to $asdfasdfa</span>
-            <span class="flywheel-step">🔥 Burned forever</span>
-            <span class="flywheel-step">Supply shrinks</span>
+        <div class="flywheel-container reveal">
+          <div class="label">The Flywheel</div>
+          <h2 class="section-title">Every transaction <span class="flame-text">burns supply</span></h2>
+
+          <div class="flywheel-visual">
+            <div class="flywheel-ring"></div>
+            <div class="flywheel-nodes">
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">💳</div>
+                <div class="flywheel-node-label">Payment</div>
+              </div>
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">🔄</div>
+                <div class="flywheel-node-label">Swap</div>
+              </div>
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">🔥</div>
+                <div class="flywheel-node-label">Ecosystem Burn</div>
+              </div>
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">💰</div>
+                <div class="flywheel-node-label">$asdfasdfa</div>
+              </div>
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">🔥</div>
+                <div class="flywheel-node-label">Token Burn</div>
+              </div>
+              <div class="flywheel-node">
+                <div class="flywheel-node-icon">📈</div>
+                <div class="flywheel-node-label">Supply ↓</div>
+              </div>
+            </div>
+            <div class="flywheel-center">
+              <div class="flame">🔥</div>
+              <div class="rate" id="burnRateCenter">Variable</div>
+            </div>
           </div>
-          <p class="body-text" style="text-align: center; margin: var(--space-xl) auto 0;">
-            All fees become $asdfasdfa before burning.<br>
-            Pay directly in $asdfasdfa? <span class="highlight">100% burned</span>.
+
+          <!-- Hybrid Burn Model -->
+          <div class="burn-model reveal" style="margin: var(--space-xl) 0; padding: var(--space-lg); background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid var(--white-10);">
+            <h3 style="color: var(--gold); margin-bottom: var(--space-md); font-size: var(--text-lg);">Hybrid Burn Model</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-lg);">
+              <div style="padding: var(--space-md); background: rgba(255,107,53,0.1); border-radius: 6px; border-left: 3px solid var(--escore-burn);">
+                <div style="font-weight: 600; color: var(--escore-burn); margin-bottom: var(--space-xs);">Pay with $asdfasdfa</div>
+                <div style="font-size: var(--text-xl); color: var(--white);">100% BURN</div>
+                <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-xs);">Direct burn - no swap needed</div>
+              </div>
+              <div style="padding: var(--space-md); background: rgba(201,162,39,0.1); border-radius: 6px; border-left: 3px solid var(--gold);">
+                <div style="font-weight: 600; color: var(--gold); margin-bottom: var(--space-xs);">Pay with Other Tokens</div>
+                <div style="font-size: var(--text-xl); color: var(--white);">Swap + Split</div>
+                <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-xs);">Token swapped to $asdfasdfa, then golden ratio split</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flywheel-splits">
+            <div class="split-item">
+              <div class="split-value flame-text" id="burnSplit">76.4%</div>
+              <div class="split-label">Base Burn</div>
+              <div style="font-size: var(--text-xs); color: var(--white-50);">1 - 1/φ³</div>
+            </div>
+            <div class="split-item">
+              <div class="split-value highlight" id="treasurySplit">23.6%</div>
+              <div class="split-label">Treasury</div>
+              <div style="font-size: var(--text-xs); color: var(--white-50);">1/φ³</div>
+            </div>
+            <div class="split-item">
+              <div class="split-value" style="color: var(--escore-burn);" id="ecosystemBonus">+38.2%</div>
+              <div class="split-label">Max Eco Bonus</div>
+              <div style="font-size: var(--text-xs); color: var(--white-50);">1/φ² × curve</div>
+            </div>
+          </div>
+
+          <p style="text-align: center; color: var(--white-50); font-size: var(--text-sm); margin-top: var(--space-lg); max-width: 600px; margin-left: auto; margin-right: auto;">
+            <strong>Ecosystem Burn Bonus:</strong> Tokens that burn their own supply earn bonus allocation.<br>
+            Formula: <code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">1/φ² × (1 - φ^(-burnPct/30))</code>
           </p>
-          <div class="cta-secondary" onclick="document.getElementById('trust').scrollIntoView({behavior:'smooth'})">
-            How we pick tokens
-          </div>
         </div>
       </div>
     </section>
 
-    <section id="trust">
+    <!-- K-SCORE TIERS -->
+    <section id="kscore">
       <div class="container">
-        <div class="section-header">
-          <div class="label reveal">Protection</div>
-          <h2 class="section-title reveal">🛡️ Only <span class="highlight">trusted</span> tokens</h2>
-          <p class="body-text reveal" style="text-align: center; margin: 0 auto;">We only accept tokens where holders <strong>accumulate</strong>, not dump.</p>
-        </div>
-        <div class="cards-row">
-          <div class="card reveal">
-            <div class="card-icon">📊</div>
-            <div class="card-title">K-score</div>
-            <div class="card-subtitle">CONVICTION METRIC</div>
-            <div class="card-body">
-              Measures if holders accumulate or extract.<br>
-              <strong style="color: var(--gold)">Minimum: Bronze (50/100)</strong>
+        <div class="label reveal">Token Verification</div>
+        <h2 class="section-title reveal">K-Score: <span class="highlight">Holder Conviction</span></h2>
+        <p class="body-text reveal" style="text-align: center; margin: 0 auto var(--space-xl);">
+          Measures whether holders are accumulating or selling.<br>
+          Minimum Bronze (50) required for gas payment.
+        </p>
+
+        <div class="kscore-container reveal">
+          <div class="kscore-bar">
+            <div class="kscore-cursor" id="kscoreCursor" style="left: 75%;"></div>
+          </div>
+          <div class="kscore-tiers">
+            <div class="kscore-tier" data-tier="rust" data-pos="10">
+              <div class="kscore-tier-icon" style="color: var(--rust);">🔩</div>
+              <div class="kscore-tier-name">Rust</div>
+              <div class="kscore-tier-range">0-19</div>
+            </div>
+            <div class="kscore-tier" data-tier="iron" data-pos="20">
+              <div class="kscore-tier-icon" style="color: #4a4a4a;">⚫</div>
+              <div class="kscore-tier-name">Iron</div>
+              <div class="kscore-tier-range">20-39</div>
+            </div>
+            <div class="kscore-tier" data-tier="copper" data-pos="30">
+              <div class="kscore-tier-icon" style="color: #b87333;">🟤</div>
+              <div class="kscore-tier-name">Copper</div>
+              <div class="kscore-tier-range">40-49</div>
+            </div>
+            <div class="kscore-tier" data-tier="bronze" data-pos="40">
+              <div class="kscore-tier-icon" style="color: var(--bronze);">🥉</div>
+              <div class="kscore-tier-name">Bronze</div>
+              <div class="kscore-tier-range">50-59</div>
+            </div>
+            <div class="kscore-tier" data-tier="silver" data-pos="52">
+              <div class="kscore-tier-icon" style="color: var(--silver);">🥈</div>
+              <div class="kscore-tier-name">Silver</div>
+              <div class="kscore-tier-range">60-69</div>
+            </div>
+            <div class="kscore-tier" data-tier="gold" data-pos="64">
+              <div class="kscore-tier-icon" style="color: var(--gold-tier);">🥇</div>
+              <div class="kscore-tier-name">Gold</div>
+              <div class="kscore-tier-range">70-79</div>
+            </div>
+            <div class="kscore-tier" data-tier="platinum" data-pos="76">
+              <div class="kscore-tier-icon" style="color: var(--platinum);">💠</div>
+              <div class="kscore-tier-name">Platinum</div>
+              <div class="kscore-tier-range">80-89</div>
+            </div>
+            <div class="kscore-tier" data-tier="diamond" data-pos="90">
+              <div class="kscore-tier-icon" style="color: var(--diamond);">💎</div>
+              <div class="kscore-tier-name">Diamond</div>
+              <div class="kscore-tier-range">90-99</div>
             </div>
           </div>
-          <div class="card reveal">
-            <div class="card-icon">🔥</div>
-            <div class="card-title">Ecosystem Bonus</div>
-            <div class="card-subtitle">DUAL BURN</div>
-            <div class="card-body">
-              Deflationary tokens get a bonus.<br>
-              <strong style="color: var(--gold)">Up to +<span id="ecosystemBonusCard">38.2%</span> extra burn</strong>
-            </div>
-          </div>
-        </div>
-        <div style="text-align: center;">
-          <div class="cta-secondary reveal" onclick="document.getElementById('tiers').scrollIntoView({behavior:'smooth'})">
-            Discover holder benefits
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="tiers">
-      <div class="container">
-        <div class="section-header">
-          <div class="label reveal">Become a legend</div>
-          <h2 class="section-title reveal">Hold $asdfasdfa = <span class="highlight">Massive discounts</span></h2>
-          <p class="body-text reveal" style="text-align: center; margin: 0 auto var(--space-md);">The more you hold, the less you pay. Simple.</p>
-
-          <div class="token-stats reveal">
-            <div class="token-stat">
-              <span class="token-stat-value" id="tokenPrice">$0.00014</span>
-              <span class="token-stat-label">Price</span>
-            </div>
-            <div class="token-stat">
-              <span class="token-stat-value" id="tokenMcap">$132K</span>
-              <span class="token-stat-label">Market Cap</span>
-            </div>
-            <div class="token-stat">
-              <span class="token-stat-value" id="tokenHolders">320</span>
-              <span class="token-stat-label">Holders</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="tiers-linear reveal">
-          <div class="tier" data-tier="diamond">
-            <div class="tier-emoji">💎</div>
-            <div class="tier-name">DIAMOND</div>
-            <div class="tier-discount" id="diamondDiscount">-95%</div>
-            <div class="tier-tokens" id="diamondTokens">10M</div>
-            <div class="tier-usd" id="diamondUsd">~$1,400</div>
-          </div>
-          <div class="tier" data-tier="platinum">
-            <div class="tier-emoji">🪙</div>
-            <div class="tier-name">PLATINUM</div>
-            <div class="tier-discount" id="platinumDiscount">-67%</div>
-            <div class="tier-tokens" id="platinumTokens">1M</div>
-            <div class="tier-usd" id="platinumUsd">~$140</div>
-          </div>
-          <div class="tier" data-tier="gold">
-            <div class="tier-emoji">🥇</div>
-            <div class="tier-name">GOLD</div>
-            <div class="tier-discount" id="goldDiscount">-33%</div>
-            <div class="tier-tokens" id="goldTokens">100K</div>
-            <div class="tier-usd" id="goldUsd">~$14</div>
-          </div>
-          <div class="tier" data-tier="silver">
-            <div class="tier-emoji">🥈</div>
-            <div class="tier-name">SILVER</div>
-            <div class="tier-discount" id="silverDiscount">0%</div>
-            <div class="tier-tokens" id="silverTokens">10K</div>
-            <div class="tier-usd" id="silverUsd">~$1.40</div>
-          </div>
-          <div class="tier" data-tier="bronze">
-            <div class="tier-emoji">🥉</div>
-            <div class="tier-name">BRONZE</div>
-            <div class="tier-discount" id="bronzeDiscount">0%</div>
-            <div class="tier-tokens">Any</div>
-            <div class="tier-usd">Base rate</div>
-          </div>
-        </div>
-
-        <p class="tier-note reveal">Max discount on service fee* — break-even floor ensures everyone covers tx cost</p>
-
-        <div class="tier-footer reveal">
-          <span class="tier-update-time">Live from <a href="https://alonisthe.dev/holdex" target="_blank">HolDex</a> • Updated <span id="tierUpdateTime">just now</span></span>
-        </div>
-      </div>
-    </section>
-
-    <section id="phi">
-      <div class="container">
-        <div class="phi-hero reveal">
-          <div class="phi-symbol">&phi;</div>
-          <h2 class="section-title">The Universe's <span class="highlight">Secret</span></h2>
-          <p class="body-text" style="text-align: center; margin: var(--space-md) auto 0;">
-            Everything is built on <strong>PHI</strong> (φ = 1.618...)<br>
-            <span style="color: var(--white-50)">The golden ratio found in galaxies, seashells, and now... your fees.</span>
+          <p style="text-align: center; color: var(--white-50); font-size: var(--text-xs); margin-top: var(--space-md);">
+            Score 100 = native tokens only. Minimum Bronze (50) required for gas payment.
           </p>
-          <div class="phi-value">1.618033988749894</div>
         </div>
-        <div class="formulas">
-          <div class="formula reveal">
-            <div class="formula-label">TREASURY SPLIT</div>
-            <div class="formula-code">Burn = 1 - 1/φ³</div>
-            <div class="formula-result">🔥 <span id="burnRatePhi">76.4%</span></div>
+      </div>
+    </section>
+
+    <!-- E-SCORE -->
+    <section id="escore">
+      <div class="container">
+        <div class="label reveal">Engagement Rewards</div>
+        <h2 class="section-title reveal">E-Score: <span class="highlight">7 Dimensions</span></h2>
+
+        <div class="escore-section reveal">
+          <div class="escore-radar">
+            <svg viewBox="0 0 300 300">
+              <!-- Radar grid -->
+              <g fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1">
+                <polygon points="150,30 255,90 255,210 150,270 45,210 45,90" />
+                <polygon points="150,60 225,105 225,195 150,240 75,195 75,105" />
+                <polygon points="150,90 195,120 195,180 150,210 105,180 105,120" />
+                <polygon points="150,120 165,135 165,165 150,180 135,165 135,135" />
+              </g>
+              <!-- Axes -->
+              <g stroke="rgba(255,255,255,0.2)" stroke-width="1">
+                <line x1="150" y1="150" x2="150" y2="30" />
+                <line x1="150" y1="150" x2="255" y2="90" />
+                <line x1="150" y1="150" x2="255" y2="210" />
+                <line x1="150" y1="150" x2="150" y2="270" />
+                <line x1="150" y1="150" x2="45" y2="210" />
+                <line x1="150" y1="150" x2="45" y2="90" />
+              </g>
+              <!-- Data polygon -->
+              <polygon
+                id="escorePolygon"
+                fill="rgba(201,162,39,0.2)"
+                stroke="var(--gold)"
+                stroke-width="2"
+                points="150,60 210,105 195,180 150,220 90,170 75,110"
+              />
+              <!-- Dimension labels -->
+              <text x="150" y="20" fill="var(--escore-time)" text-anchor="middle" font-size="11">TIME</text>
+              <text x="270" y="90" fill="var(--escore-hold)" text-anchor="start" font-size="11">HOLD</text>
+              <text x="270" y="210" fill="var(--escore-burn)" text-anchor="start" font-size="11">BURN</text>
+              <text x="150" y="290" fill="var(--escore-use)" text-anchor="middle" font-size="11">USE</text>
+              <text x="30" y="210" fill="var(--escore-build)" text-anchor="end" font-size="11">BUILD</text>
+              <text x="30" y="90" fill="var(--escore-run)" text-anchor="end" font-size="11">RUN</text>
+            </svg>
           </div>
-          <div class="formula reveal">
-            <div class="formula-label">HOLDER DISCOUNT</div>
-            <div class="formula-code">discount = min(95, (log₁₀(share)+5)/3)</div>
-            <div class="formula-result">Up to <span class="highlight" id="maxDiscountPhi">95%</span></div>
+
+          <div class="escore-dimensions">
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-hold);">📊</div>
+              <div class="escore-dim-name">Hold</div>
+              <div class="escore-dim-weight">φ²</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 85%; background: var(--escore-hold);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-burn);">🔥</div>
+              <div class="escore-dim-name">Burn</div>
+              <div class="escore-dim-weight">φ²</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 72%; background: var(--escore-burn);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-use);">⚡</div>
+              <div class="escore-dim-name">Use (API)</div>
+              <div class="escore-dim-weight">φ</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 60%; background: var(--escore-use);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-build);">🛠</div>
+              <div class="escore-dim-name">Build (Apps)</div>
+              <div class="escore-dim-weight">φ</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 45%; background: var(--escore-build);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-run);">🖥</div>
+              <div class="escore-dim-name">Run (Nodes)</div>
+              <div class="escore-dim-weight">φ</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 30%; background: var(--escore-run);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-refer);">🔗</div>
+              <div class="escore-dim-name">Refer</div>
+              <div class="escore-dim-weight">1</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 55%; background: var(--escore-refer);"></div></div>
+            </div>
+            <div class="escore-dim">
+              <div class="escore-dim-icon" style="background: var(--escore-time);">⏱</div>
+              <div class="escore-dim-name">Time</div>
+              <div class="escore-dim-weight">1</div>
+              <div class="escore-dim-bar"><div class="escore-dim-fill" style="width: 90%; background: var(--escore-time);"></div></div>
+            </div>
           </div>
-          <div class="formula reveal">
-            <div class="formula-label">ECOSYSTEM BONUS</div>
-            <div class="formula-code">bonus = (1/φ²) × (1 - φ^(-burn%/30))</div>
-            <div class="formula-result" style="color: var(--gold);">Up to +<span id="ecosystemBonusPhi">38.2%</span></div>
+        </div>
+
+        <!-- Combined Discount Display -->
+        <div class="discount-compare reveal">
+          <div class="discount-option" id="holderDiscount">
+            <div class="discount-source">Holder Tier</div>
+            <div class="discount-value" id="holderDiscountValue">-67%</div>
+            <div class="discount-badge">💎 Platinum</div>
+          </div>
+          <div class="discount-option active" id="escoreDiscount">
+            <div class="discount-source">E-Score</div>
+            <div class="discount-value" id="escoreDiscountValue">-78%</div>
+            <div class="discount-badge">Score: 72</div>
+          </div>
+          <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: var(--space-lg);">
+            <div style="font-size: var(--text-xs); color: var(--white-50); margin-bottom: var(--space-xs);">Active</div>
+            <div style="font-size: var(--text-xl); color: var(--gold);" id="activeDiscount">-78%</div>
+            <div style="font-size: var(--text-xs); color: var(--gold); margin-top: var(--space-xs);">max(holder, e-score)</div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- PHI FORMULAS REFERENCE -->
+    <section id="formulas" style="padding: var(--space-2xl) 0;">
+      <div class="container">
+        <div class="label reveal">Code is Law</div>
+        <h2 class="section-title reveal" style="text-align: center;">All Formulas - <span class="highlight">φ-Based</span></h2>
+        <p class="body-text reveal" style="text-align: center; margin: 0 auto var(--space-xl); max-width: 700px;">
+          Every calculation derives from the Golden Ratio (φ = 1.618033988749...).<br>
+          <a href="https://github.com/zeyxx/GASdf/tree/main/src" target="_blank" style="color: var(--gold);">Verify in source code →</a>
+        </p>
+
+        <!-- DUAL BURN CHANNEL -->
+        <div class="reveal" style="margin-bottom: var(--space-xl); padding: var(--space-lg); background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(201,162,39,0.1)); border-radius: 12px; border: 1px solid var(--white-10);">
+          <h3 style="color: var(--white); margin-bottom: var(--space-md); text-align: center;">Dual Burn Channel</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); text-align: center;">
+            <div>
+              <div style="font-size: var(--text-2xl); color: var(--escore-burn); font-weight: 700;">100%</div>
+              <div style="font-size: var(--text-sm); color: var(--white-70);">Pay with $asdfasdfa</div>
+              <div style="font-size: var(--text-xs); color: var(--white-50);">Direct burn, no split</div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center; color: var(--white-30);">or</div>
+            <div>
+              <div style="font-size: var(--text-2xl); color: var(--gold); font-weight: 700;">76.4% / 23.6%</div>
+              <div style="font-size: var(--text-sm); color: var(--white-70);">Pay with other tokens</div>
+              <div style="font-size: var(--text-xs); color: var(--white-50);">Burn / Treasury (1-1/φ³ / 1/φ³)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="reveal" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-lg);">
+
+          <!-- Ecosystem Burn Bonus -->
+          <div style="padding: var(--space-lg); background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid var(--gold);">
+            <h4 style="color: var(--gold); margin-bottom: var(--space-sm);">Ecosystem Burn Bonus</h4>
+            <code style="display: block; background: rgba(255,255,255,0.05); padding: var(--space-sm); border-radius: 4px; font-size: var(--text-sm); margin-bottom: var(--space-sm); font-family: monospace;">
+              bonus = (1/φ²) × (1 - φ<sup>-b/30</sup>)
+            </code>
+            <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-sm);">
+              <strong>b</strong> = token's self-burn %<br>
+              <strong>Max</strong> = 1/φ² = 38.2% (at b ≥ 30%)
+            </div>
+            <p style="font-size: var(--text-xs); color: var(--white-30); margin-top: var(--space-xs);">
+              <em>holdex.js:216</em>
+            </p>
+          </div>
+
+          <!-- E-Score Discount -->
+          <div style="padding: var(--space-lg); background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid var(--escore-hold);">
+            <h4 style="color: var(--escore-hold); margin-bottom: var(--space-sm);">E-Score Discount</h4>
+            <code style="display: block; background: rgba(255,255,255,0.05); padding: var(--space-sm); border-radius: 4px; font-size: var(--text-sm); margin-bottom: var(--space-sm); font-family: monospace;">
+              discount = 1 - φ<sup>-E/25</sup>
+            </code>
+            <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-sm);">
+              <strong>E</strong> = weighted sum of 7 dimensions<br>
+              <strong>Cap</strong> = 95% (0.95)
+            </div>
+            <p style="font-size: var(--text-xs); color: var(--white-30); margin-top: var(--space-xs);">
+              <em>harmony.js:130</em>
+            </p>
+          </div>
+
+          <!-- Holder Discount -->
+          <div style="padding: var(--space-lg); background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid var(--diamond);">
+            <h4 style="color: var(--diamond); margin-bottom: var(--space-sm);">Holder Discount</h4>
+            <code style="display: block; background: rgba(255,255,255,0.05); padding: var(--space-sm); border-radius: 4px; font-size: var(--text-sm); margin-bottom: var(--space-sm); font-family: monospace;">
+              discount = (log₁₀(share) + 5) / 3
+            </code>
+            <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-sm);">
+              <strong>share</strong> = balance / circulating supply<br>
+              <strong>Cap</strong> = 95% (0.95)
+            </div>
+            <p style="font-size: var(--text-xs); color: var(--white-30); margin-top: var(--space-xs);">
+              <em>holder-tiers.js:151</em>
+            </p>
+          </div>
+
+          <!-- Combined Discount -->
+          <div style="padding: var(--space-lg); background: rgba(0,0,0,0.4); border-radius: 8px; border-left: 3px solid var(--platinum);">
+            <h4 style="color: var(--platinum); margin-bottom: var(--space-sm);">Active Discount</h4>
+            <code style="display: block; background: rgba(255,255,255,0.05); padding: var(--space-sm); border-radius: 4px; font-size: var(--text-sm); margin-bottom: var(--space-sm); font-family: monospace;">
+              active = max(holder, escore)
+            </code>
+            <div style="font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-sm);">
+              Best of both applied automatically<br>
+              <strong>Cap</strong> = 95% (prevents negative fees)
+            </div>
+            <p style="font-size: var(--text-xs); color: var(--white-30); margin-top: var(--space-xs);">
+              <em>holder-tiers.js:278</em>
+            </p>
+          </div>
+
+        </div>
+
+        <!-- Holder Tiers Table -->
+        <div class="reveal" style="margin-top: var(--space-xl); overflow-x: auto;">
+          <h3 style="color: var(--white); margin-bottom: var(--space-md); text-align: center;">Holder Tiers</h3>
+          <table style="width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; font-size: var(--text-sm);">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--white-10);">
+                <th style="padding: var(--space-sm); text-align: left; color: var(--white-50);">Tier</th>
+                <th style="padding: var(--space-sm); text-align: right; color: var(--white-50);">Min Share</th>
+                <th style="padding: var(--space-sm); text-align: right; color: var(--white-50);">Discount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding: var(--space-sm);"><span style="color: var(--diamond);">💎</span> Diamond</td><td style="text-align: right;">≥ 1%</td><td style="text-align: right; color: var(--escore-burn);">95%</td></tr>
+              <tr><td style="padding: var(--space-sm);"><span style="color: var(--platinum);">💠</span> Platinum</td><td style="text-align: right;">≥ 0.1%</td><td style="text-align: right;">67%</td></tr>
+              <tr><td style="padding: var(--space-sm);"><span style="color: var(--gold-tier);">🥇</span> Gold</td><td style="text-align: right;">≥ 0.01%</td><td style="text-align: right;">33%</td></tr>
+              <tr><td style="padding: var(--space-sm);"><span style="color: var(--silver);">🥈</span> Silver</td><td style="text-align: right;">≥ 0.001%</td><td style="text-align: right;">0%</td></tr>
+              <tr><td style="padding: var(--space-sm);"><span style="color: var(--bronze);">🥉</span> Bronze</td><td style="text-align: right;">Any</td><td style="text-align: right;">0%</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size: var(--text-xs); color: var(--white-30); text-align: center; margin-top: var(--space-sm);">
+            <em>holder-tiers.js:334</em>
+          </p>
+        </div>
+
+        <!-- E-Score Dimensions -->
+        <div class="reveal" style="margin-top: var(--space-xl);">
+          <h3 style="color: var(--white); margin-bottom: var(--space-md); text-align: center;">E-Score Dimensions (φ-weighted)</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm); justify-content: center;">
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">📊 Hold <strong>0.382</strong></span>
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">🔥 Burn <strong>0.382</strong></span>
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">⚡ Use <strong>0.236</strong></span>
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">🛠 Build <strong>0.146</strong></span>
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">🖥 Node <strong>0.090</strong></span>
+            <span style="padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 20px; font-size: var(--text-xs);">🔗 Refer <strong>0.056</strong></span>
+          </div>
+          <p style="font-size: var(--text-xs); color: var(--white-30); text-align: center; margin-top: var(--space-sm);">
+            <em>harmony.js:38-46</em>
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CTA -->
     <section id="cta">
       <div class="container">
-        <div class="cta-minimal reveal">
-          <h2 class="section-title">Ready to <span class="highlight">break free</span>?</h2>
-          <p class="body-text" style="text-align: center; margin: var(--space-md) auto 0;">
-            Connect your wallet. Pay with any token.<br>
-            🔥 Watch it burn forever.
-          </p>
-          <div class="cta-buttons">
-            <button class="cta-btn-primary">LAUNCH NOW</button>
-            <a href="https://github.com/zeyxx/GASdf" target="_blank" class="cta-btn-secondary">View on GitHub</a>
-          </div>
+        <h2 class="section-title reveal" style="text-align: center;">Start <span class="highlight">building</span></h2>
+        <p class="body-text reveal" style="text-align: center; margin: var(--space-md) auto 0;">
+          Integrate GASdf in your app. Let users pay gas with any token.
+        </p>
+
+        <div class="cta-grid reveal">
+          <button class="cta-btn cta-btn-primary" onclick="document.getElementById('try').scrollIntoView({behavior:'smooth'})">Try the Apps</button>
+          <a href="https://github.com/zeyxx/GASdf" target="_blank" class="cta-btn cta-btn-secondary">GitHub</a>
+          <a href="https://alonisthe.dev/holdex" target="_blank" class="cta-btn cta-btn-secondary">HolDex API</a>
         </div>
       </div>
     </section>
@@ -872,14 +1930,14 @@
     <footer class="reveal">
       <div class="footer-links">
         <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
-        <a href="https://x.com/asdfasdfa_" target="_blank">Twitter</a>
+        <a href="https://x.com/asdfasdfa_" target="_blank">X</a>
         <a href="https://alonisthe.dev/holdex" target="_blank">HolDex</a>
       </div>
-      <div class="footer-copy">Built for Solana. Powered by φ.</div>
+      <div class="footer-copy">Built on Solana. Powered by φ.</div>
     </footer>
   </div>
 
-  <!-- Three.js -->
+  <!-- Three.js Import Map -->
   <script type="importmap">
   {
     "imports": {
@@ -895,11 +1953,19 @@
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-    // ============================================================================
-    // SPACE RENDERER - Stars, Milky Way, Nebulae, Cosmic Dust
-    // The space flows around the fixed CSS singularity
-    // ============================================================================
+    // ========================================================================
+    // GOLDEN RATIO CONSTANTS
+    // ========================================================================
+    const PHI = 1.618033988749894;
+    const PHI_CUBED = PHI * PHI * PHI;
+    const BURN_RATE = 1 - (1 / PHI_CUBED);
+    const TREASURY_RATE = 1 / PHI_CUBED;
+    const ECOSYSTEM_BONUS = 1 / (PHI * PHI);
 
+    // ========================================================================
+    // SPACE RENDERER - Full version with all effects
+    // Stars, Milky Way, Nebulae, Cosmic Dust, Lorenz Comets
+    // ========================================================================
     class SpaceRenderer {
       constructor(container) {
         this.container = container;
@@ -1029,7 +2095,7 @@
 
       // Milky Way particle cloud - INTENSIFIED
       createMilkyWay() {
-        const particleCount = 10000; // More particles
+        const particleCount = 10000;
         const positions = new Float32Array(particleCount * 3);
         const colors = new Float32Array(particleCount * 3);
         const sizes = new Float32Array(particleCount);
@@ -1037,7 +2103,7 @@
 
         for (let i = 0; i < particleCount; i++) {
           const i3 = i * 3;
-          const x = (Math.random() - 0.5) * 3000; // Wider spread
+          const x = (Math.random() - 0.5) * 3000;
           const ySpread = 80 + Math.random() * 120;
           const y = (Math.random() - 0.5) * ySpread * (0.3 + Math.random() * 0.7);
           const z = -400 - Math.random() * 800;
@@ -1052,7 +2118,7 @@
           colors[i3 + 1] = warmth * 0.93;
           colors[i3 + 2] = warmth * 0.75;
 
-          sizes[i] = 1.5 + Math.random() * 3.0; // Larger particles
+          sizes[i] = 1.5 + Math.random() * 3.0;
           const distFromCenter = Math.abs(y) / 100;
           // Intensified alpha: 2.5x brighter
           alphas[i] = (1 - distFromCenter) * (0.035 + Math.random() * 0.045);
@@ -1224,12 +2290,11 @@
         this.cometPool = [];
 
         // Golden ratio constants
-        const PHI = 1.618033988749;
-        const PHI_INV = 1 / PHI;           // 0.618...
-        const PHI_SQ = PHI * PHI;          // 2.618...
-        const PHI_INV_SQ = 1 / PHI_SQ;     // 0.382...
+        const PHI_INV = 1 / PHI;
+        const PHI_SQ = PHI * PHI;
+        const PHI_INV_SQ = 1 / PHI_SQ;
 
-        // Rule of thirds intersections (golden ratio approximation)
+        // Rule of thirds intersections
         const THIRD = 1/3;
         const TWO_THIRD = 2/3;
 
@@ -1242,102 +2307,17 @@
         };
 
         // Mathematically balanced paths using golden ratio
-        // Alternates: RIGHT → LEFT → RIGHT → LEFT (visual balance)
-        // Uses rule of thirds for start/end points
-        // Mobile: paths adapt to portrait orientation
         this.strategicPaths = [
-          // 1. HERO: Z-pattern start (top-right → center)
-          // Fibonacci timing: spawns at 0, respawn 8s
-          {
-            trigger: 0,
-            startX: PHI_INV,           // 0.618 (golden point right)
-            startY: PHI_INV,           // 0.618 (golden point top)
-            targetX: 0,                // Center
-            targetY: -PHI_INV_SQ,      // -0.382 (below center, toward CTA)
-            depth: -350,
-            speed: PHI_INV,            // 0.618
-            respawnDelay: FIB[5] * 1000  // 8s
-          },
-          // 2. CONTENT: Balance from left (creates symmetry)
-          {
-            trigger: PHI_INV_SQ * 0.3, // ~0.11
-            startX: -PHI_INV,          // -0.618 (golden point left)
-            startY: THIRD,             // 0.33 (rule of thirds)
-            targetX: -PHI_INV_SQ,      // -0.382
-            targetY: -THIRD,           // -0.33
-            depth: -480,
-            speed: PHI_INV_SQ,         // 0.382 (slower, subtle)
-            respawnDelay: FIB[6] * 1000  // 13s
-          },
-          // 3. HOW SECTION: Right sweep (matches reading direction)
-          {
-            trigger: PHI_INV_SQ,       // 0.382
-            startX: TWO_THIRD,         // 0.67 (rule of thirds)
-            startY: PHI_INV_SQ,        // 0.382
-            targetX: THIRD,            // 0.33
-            targetY: -PHI_INV,         // -0.618
-            depth: -400,
-            speed: PHI_INV * 1.1,
-            respawnDelay: FIB[4] * 2000  // 10s
-          },
-          // 4. FLYWHEEL: Left diagonal (visual rhythm)
-          {
-            trigger: PHI_INV,          // 0.618
-            startX: -TWO_THIRD,        // -0.67
-            startY: PHI_INV_SQ,        // 0.382
-            targetX: THIRD,            // 0.33 (crosses to right)
-            targetY: -PHI_INV_SQ,      // -0.382
-            depth: -360,
-            speed: PHI_INV,
-            respawnDelay: FIB[5] * 1200  // ~10s
-          },
-          // 5. TIERS: Horizontal golden sweep (showcases all tiers)
-          {
-            trigger: 1 - PHI_INV,      // 0.382
-            startX: PHI_INV + 0.1,     // 0.72 (past golden point)
-            startY: 0,                 // Center height
-            targetX: -PHI_INV,         // -0.618 (full sweep)
-            targetY: -THIRD * 0.5,     // Slight downward
-            depth: -380,
-            speed: PHI_INV_SQ * 1.5,   // Slower for visibility
-            respawnDelay: FIB[5] * 1400  // ~11s
-          },
-          // 6. PHI: Golden spiral path (embodies the mathematics)
-          {
-            trigger: PHI_INV + PHI_INV_SQ * 0.5, // ~0.81
-            startX: -PHI_INV_SQ,       // -0.382
-            startY: PHI_INV,           // 0.618
-            targetX: PHI_INV_SQ,       // 0.382 (spiral across)
-            targetY: -PHI_INV,         // -0.618
-            depth: -420,
-            speed: PHI_INV_SQ,         // Slow, contemplative
-            respawnDelay: FIB[6] * 1000  // 13s
-          },
-          // 7. FINAL CTA: Convergent sweep (all energy to action)
-          {
-            trigger: 1 - PHI_INV_SQ,   // 0.618 (golden trigger)
-            startX: PHI_INV,           // 0.618
-            startY: PHI_INV,           // 0.618 (golden corner)
-            targetX: 0,                // Dead center
-            targetY: 0,                // Dead center (CTA)
-            depth: -300,
-            speed: PHI_INV * 1.3,      // Faster, urgent
-            respawnDelay: FIB[4] * 1200  // ~6s
-          },
-          // 8. AMBIENT: Very distant, slow background motion
-          {
-            trigger: THIRD,
-            startX: -1,                // Far left edge
-            startY: PHI_INV_SQ,        // 0.382
-            targetX: 1,                // Far right (long journey)
-            targetY: -PHI_INV_SQ,
-            depth: -600,               // Very far back
-            speed: PHI_INV_SQ * 0.4,   // Very slow
-            respawnDelay: FIB[6] * 1500  // ~20s
-          }
+          { trigger: 0, startX: PHI_INV, startY: PHI_INV, targetX: 0, targetY: -PHI_INV_SQ, depth: -350, speed: PHI_INV, respawnDelay: FIB[5] * 1000 },
+          { trigger: PHI_INV_SQ * 0.3, startX: -PHI_INV, startY: THIRD, targetX: -PHI_INV_SQ, targetY: -THIRD, depth: -480, speed: PHI_INV_SQ, respawnDelay: FIB[6] * 1000 },
+          { trigger: PHI_INV_SQ, startX: TWO_THIRD, startY: PHI_INV_SQ, targetX: THIRD, targetY: -PHI_INV, depth: -400, speed: PHI_INV * 1.1, respawnDelay: FIB[4] * 2000 },
+          { trigger: PHI_INV, startX: -TWO_THIRD, startY: PHI_INV_SQ, targetX: THIRD, targetY: -PHI_INV_SQ, depth: -360, speed: PHI_INV, respawnDelay: FIB[5] * 1200 },
+          { trigger: 1 - PHI_INV, startX: PHI_INV + 0.1, startY: 0, targetX: -PHI_INV, targetY: -THIRD * 0.5, depth: -380, speed: PHI_INV_SQ * 1.5, respawnDelay: FIB[5] * 1400 },
+          { trigger: PHI_INV + PHI_INV_SQ * 0.5, startX: -PHI_INV_SQ, startY: PHI_INV, targetX: PHI_INV_SQ, targetY: -PHI_INV, depth: -420, speed: PHI_INV_SQ, respawnDelay: FIB[6] * 1000 },
+          { trigger: 1 - PHI_INV_SQ, startX: PHI_INV, startY: PHI_INV, targetX: 0, targetY: 0, depth: -300, speed: PHI_INV * 1.3, respawnDelay: FIB[4] * 1200 },
+          { trigger: THIRD, startX: -1, startY: PHI_INV_SQ, targetX: 1, targetY: -PHI_INV_SQ, depth: -600, speed: PHI_INV_SQ * 0.4, respawnDelay: FIB[6] * 1500 }
         ];
 
-        // Create comet for each strategic path
         this.strategicPaths.forEach((path, i) => {
           const comet = this.createStrategicComet(i, path);
           this.cometPool.push(comet);
@@ -1369,7 +2349,6 @@
         geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-        // Warm gold-white for strategic comets (matches brand)
         const hue = 0.12 + (index * 0.618033988749 * 0.08) % 0.1;
         const color = new THREE.Color().setHSL(hue, 0.25, 0.9);
 
@@ -1430,10 +2409,8 @@
       }
 
       spawnStrategicComet(comet, now) {
-        const PHI = 1.618033988749;
         const path = comet.path;
 
-        // Initialize Lorenz with path-based seed for consistent chaos
         const seed = path.startX * 10 + path.startY * 7 + now * 0.0001;
         comet.lorenz = {
           x: 1 + Math.sin(seed) * 0.3,
@@ -1441,17 +2418,13 @@
           z: 1 + Math.sin(seed * PHI * PHI) * 0.3
         };
 
-        // Responsive scaling based on device orientation
         const aspect = window.innerWidth / window.innerHeight;
         const isMobile = window.innerWidth < 768;
         const isPortrait = aspect < 1;
 
-        // Scale factors: desktop landscape vs mobile portrait
-        // Mobile: compress X, expand Y for vertical screen
         const scaleX = isPortrait ? 100 : 180 * Math.min(aspect, 1.8);
         const scaleY = isPortrait ? 150 : 120;
 
-        // Mobile adjustment: pull paths more toward center
         const mobileCenter = isMobile ? 0.3 : 0;
 
         comet.startWorld = {
@@ -1474,15 +2447,13 @@
         const cfg = this.cometConfig;
         const now = performance.now();
 
-        this.cometPool.forEach((comet, idx) => {
+        this.cometPool.forEach((comet) => {
           const path = comet.path;
 
-          // Check if should spawn based on scroll position
           const shouldTrigger = this.scrollProgress >= path.trigger &&
                                 this.scrollProgress < path.trigger + 0.3;
 
           if (shouldTrigger && !comet.active) {
-            // Check respawn delay
             if (now - comet.lastSpawn > path.respawnDelay) {
               this.spawnStrategicComet(comet, now);
             }
@@ -1494,31 +2465,25 @@
           const dt = 0.006;
           comet.lorenz = this.lorenzStep(comet.lorenz, dt, cfg.lorenz);
 
-          // Progress along strategic path (0 to 1)
           comet.progress += 0.004 * path.speed;
 
-          // Eased progress for smooth deceleration toward target
           const eased = 1 - Math.pow(1 - Math.min(comet.progress, 1), 2.5);
 
-          // Interpolate position with chaos overlay
-          const chaosScale = 3 * (1 - eased); // Chaos diminishes toward target
+          const chaosScale = 3 * (1 - eased);
           const baseX = comet.startWorld.x + (comet.targetWorld.x - comet.startWorld.x) * eased;
           const baseY = comet.startWorld.y + (comet.targetWorld.y - comet.startWorld.y) * eased;
 
-          // Add Lorenz chaos as subtle perturbation
           const worldPos = new THREE.Vector3(
             baseX + (comet.lorenz.x - 10) * chaosScale,
             baseY + (comet.lorenz.y - 15) * chaosScale + this.scrollProgress * -80,
             path.depth + (comet.lorenz.z - 25) * 0.5
           );
 
-          // Store trail
           comet.trail.unshift(worldPos);
           if (comet.trail.length > cfg.tailSegments) {
             comet.trail.pop();
           }
 
-          // Update geometry
           const positions = comet.geometry.attributes.position.array;
           for (let i = 0; i < cfg.tailSegments; i++) {
             if (i < comet.trail.length) {
@@ -1529,11 +2494,9 @@
           }
           comet.geometry.attributes.position.needsUpdate = true;
 
-          // Deactivate when path complete
           comet.life++;
           if (comet.progress > 1.2 || comet.life > 600) {
             comet.active = false;
-            // Clear trail positions
             for (let i = 0; i < cfg.tailSegments * 3; i++) {
               positions[i] = -99999;
             }
@@ -1555,7 +2518,6 @@
       setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
-        // Bloom: strength, radius, threshold (lower = less blur)
         this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.3, 0.75);
         this.composer.addPass(this.bloomPass);
       }
@@ -1564,20 +2526,17 @@
         requestAnimationFrame(() => this.animate());
         this.time += 0.016;
 
-        // Smooth scroll interpolation
         this.scrollY += (this.targetScrollY - this.scrollY) * 0.06;
         const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
         this.scrollProgress = this.scrollY / maxScroll;
 
-        // Smooth mouse interpolation (wider parallax)
         this.mouseX += (this.targetMouseX - this.mouseX) * 0.04;
         this.mouseY += (this.targetMouseY - this.mouseY) * 0.04;
 
-        // Camera moves through space based on scroll
         const cameraZ = 5 - this.scrollProgress * 300;
         const cameraY = -this.scrollProgress * 150;
 
-        // WIDER mouse parallax - horizontal shift up to ±60 units
+        // WIDER mouse parallax
         const mouseParallaxX = this.mouseX * 60;
         const mouseParallaxY = this.mouseY * 25;
 
@@ -1585,7 +2544,7 @@
         this.camera.position.y = cameraY + mouseParallaxY;
         this.camera.position.x = mouseParallaxX;
 
-        // Stars follow but lag (distant) - WIDER horizontal parallax
+        // Stars follow but lag (distant)
         if (this.stars) {
           this.stars.material.uniforms.time.value = this.time;
           this.stars.position.x = mouseParallaxX * 0.15;
@@ -1594,7 +2553,7 @@
           this.stars.rotation.y = this.time * 0.001;
         }
 
-        // Milky Way (very distant) - subtle parallax
+        // Milky Way (very distant)
         if (this.milkyWay) {
           this.milkyWay.material.uniforms.time.value = this.time;
           this.milkyWay.position.x = mouseParallaxX * 0.08;
@@ -1602,17 +2561,19 @@
           this.milkyWay.position.z = cameraZ * 0.1;
         }
 
-        // Nebulae at different depths - variable parallax
-        this.nebulae.forEach((nebula, i) => {
-          nebula.material.uniforms.time.value = this.time;
-          const depth = 0.2 + i * 0.12;
-          nebula.position.x = nebula.userData.baseX + mouseParallaxX * (0.1 + i * 0.08);
-          nebula.position.y = nebula.userData.baseY + cameraY * depth + mouseParallaxY * (0.08 + i * 0.04);
-          nebula.position.z = nebula.userData.baseZ + cameraZ * depth * 0.4;
-          nebula.lookAt(this.camera.position);
-        });
+        // Nebulae at different depths
+        if (this.nebulae) {
+          this.nebulae.forEach((nebula, i) => {
+            nebula.material.uniforms.time.value = this.time;
+            const depth = 0.2 + i * 0.12;
+            nebula.position.x = nebula.userData.baseX + mouseParallaxX * (0.1 + i * 0.08);
+            nebula.position.y = nebula.userData.baseY + cameraY * depth + mouseParallaxY * (0.08 + i * 0.04);
+            nebula.position.z = nebula.userData.baseZ + cameraZ * depth * 0.4;
+            nebula.lookAt(this.camera.position);
+          });
+        }
 
-        // Cosmic dust (close, fast parallax) - STRONG horizontal parallax
+        // Cosmic dust (close, fast parallax)
         if (this.cosmicDust) {
           this.cosmicDust.material.uniforms.time.value = this.time;
           this.cosmicDust.material.uniforms.scrollOffset.value = this.scrollProgress * 400;
@@ -1621,23 +2582,18 @@
           this.cosmicDust.position.z = cameraZ * 0.8;
         }
 
-        // Update comets
         this.updateComets();
-
         this.composer.render();
       }
 
       setupEventListeners() {
         window.addEventListener('scroll', () => { this.targetScrollY = window.scrollY; }, { passive: true });
 
-        // Mouse tracking for wider parallax
         window.addEventListener('mousemove', (e) => {
-          // Normalize to -1 to 1 range
           this.targetMouseX = (e.clientX / window.innerWidth - 0.5) * 2;
           this.targetMouseY = (e.clientY / window.innerHeight - 0.5) * 2;
         }, { passive: true });
 
-        // Touch support for mobile
         window.addEventListener('touchmove', (e) => {
           if (e.touches.length > 0) {
             this.targetMouseX = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
@@ -1645,7 +2601,6 @@
           }
         }, { passive: true });
 
-        // Reset on mouse leave
         document.addEventListener('mouseleave', () => {
           this.targetMouseX = 0;
           this.targetMouseY = 0;
@@ -1661,12 +2616,11 @@
       }
     }
 
-    // Initialize space renderer
-    const container = document.getElementById('space-container');
-    new SpaceRenderer(container);
+    // Initialize
+    new SpaceRenderer(document.getElementById('space-container'));
 
     // ========================================================================
-    // BLACK HOLE SCROLL ANIMATION - rises as you scroll
+    // BLACK HOLE SCROLL ANIMATION
     // ========================================================================
     const blackHole = document.getElementById('blackHole');
     let bhScrollY = 0, bhTargetY = 0;
@@ -1676,10 +2630,8 @@
       const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
       const progress = bhScrollY / maxScroll;
 
-      // Black hole rises from -40vh to 35vh as you scroll
-      const bottom = -40 + progress * 75;
-      // Slight scale increase as it gets closer
-      const scale = 1 + progress * 0.15;
+      const bottom = -40 + progress * 70;
+      const scale = 1 + progress * 0.12;
       blackHole.style.bottom = `${bottom}vh`;
       blackHole.style.transform = `translateX(-50%) scale(${scale})`;
 
@@ -1697,12 +2649,45 @@
     document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
     // ========================================================================
-    // PROGRESS DOTS
+    // PHI VALUES
     // ========================================================================
-    const sections = ['hero', 'how', 'flywheel', 'trust', 'tiers', 'phi', 'cta'];
+    const burnRateStr = (BURN_RATE * 100).toFixed(1) + '%';
+    const treasuryRateStr = (TREASURY_RATE * 100).toFixed(1) + '%';
+    const ecosystemBonusStr = '+' + (ECOSYSTEM_BONUS * 100).toFixed(1) + '%';
+
+    document.getElementById('burnRateCenter').textContent = burnRateStr;
+    document.getElementById('burnSplit').textContent = burnRateStr;
+    document.getElementById('treasurySplit').textContent = treasuryRateStr;
+    document.getElementById('ecosystemBonus').textContent = ecosystemBonusStr;
+    document.getElementById('burnRatePhi').textContent = burnRateStr;
+
+    // ========================================================================
+    // K-SCORE TIER INTERACTION
+    // ========================================================================
+    const kscoreCursor = document.getElementById('kscoreCursor');
+    document.querySelectorAll('.kscore-tier').forEach(tier => {
+      tier.addEventListener('mouseenter', () => {
+        const pos = tier.dataset.pos;
+        kscoreCursor.style.left = pos + '%';
+      });
+    });
+
+    // ========================================================================
+    // PROGRESS NAVIGATION
+    // ========================================================================
+    const sections = ['hero', 'try', 'ecosystem', 'flywheel', 'kscore', 'escore', 'cta'];
     const progressDots = document.querySelectorAll('.progress-dot');
     const progressLabel = document.querySelector('.progress-label');
-    const labels = { hero: 'Explorer', how: 'Learning', flywheel: 'Curious', trust: 'Evaluating', tiers: 'Interested', phi: 'Deep Diver', cta: 'Ready!' };
+
+    const labels = {
+      hero: 'overview',
+      try: 'try it',
+      ecosystem: 'ecosystem',
+      flywheel: 'flywheel',
+      kscore: 'k-score',
+      escore: 'e-score',
+      cta: 'start'
+    };
 
     function updateProgress() {
       const scrollPos = window.scrollY + window.innerHeight / 2;
@@ -1711,129 +2696,110 @@
         const el = document.getElementById(s);
         if (el && el.offsetTop <= scrollPos) active = s;
       }
-      progressDots.forEach((dot, i) => dot.classList.toggle('active', i <= sections.indexOf(active)));
-      if (progressLabel) progressLabel.textContent = labels[active] || 'Explorer';
+      progressDots.forEach(dot => {
+        const section = dot.dataset.section;
+        const idx = sections.indexOf(section);
+        const activeIdx = sections.indexOf(active);
+        dot.classList.toggle('active', idx <= activeIdx);
+      });
+      if (progressLabel) progressLabel.textContent = labels[active] || 'gm';
     }
     window.addEventListener('scroll', updateProgress, { passive: true });
     updateProgress();
 
-    // ========================================================================
-    // LIVE DATA
-    // ========================================================================
-    const PHI = 1.618033988749894;
-    const PHI_CUBED = PHI * PHI * PHI;
-    const BURN_RATE = 1 - (1 / PHI_CUBED);
-    const ECOSYSTEM_BONUS = 1 / (PHI * PHI);
-    const MAX_DISCOUNT = 0.95;
-
-    const TIER_THRESHOLDS = { diamond: 0.01, platinum: 0.001, gold: 0.0001, silver: 0.00001, bronze: 0 };
-
-    function formatRate(r) { return (r * 100).toFixed(1) + '%'; }
-    function calcDiscount(s) { return s <= 0 ? 0 : Math.min(MAX_DISCOUNT, Math.max(0, (Math.log10(s) + 5) / 3)); }
-    function formatDiscount(s) { const d = calcDiscount(s); return d > 0 ? `-${Math.round(d * 100)}%` : '0%'; }
-    function formatNumber(n) { return n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n.toFixed(0); }
-    function formatUSD(n) { return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(1)+'K' : n >= 1 ? '$'+n.toFixed(0) : '$'+n.toFixed(2); }
-    function formatPrice(p) { return p >= 1 ? '$'+p.toFixed(2) : p >= 0.01 ? '$'+p.toFixed(4) : '$'+p.toFixed(6); }
-
-    // Initialize phi values
-    const burnRateStr = formatRate(BURN_RATE);
-    ['burnRateHero', 'burnRateStat', 'burnRateStep', 'burnRatePhi'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = burnRateStr;
+    // Click navigation for dots
+    progressDots.forEach(dot => {
+      dot.addEventListener('click', () => {
+        const section = document.getElementById(dot.dataset.section);
+        if (section) section.scrollIntoView({ behavior: 'smooth' });
+      });
     });
-    document.getElementById('ecosystemBonusCard').textContent = formatRate(ECOSYSTEM_BONUS);
-    document.getElementById('ecosystemBonusPhi').textContent = formatRate(ECOSYSTEM_BONUS);
-    document.getElementById('maxDiscountPhi').textContent = Math.round(MAX_DISCOUNT * 100) + '%';
-    document.getElementById('diamondDiscount').textContent = formatDiscount(TIER_THRESHOLDS.diamond);
-    document.getElementById('platinumDiscount').textContent = formatDiscount(TIER_THRESHOLDS.platinum);
-    document.getElementById('goldDiscount').textContent = formatDiscount(TIER_THRESHOLDS.gold);
-    document.getElementById('silverDiscount').textContent = formatDiscount(TIER_THRESHOLDS.silver);
-    document.getElementById('bronzeDiscount').textContent = formatDiscount(TIER_THRESHOLDS.bronze);
 
-    // Load HolDex data (beta: holdex-api.onrender.com, prod: alonisthe.dev/holdex)
-    const HOLDEX_API = 'https://holdex-api.onrender.com/api';
-    const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
-    let lastHolDexUpdate = Date.now();
+    // ========================================================================
+    // 5 MINI APPS - Tab Switching
+    // ========================================================================
+    const appTabs = document.querySelectorAll('.app-tab');
+    const appPanels = document.querySelectorAll('.app-panel');
 
-    async function loadHolDexData() {
-      try {
-        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
-        const data = await res.json();
-        if (!data.success || !data.token) return;
+    appTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const app = tab.dataset.app;
 
-        const token = data.token;
-        const supply = parseInt(token.supply) / Math.pow(10, token.decimals);
-        const price = token.priceUsd || token.priceusd || 0;
-        const mcap = token.marketCap || token.marketcap || 0;
-        const holders = token.real_holders || token.holders || 0;
+        // Update tabs
+        appTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
 
-        document.getElementById('tokenPrice').textContent = formatPrice(price);
-        document.getElementById('tokenMcap').textContent = formatUSD(mcap);
-        document.getElementById('tokenHolders').textContent = holders.toLocaleString();
+        // Update panels
+        appPanels.forEach(p => p.classList.remove('active'));
+        document.getElementById('panel-' + app).classList.add('active');
+      });
+    });
 
-        const diamondTokens = supply * TIER_THRESHOLDS.diamond;
-        const platinumTokens = supply * TIER_THRESHOLDS.platinum;
-        const goldTokens = supply * TIER_THRESHOLDS.gold;
-        const silverTokens = supply * TIER_THRESHOLDS.silver;
-
-        document.getElementById('diamondTokens').textContent = formatNumber(diamondTokens);
-        document.getElementById('platinumTokens').textContent = formatNumber(platinumTokens);
-        document.getElementById('goldTokens').textContent = formatNumber(goldTokens);
-        document.getElementById('silverTokens').textContent = formatNumber(silverTokens);
-
-        document.getElementById('diamondUsd').textContent = '~' + formatUSD(diamondTokens * price);
-        document.getElementById('platinumUsd').textContent = '~' + formatUSD(platinumTokens * price);
-        document.getElementById('goldUsd').textContent = '~' + formatUSD(goldTokens * price);
-        document.getElementById('silverUsd').textContent = '~' + formatUSD(silverTokens * price);
-
-        document.getElementById('tierUpdateTime').textContent = 'just now';
-        lastHolDexUpdate = Date.now();
-      } catch (e) { console.log('HolDex fetch error:', e.message); }
-    }
-    loadHolDexData();
-    setInterval(loadHolDexData, 60000);
-    setInterval(() => {
-      const sec = Math.floor((Date.now() - lastHolDexUpdate) / 1000);
-      const el = document.getElementById('tierUpdateTime');
-      if (el) el.textContent = sec < 60 ? 'just now' : sec < 120 ? '1 min ago' : Math.floor(sec/60) + ' mins ago';
-    }, 30000);
-
-    // Load GASdf stats
+    // ========================================================================
+    // LOAD LIVE DATA FROM APIs
+    // ========================================================================
     async function loadStats() {
       try {
-        const res = await fetch('/v1/stats');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.totalBurnedUsd !== undefined) document.getElementById('statBurned').textContent = '$' + data.totalBurnedUsd.toLocaleString();
-        if (data.totalTransactions !== undefined) document.getElementById('statTx').textContent = data.totalTransactions.toLocaleString();
-      } catch (e) {}
-    }
-    loadStats();
-    setInterval(loadStats, 30000);
+        // GASdf Stats
+        const statsRes = await fetch('/v1/stats');
+        if (statsRes.ok) {
+          const data = await statsRes.json();
+          if (data.totalBurnedUsd !== undefined) {
+            document.getElementById('statBurned').textContent = '$' + data.totalBurnedUsd.toLocaleString();
+          }
+          if (data.totalTransactions !== undefined) {
+            document.getElementById('statTx').textContent = data.totalTransactions.toLocaleString();
+          }
+        }
 
-    // Live ticker
-    const tickerMessages = [
-      'Burning live on Solana mainnet',
-      'Diamond tier user just burned 1,234 USDC in fees',
-      'Platinum holder saved $456 on transaction fees',
-      '12,456 transactions processed today (+34%)',
-      'Gold tier unlocked: 10K+ $asdfasdfa burned',
-      'New ATH: 2.4M tokens burned this week',
-    ];
-    let tickerIndex = 0;
-    function updateTicker() {
-      const ticker = document.getElementById('liveTicker');
-      if (ticker) {
-        ticker.style.opacity = 0;
-        setTimeout(() => {
-          ticker.textContent = tickerMessages[tickerIndex];
-          ticker.style.opacity = 1;
-          tickerIndex = (tickerIndex + 1) % tickerMessages.length;
-        }, 400);
+        // GASdf Health for uptime
+        const healthRes = await fetch('/v1/health');
+        if (healthRes.ok) {
+          const health = await healthRes.json();
+          if (health.uptime !== undefined) {
+            const hours = Math.floor(health.uptime / 3600);
+            const days = Math.floor(hours / 24);
+            const uptimeStr = days > 0 ? days + 'd' : hours + 'h';
+            document.getElementById('statUptime').textContent = uptimeStr;
+          }
+        }
+      } catch (e) {
+        console.error('Stats load error:', e);
       }
     }
-    updateTicker();
-    setInterval(updateTicker, 5000);
+
+    // Load HolDex tokens for dropdowns
+    async function loadTokens() {
+      try {
+        const res = await fetch('https://asdev-backend.onrender.com/api/tokens?limit=20&verified=true');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.tokens && data.tokens.length > 0) {
+          const selects = document.querySelectorAll('.form-select');
+          selects.forEach(select => {
+            // Keep first option
+            const firstOpt = select.options[0];
+            select.innerHTML = '';
+            select.appendChild(firstOpt);
+
+            // Add tokens
+            data.tokens.forEach(token => {
+              const opt = document.createElement('option');
+              opt.value = token.mint;
+              opt.textContent = token.ticker + ' (K:' + token.kScore + ')';
+              select.appendChild(opt);
+            });
+          });
+        }
+      } catch (e) {
+        console.error('Tokens load error:', e);
+      }
+    }
+
+    loadStats();
+    loadTokens();
+    setInterval(loadStats, 30000);
   </script>
 </body>
 </html>
