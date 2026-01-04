@@ -52,8 +52,8 @@ function timingSafeCompare(a, b) {
 function adminAuth(req, res, next) {
   // SECURITY: Only accept API key from header, never from query params
   // Query params are logged in server logs, browser history, and referrer headers
-  const apiKey = req.headers['x-admin-key'];
-  const expectedKey = process.env.ADMIN_API_KEY;
+  const apiKey = req.headers['x-admin-key'] || '';
+  const expectedKey = process.env.ADMIN_API_KEY || '';
 
   // Warn if someone tries to use query param (legacy/attack detection)
   if (req.query.key) {
@@ -63,7 +63,12 @@ function adminAuth(req, res, next) {
     });
   }
 
-  if (!expectedKey) {
+  // SECURITY: Always perform timing-safe comparison to prevent timing oracle
+  // Even if expectedKey is empty, we compare to prevent detection of config state
+  const isValidKey = timingSafeCompare(apiKey, expectedKey);
+  const isConfigured = expectedKey.length > 0;
+
+  if (!isConfigured) {
     logger.warn('ADMIN', 'Admin endpoint accessed but ADMIN_API_KEY not configured');
     return res.status(503).json({
       error: 'Admin API not configured',
@@ -72,7 +77,7 @@ function adminAuth(req, res, next) {
   }
 
   // SECURITY: Use timing-safe comparison to prevent timing attacks
-  if (!timingSafeCompare(apiKey, expectedKey)) {
+  if (!isValidKey) {
     logger.warn('ADMIN', 'Unauthorized admin access attempt', {
       ip: req.ip,
       path: req.path,

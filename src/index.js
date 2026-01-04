@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 const config = require('./utils/config');
 const logger = require('./utils/logger');
@@ -25,6 +26,21 @@ const adminRouter = require('./routes/admin');
 const holdexRouter = require('./routes/holdex');
 
 const app = express();
+
+// =============================================================================
+// SECURITY: Timing-safe string comparison to prevent timing attacks
+// =============================================================================
+function timingSafeCompare(a, b) {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Compare against self to maintain constant time
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 // Trust proxy for rate limiting behind reverse proxy
 app.set('trust proxy', 1);
@@ -62,8 +78,8 @@ app.get('/metrics', (req, res) => {
   }
 
   // SECURITY: Only accept API key from header, never from query params
-  const apiKey = req.headers['x-metrics-key'];
-  const expectedKey = process.env.METRICS_API_KEY;
+  const apiKey = req.headers['x-metrics-key'] || '';
+  const expectedKey = process.env.METRICS_API_KEY || '';
 
   // Warn if someone tries to use query param (legacy/attack detection)
   if (req.query.key) {
@@ -72,14 +88,18 @@ app.get('/metrics', (req, res) => {
     });
   }
 
+  // SECURITY: Always perform timing-safe comparison first (prevent timing oracle)
+  const isValidKey = timingSafeCompare(apiKey, expectedKey);
+  const isConfigured = expectedKey.length > 0;
+
   // Production: require METRICS_API_KEY
-  if (config.IS_PROD && !expectedKey) {
+  if (config.IS_PROD && !isConfigured) {
     logger.error('METRICS', 'METRICS_API_KEY not configured in production');
     return res.status(503).json({ error: 'Metrics not configured' });
   }
 
   // Validate API key if configured
-  if (expectedKey && apiKey !== expectedKey) {
+  if (isConfigured && !isValidKey) {
     logger.warn('METRICS', 'Unauthorized metrics access attempt', { ip: req.ip });
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -91,16 +111,20 @@ app.get('/metrics', (req, res) => {
 // Alerts endpoint (requires same auth as metrics - operational data)
 app.get('/alerts', (req, res) => {
   // SECURITY: Only accept API key from header
-  const apiKey = req.headers['x-metrics-key'];
-  const expectedKey = process.env.METRICS_API_KEY;
+  const apiKey = req.headers['x-metrics-key'] || '';
+  const expectedKey = process.env.METRICS_API_KEY || '';
+
+  // SECURITY: Always perform timing-safe comparison first (prevent timing oracle)
+  const isValidKey = timingSafeCompare(apiKey, expectedKey);
+  const isConfigured = expectedKey.length > 0;
 
   // Production: require METRICS_API_KEY
-  if (config.IS_PROD && !expectedKey) {
+  if (config.IS_PROD && !isConfigured) {
     return res.status(503).json({ error: 'Alerts not configured' });
   }
 
   // Validate API key if configured
-  if (expectedKey && apiKey !== expectedKey) {
+  if (isConfigured && !isValidKey) {
     logger.warn('ALERTS', 'Unauthorized alerts access attempt', { ip: req.ip });
     return res.status(401).json({ error: 'Unauthorized' });
   }
