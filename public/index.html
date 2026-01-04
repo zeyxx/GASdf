@@ -2296,7 +2296,7 @@
     // CONSTANTS
     // ═══════════════════════════════════════════════════════════
     const PHI = 1.618033988749;
-    const HOLDEX_API = 'https://holdex-api.onrender.com/api';
+    const HOLDEX_API = '/v1/holdex'; // Proxy with API key
     const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
     const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
     const FEE_PAYER = '9F5NUrZYjP5MRmqLBc8vd3rsmXiYQdqAMNF7VdKqM68w';
@@ -2453,9 +2453,7 @@
     // ═══════════════════════════════════════════════════════════
     async function fetchAsdfBurnData() {
       try {
-        const headers = {};
-        if (walletPublicKey) headers['x-wallet'] = walletPublicKey;
-        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`, { headers });
+        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
         const data = await res.json();
 
         if (data.success && data.token) {
@@ -2502,9 +2500,7 @@
     // ═══════════════════════════════════════════════════════════
     async function fetchHoldexTokens() {
       try {
-        const headers = {};
-        if (walletPublicKey) headers['x-wallet'] = walletPublicKey;
-        const res = await fetch(`${HOLDEX_API}/tokens?limit=100`, { headers });
+        const res = await fetch(`${HOLDEX_API}/tokens?limit=100`);
         const data = await res.json();
 
         if (!data.success || !data.tokens) return;
