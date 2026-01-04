@@ -11,11 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **3D Landing Page**: Immersive space experience with Three.js
   - Stars with Harvard spectral classification (12,000 stars)
-  - Milky Way particle cloud (6,000 particles)
+  - Milky Way particle cloud (10,000 particles, 2.5x brightness)
   - Volumetric nebulae with FBM noise shaders
-  - Cosmic dust with drift and parallax
+  - 4D chaos comets (Lorenz attractor + 4D rotation)
+  - Strategic psychological placement with golden ratio (φ)
   - Post-processing bloom effects
   - CSS singularity (black hole) fixed in background
+
+- **HolDex Harmony Integration**: E-Score engagement-based discounts
+  - `src/services/harmony.js`: 7-dimension E-Score calculation using φ
+  - Combined discount system (higher of holder tier vs E-Score)
+  - HMAC-SHA256 signed burn notifications to HolDex
+  - Dimensions: Holding, Burning, API Usage, App Dev, Node Ops, Referrals, Duration
+  - E-Score curve: `discount = min(95%, 1 - φ^(-E/25))`
 
 - **Enhanced Alerting**: Rich alert messages with detailed context
   - Balance thresholds now include wallet addresses
@@ -26,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **HolDex Integration**: Now using `holdex-api.onrender.com` (beta)
 - **Token Symbol**: Consistently use `$asdfasdfa` across all documentation
+- **Discount System**: Uses higher of holder tier or E-Score discount
 - SDK version bumped to 1.8.0
 
 ### Fixed

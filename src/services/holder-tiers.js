@@ -1,19 +1,22 @@
 /**
- * $ASDF Holder Tier System - Supply-Based Discount
+ * $ASDF Holder Tier System - Supply-Based Discount + E-Score
  *
- * Discount is based on % of circulating supply, not absolute tokens.
- * As $ASDF burns (deflationary), everyone's discount naturally increases.
+ * Two discount sources (uses the higher):
+ * 1. Holder Tier: Based on % of circulating supply
+ * 2. E-Score: Based on 7 engagement dimensions (from HolDex Harmony API)
  *
- * Formula: discount = min(95%, max(0, (log₁₀(share) + 5) / 3))
- * Where: share = holding / circulating_supply
+ * Holder Formula: discount = min(95%, max(0, (log₁₀(share) + 5) / 3))
+ * E-Score Formula: discount = min(95%, 1 - φ^(-E/25))
  *
  * This creates a virtuous flywheel:
  * Hold → Burns happen → Your share grows → Better discount → More hold
+ * Engage → E-Score grows → Better discount → More engagement
  */
 const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
 const { getConnection } = require('../utils/rpc');
 const logger = require('../utils/logger');
+const harmony = require('./harmony');
 
 // Treasury ratio from config (Pure Golden: 1/φ³ ≈ 23.6%)
 // Used for break-even calculation to ensure consistency across codebase
@@ -248,7 +251,11 @@ function getNextTierInfo(currentTierName, currentSharePercent, circulating) {
 }
 
 /**
- * Calculate fee with holder discount based on supply share
+ * Calculate fee with combined discount (holder tier + E-Score)
+ *
+ * Uses the HIGHER of:
+ * 1. Holder Tier discount (based on % of supply held)
+ * 2. E-Score discount (based on 7 engagement dimensions)
  *
  * @param {string} walletAddress - User's wallet public key
  * @param {number} baseFee - Original fee in lamports
@@ -256,14 +263,37 @@ function getNextTierInfo(currentTierName, currentSharePercent, circulating) {
  * @returns {Promise<Object>} - Complete fee info
  */
 async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
-  const tierInfo = await getHolderTier(walletAddress);
+  // Fetch holder tier and E-Score in parallel
+  const [tierInfo, eScoreData] = await Promise.all([
+    getHolderTier(walletAddress),
+    harmony.getEScore(walletAddress).catch((err) => {
+      logger.debug('[HOLDER-TIERS] E-Score fetch failed, using 0', { error: err.message });
+      return { eScore: 0, discount: 0 };
+    }),
+  ]);
+
+  // Use the HIGHER discount (holder tier vs E-Score)
+  const holderDiscount = tierInfo.discount;
+  const eScoreDiscount = eScoreData.discount || 0;
+  const effectiveDiscount = Math.max(holderDiscount, eScoreDiscount);
+  const discountSource = eScoreDiscount > holderDiscount ? 'escore' : 'holder';
+
   const breakEvenFee = calculateBreakEvenFee(txCost);
-  const discountedFee = applyDiscount(baseFee, tierInfo.discount, txCost);
+  const discountedFee = applyDiscount(baseFee, effectiveDiscount, txCost);
   const savings = baseFee - discountedFee;
   const actualDiscountPercent = baseFee > 0 ? Math.round((1 - discountedFee / baseFee) * 100) : 0;
 
   // Get next tier info for upgrade motivation
   const nextTier = getNextTierInfo(tierInfo.tier, tierInfo.sharePercent, tierInfo.circulating);
+
+  logger.debug('[HOLDER-TIERS] Combined discount calculated', {
+    wallet: walletAddress.slice(0, 8),
+    holderDiscount: (holderDiscount * 100).toFixed(1) + '%',
+    eScore: eScoreData.eScore,
+    eScoreDiscount: (eScoreDiscount * 100).toFixed(1) + '%',
+    effectiveDiscount: (effectiveDiscount * 100).toFixed(1) + '%',
+    source: discountSource,
+  });
 
   return {
     // Fee info
@@ -287,6 +317,11 @@ async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
     balance: tierInfo.balance,
     circulating: tierInfo.circulating,
     sharePercent: tierInfo.sharePercent,
+
+    // E-Score info
+    eScore: eScoreData.eScore || 0,
+    eScoreDiscount: eScoreDiscount,
+    discountSource,
   };
 }
 

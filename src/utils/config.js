@@ -149,6 +149,8 @@ const config = {
   // HolDex - Community verification service ($ASDF ecosystem)
   HOLDEX_URL: process.env.HOLDEX_URL || 'https://holdex-api.onrender.com/api',
   HOLDEX_API_KEY: process.env.HOLDEX_API_KEY,
+  HOLDEX_WEBHOOK_SECRET: process.env.HOLDEX_WEBHOOK_SECRET, // HMAC-SHA256 for burn notifications
+  HOLDEX_TIMEOUT: parseInt(process.env.HOLDEX_TIMEOUT) || 10000, // API timeout in ms
 
   // Minimum K-score for token acceptance (0-100)
   // K-score = (accumulators + maintained) / total_holders

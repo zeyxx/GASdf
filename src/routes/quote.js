@@ -270,6 +270,16 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         breakEvenFee: tierInfo.breakEvenFee,
         isAtBreakEven: tierInfo.isAtBreakEven,
       },
+      // E-Score from HolDex Harmony API (engagement-based discount)
+      eScore: tierInfo.eScore
+        ? {
+            score: tierInfo.eScore,
+            discount: Math.round((tierInfo.eScoreDiscount || 0) * 100),
+            isActive: tierInfo.discountSource === 'escore',
+          }
+        : null,
+      // Which discount source is active (holder tier vs E-Score)
+      discountSource: tierInfo.discountSource || 'holder',
       expiresAt,
       ttl,
     });

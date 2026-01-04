@@ -14,6 +14,7 @@ const { pool: feePayerPool } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
 const holdex = require('./holdex');
+const harmony = require('./harmony');
 const jito = require('./jito');
 const {
   calculateTreasurySplit,
@@ -547,6 +548,21 @@ async function executeBurnWithLock(tokenBalances) {
           method: 'batch',
           treasuryAmount: results.totalAsdfRetained || 0,
         });
+
+        // Notify HolDex of burn event (HMAC-signed webhook)
+        // This updates E-Score "burning" dimension for all burners in batch
+        const treasury = getTreasuryAddress();
+        harmony
+          .notifyBurn({
+            signature: batchResult.signature,
+            mint: config.ASDF_MINT,
+            amount: totalAsdfBurned,
+            burner: treasury?.toBase58() || 'treasury',
+            timestamp: Date.now(),
+          })
+          .catch((err) => {
+            logger.warn('BURN', 'HolDex burn notification failed', { error: err.message });
+          });
       }
     } catch (error) {
       logger.error('BURN', 'Batch burn failed, falling back to individual burns', {
