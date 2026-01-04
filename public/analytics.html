@@ -1201,7 +1201,7 @@
 
       try {
         // Fetch real burn data from API
-        const response = await fetch(`${CONFIG.apiBase}/v1/stats/burns?limit=30`);
+        const response = await fetch(`${API_BASE}/v1/stats/burns?limit=30`);
         const data = await response.json();
         const burns = data.burns || [];
 
@@ -1248,7 +1248,7 @@
 
       try {
         // Fetch real burn transactions from API
-        const response = await fetch(`${CONFIG.apiBase}/v1/stats/burns?limit=5`);
+        const response = await fetch(`${API_BASE}/v1/stats/burns?limit=5`);
         const data = await response.json();
         const burns = data.burns || [];
 
