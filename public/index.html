@@ -1217,76 +1217,123 @@
       }
 
       // ========================================================================
-      // STRATEGIC COMETS - Psychologically placed to guide attention
-      // Comets appear at key moments and guide eye toward CTAs
+      // GOLDEN RATIO COMETS - Mathematically perfect psychological harmony
+      // Based on φ (1.618...), Fibonacci, Z-pattern reading, Rule of Thirds
       // ========================================================================
       createComets() {
         this.cometPool = [];
+
+        // Golden ratio constants
         const PHI = 1.618033988749;
+        const PHI_INV = 1 / PHI;           // 0.618...
+        const PHI_SQ = PHI * PHI;          // 2.618...
+        const PHI_INV_SQ = 1 / PHI_SQ;     // 0.382...
+
+        // Rule of thirds intersections (golden ratio approximation)
+        const THIRD = 1/3;
+        const TWO_THIRD = 2/3;
+
+        // Fibonacci timing sequence (seconds)
+        const FIB = [1, 1, 2, 3, 5, 8, 13];
 
         this.cometConfig = {
-          tailSegments: 70,
+          tailSegments: 65,
           lorenz: { sigma: 10, rho: 28, beta: 8/3 },
         };
 
-        // Strategic comet definitions - each guides toward key UI element
-        // Positions relative to viewport: x(-1 to 1), y(-1 to 1)
+        // Mathematically balanced paths using golden ratio
+        // Alternates: RIGHT → LEFT → RIGHT → LEFT (visual balance)
+        // Uses rule of thirds for start/end points
+        // Mobile: paths adapt to portrait orientation
         this.strategicPaths = [
-          // 1. Hero → CTA: sweeps from upper-right toward center CTA button
+          // 1. HERO: Z-pattern start (top-right → center)
+          // Fibonacci timing: spawns at 0, respawn 8s
           {
-            trigger: 0,      // scrollProgress when to spawn
-            startX: 0.8, startY: 0.6,
-            targetX: 0.0, targetY: -0.1,  // Toward hero CTA
-            depth: -380, scale: 10, speed: 1.2,
-            respawnDelay: 8000
+            trigger: 0,
+            startX: PHI_INV,           // 0.618 (golden point right)
+            startY: PHI_INV,           // 0.618 (golden point top)
+            targetX: 0,                // Center
+            targetY: -PHI_INV_SQ,      // -0.382 (below center, toward CTA)
+            depth: -350,
+            speed: PHI_INV,            // 0.618
+            respawnDelay: FIB[5] * 1000  // 8s
           },
-          // 2. Left accent: subtle movement drawing eye to content
+          // 2. CONTENT: Balance from left (creates symmetry)
           {
-            trigger: 0.05,
-            startX: -0.9, startY: 0.3,
-            targetX: -0.3, targetY: -0.2,
-            depth: -500, scale: 7, speed: 0.8,
-            respawnDelay: 12000
+            trigger: PHI_INV_SQ * 0.3, // ~0.11
+            startX: -PHI_INV,          // -0.618 (golden point left)
+            startY: THIRD,             // 0.33 (rule of thirds)
+            targetX: -PHI_INV_SQ,      // -0.382
+            targetY: -THIRD,           // -0.33
+            depth: -480,
+            speed: PHI_INV_SQ,         // 0.382 (slower, subtle)
+            respawnDelay: FIB[6] * 1000  // 13s
           },
-          // 3. How section: guides down toward steps
+          // 3. HOW SECTION: Right sweep (matches reading direction)
           {
-            trigger: 0.15,
-            startX: 0.7, startY: 0.5,
-            targetX: 0.1, targetY: -0.4,
-            depth: -420, scale: 9, speed: 1.0,
-            respawnDelay: 10000
+            trigger: PHI_INV_SQ,       // 0.382
+            startX: TWO_THIRD,         // 0.67 (rule of thirds)
+            startY: PHI_INV_SQ,        // 0.382
+            targetX: THIRD,            // 0.33
+            targetY: -PHI_INV,         // -0.618
+            depth: -400,
+            speed: PHI_INV * 1.1,
+            respawnDelay: FIB[4] * 2000  // 10s
           },
-          // 4. Flywheel accent: circular suggestion
+          // 4. FLYWHEEL: Left diagonal (visual rhythm)
           {
-            trigger: 0.3,
-            startX: -0.6, startY: 0.4,
-            targetX: 0.4, targetY: -0.3,
-            depth: -350, scale: 8, speed: 1.1,
-            respawnDelay: 9000
+            trigger: PHI_INV,          // 0.618
+            startX: -TWO_THIRD,        // -0.67
+            startY: PHI_INV_SQ,        // 0.382
+            targetX: THIRD,            // 0.33 (crosses to right)
+            targetY: -PHI_INV_SQ,      // -0.382
+            depth: -360,
+            speed: PHI_INV,
+            respawnDelay: FIB[5] * 1200  // ~10s
           },
-          // 5. Tiers section: sweeps across tier cards
+          // 5. TIERS: Horizontal golden sweep (showcases all tiers)
           {
-            trigger: 0.5,
-            startX: 0.9, startY: 0.2,
-            targetX: -0.5, targetY: -0.1,
-            depth: -400, scale: 11, speed: 0.9,
-            respawnDelay: 11000
+            trigger: 1 - PHI_INV,      // 0.382
+            startX: PHI_INV + 0.1,     // 0.72 (past golden point)
+            startY: 0,                 // Center height
+            targetX: -PHI_INV,         // -0.618 (full sweep)
+            targetY: -THIRD * 0.5,     // Slight downward
+            depth: -380,
+            speed: PHI_INV_SQ * 1.5,   // Slower for visibility
+            respawnDelay: FIB[5] * 1400  // ~11s
           },
-          // 6. Phi section: golden spiral suggestion
+          // 6. PHI: Golden spiral path (embodies the mathematics)
           {
-            trigger: 0.65,
-            startX: -0.7, startY: 0.5,
-            targetX: 0.3, targetY: -0.5,
-            depth: -450, scale: 12, speed: 0.7,
-            respawnDelay: 14000
+            trigger: PHI_INV + PHI_INV_SQ * 0.5, // ~0.81
+            startX: -PHI_INV_SQ,       // -0.382
+            startY: PHI_INV,           // 0.618
+            targetX: PHI_INV_SQ,       // 0.382 (spiral across)
+            targetY: -PHI_INV,         // -0.618
+            depth: -420,
+            speed: PHI_INV_SQ,         // Slow, contemplative
+            respawnDelay: FIB[6] * 1000  // 13s
           },
-          // 7. Final CTA: dramatic sweep toward action
+          // 7. FINAL CTA: Convergent sweep (all energy to action)
           {
-            trigger: 0.8,
-            startX: 0.8, startY: 0.7,
-            targetX: 0.0, targetY: 0.0,  // Center CTA
-            depth: -320, scale: 14, speed: 1.3,
-            respawnDelay: 7000
+            trigger: 1 - PHI_INV_SQ,   // 0.618 (golden trigger)
+            startX: PHI_INV,           // 0.618
+            startY: PHI_INV,           // 0.618 (golden corner)
+            targetX: 0,                // Dead center
+            targetY: 0,                // Dead center (CTA)
+            depth: -300,
+            speed: PHI_INV * 1.3,      // Faster, urgent
+            respawnDelay: FIB[4] * 1200  // ~6s
+          },
+          // 8. AMBIENT: Very distant, slow background motion
+          {
+            trigger: THIRD,
+            startX: -1,                // Far left edge
+            startY: PHI_INV_SQ,        // 0.382
+            targetX: 1,                // Far right (long journey)
+            targetY: -PHI_INV_SQ,
+            depth: -600,               // Very far back
+            speed: PHI_INV_SQ * 0.4,   // Very slow
+            respawnDelay: FIB[6] * 1500  // ~20s
           }
         ];
 
@@ -1297,7 +1344,6 @@
           this.scene.add(comet.mesh);
         });
 
-        // Track spawned state
         this.spawnedComets = new Set();
       }
 
@@ -1395,15 +1441,26 @@
           z: 1 + Math.sin(seed * PHI * PHI) * 0.3
         };
 
-        // Convert viewport coords to world coords
+        // Responsive scaling based on device orientation
         const aspect = window.innerWidth / window.innerHeight;
+        const isMobile = window.innerWidth < 768;
+        const isPortrait = aspect < 1;
+
+        // Scale factors: desktop landscape vs mobile portrait
+        // Mobile: compress X, expand Y for vertical screen
+        const scaleX = isPortrait ? 100 : 180 * Math.min(aspect, 1.8);
+        const scaleY = isPortrait ? 150 : 120;
+
+        // Mobile adjustment: pull paths more toward center
+        const mobileCenter = isMobile ? 0.3 : 0;
+
         comet.startWorld = {
-          x: path.startX * 180 * aspect,
-          y: path.startY * 120
+          x: (path.startX * (1 - mobileCenter)) * scaleX,
+          y: path.startY * scaleY
         };
         comet.targetWorld = {
-          x: path.targetX * 180 * aspect,
-          y: path.targetY * 120
+          x: (path.targetX * (1 - mobileCenter * 0.5)) * scaleX,
+          y: path.targetY * scaleY
         };
 
         comet.progress = 0;
