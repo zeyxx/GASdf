@@ -908,11 +908,18 @@
         this.targetScrollY = 0;
         this.scrollProgress = 0;
 
+        // Mouse parallax - wider movement
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.targetMouseX = 0;
+        this.targetMouseY = 0;
+
         this.init();
         this.createStars();
         this.createMilkyWay();
         this.createNebulae();
         this.createCosmicDust();
+        this.createComets();
         this.setupPostProcessing();
         this.animate();
         this.setupEventListeners();
@@ -1020,9 +1027,9 @@
         this.scene.add(this.stars);
       }
 
-      // Milky Way particle cloud
+      // Milky Way particle cloud - INTENSIFIED
       createMilkyWay() {
-        const particleCount = 6000;
+        const particleCount = 10000; // More particles
         const positions = new Float32Array(particleCount * 3);
         const colors = new Float32Array(particleCount * 3);
         const sizes = new Float32Array(particleCount);
@@ -1030,23 +1037,25 @@
 
         for (let i = 0; i < particleCount; i++) {
           const i3 = i * 3;
-          const x = (Math.random() - 0.5) * 2500;
-          const ySpread = 60 + Math.random() * 100;
+          const x = (Math.random() - 0.5) * 3000; // Wider spread
+          const ySpread = 80 + Math.random() * 120;
           const y = (Math.random() - 0.5) * ySpread * (0.3 + Math.random() * 0.7);
-          const z = -500 - Math.random() * 700;
+          const z = -400 - Math.random() * 800;
 
           positions[i3] = x;
           positions[i3 + 1] = y;
           positions[i3 + 2] = z;
 
-          const warmth = 0.85 + Math.random() * 0.15;
+          // Warmer, more vivid colors
+          const warmth = 0.88 + Math.random() * 0.12;
           colors[i3] = warmth;
-          colors[i3 + 1] = warmth * 0.92;
-          colors[i3 + 2] = warmth * 0.78;
+          colors[i3 + 1] = warmth * 0.93;
+          colors[i3 + 2] = warmth * 0.75;
 
-          sizes[i] = 1 + Math.random() * 2.5;
-          const distFromCenter = Math.abs(y) / 80;
-          alphas[i] = (1 - distFromCenter) * (0.015 + Math.random() * 0.025);
+          sizes[i] = 1.5 + Math.random() * 3.0; // Larger particles
+          const distFromCenter = Math.abs(y) / 100;
+          // Intensified alpha: 2.5x brighter
+          alphas[i] = (1 - distFromCenter) * (0.035 + Math.random() * 0.045);
         }
 
         const geometry = new THREE.BufferGeometry();
@@ -1145,6 +1154,7 @@
           const nebula = new THREE.Mesh(geometry, material);
           nebula.scale.set(cfg.size, cfg.size, 1);
           nebula.position.set(cfg.x, cfg.y, cfg.z);
+          nebula.userData.baseX = cfg.x;
           nebula.userData.baseY = cfg.y;
           nebula.userData.baseZ = cfg.z;
           this.nebulae.push(nebula);
@@ -1206,6 +1216,252 @@
         this.scene.add(this.cosmicDust);
       }
 
+      // Comets with trails - cinematic movement
+      createComets() {
+        this.comets = [];
+        this.cometPool = [];
+
+        // Comet configuration for pleasant cinematics
+        this.cometConfig = {
+          maxComets: 6,
+          spawnInterval: 3500,      // ms between spawns
+          minSpeed: 0.8,
+          maxSpeed: 2.2,
+          tailLength: 45,
+          tailSegments: 35,
+          minSize: 1.2,
+          maxSize: 2.8
+        };
+
+        // Create comet geometry (reusable)
+        for (let i = 0; i < this.cometConfig.maxComets; i++) {
+          const comet = this.createSingleComet();
+          comet.visible = false;
+          this.cometPool.push(comet);
+          this.scene.add(comet.group);
+        }
+
+        // Spawn first comet immediately
+        setTimeout(() => this.spawnComet(), 1000);
+
+        // Periodic spawning
+        setInterval(() => this.spawnComet(), this.cometConfig.spawnInterval);
+      }
+
+      createSingleComet() {
+        const cfg = this.cometConfig;
+        const group = new THREE.Group();
+
+        // Comet head (bright core)
+        const headGeometry = new THREE.SphereGeometry(1, 16, 16);
+        const headMaterial = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.95
+        });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        group.add(head);
+
+        // Comet glow
+        const glowGeometry = new THREE.SphereGeometry(2.5, 16, 16);
+        const glowMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            glowColor: { value: new THREE.Color(0x88ccff) },
+            intensity: { value: 0.6 }
+          },
+          vertexShader: `
+            varying vec3 vNormal;
+            void main() {
+              vNormal = normalize(normalMatrix * normal);
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 glowColor;
+            uniform float intensity;
+            varying vec3 vNormal;
+            void main() {
+              float glow = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+              gl_FragColor = vec4(glowColor, glow * intensity);
+            }
+          `,
+          transparent: true,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        group.add(glow);
+
+        // Comet tail (particle trail)
+        const tailPositions = new Float32Array(cfg.tailSegments * 3);
+        const tailColors = new Float32Array(cfg.tailSegments * 3);
+        const tailSizes = new Float32Array(cfg.tailSegments);
+        const tailAlphas = new Float32Array(cfg.tailSegments);
+
+        for (let j = 0; j < cfg.tailSegments; j++) {
+          tailSizes[j] = cfg.maxSize * (1 - j / cfg.tailSegments) * 0.8;
+          tailAlphas[j] = (1 - j / cfg.tailSegments) * 0.7;
+
+          // Blue-white gradient
+          const t = j / cfg.tailSegments;
+          tailColors[j * 3] = 0.7 + 0.3 * (1 - t);     // R
+          tailColors[j * 3 + 1] = 0.85 + 0.15 * (1 - t); // G
+          tailColors[j * 3 + 2] = 1.0;                  // B
+        }
+
+        const tailGeometry = new THREE.BufferGeometry();
+        tailGeometry.setAttribute('position', new THREE.BufferAttribute(tailPositions, 3));
+        tailGeometry.setAttribute('color', new THREE.BufferAttribute(tailColors, 3));
+        tailGeometry.setAttribute('size', new THREE.BufferAttribute(tailSizes, 1));
+        tailGeometry.setAttribute('alpha', new THREE.BufferAttribute(tailAlphas, 1));
+
+        const tailMaterial = new THREE.ShaderMaterial({
+          uniforms: {},
+          vertexShader: `
+            attribute float size;
+            attribute float alpha;
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              vColor = color;
+              vAlpha = alpha;
+              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+              gl_PointSize = size * (200.0 / -mvPosition.z);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              vec2 center = gl_PointCoord - 0.5;
+              float dist = length(center);
+              float alpha = smoothstep(0.5, 0.0, dist) * vAlpha;
+              gl_FragColor = vec4(vColor, alpha);
+            }
+          `,
+          transparent: true,
+          vertexColors: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        const tail = new THREE.Points(tailGeometry, tailMaterial);
+        group.add(tail);
+
+        return {
+          group,
+          head,
+          glow,
+          tail,
+          tailGeometry,
+          visible: false,
+          position: new THREE.Vector3(),
+          velocity: new THREE.Vector3(),
+          trail: [],
+          life: 0,
+          maxLife: 0
+        };
+      }
+
+      spawnComet() {
+        // Find inactive comet
+        const comet = this.cometPool.find(c => !c.visible);
+        if (!comet) return;
+
+        const cfg = this.cometConfig;
+
+        // Random spawn from edges (mostly from right/top)
+        const side = Math.random();
+        const speed = cfg.minSpeed + Math.random() * (cfg.maxSpeed - cfg.minSpeed);
+        const size = cfg.minSize + Math.random() * (cfg.maxSize - cfg.minSize);
+
+        if (side < 0.6) {
+          // From right
+          comet.position.set(
+            200 + Math.random() * 100,
+            (Math.random() - 0.3) * 200,
+            -150 - Math.random() * 300
+          );
+          comet.velocity.set(
+            -speed * (0.7 + Math.random() * 0.4),
+            -speed * (0.2 + Math.random() * 0.3),
+            -speed * (0.1 + Math.random() * 0.2)
+          );
+        } else if (side < 0.85) {
+          // From top-right
+          comet.position.set(
+            100 + Math.random() * 150,
+            150 + Math.random() * 100,
+            -100 - Math.random() * 250
+          );
+          comet.velocity.set(
+            -speed * (0.5 + Math.random() * 0.4),
+            -speed * (0.5 + Math.random() * 0.4),
+            -speed * (0.15 + Math.random() * 0.15)
+          );
+        } else {
+          // From left (rare)
+          comet.position.set(
+            -200 - Math.random() * 100,
+            (Math.random() - 0.2) * 150,
+            -200 - Math.random() * 200
+          );
+          comet.velocity.set(
+            speed * (0.6 + Math.random() * 0.4),
+            -speed * (0.3 + Math.random() * 0.2),
+            -speed * (0.1 + Math.random() * 0.15)
+          );
+        }
+
+        comet.head.scale.setScalar(size);
+        comet.glow.scale.setScalar(size);
+        comet.trail = [];
+        comet.life = 0;
+        comet.maxLife = 400 + Math.random() * 200;
+        comet.visible = true;
+        comet.group.visible = true;
+      }
+
+      updateComets() {
+        const cfg = this.cometConfig;
+
+        this.cometPool.forEach(comet => {
+          if (!comet.visible) return;
+
+          // Update position
+          comet.position.add(comet.velocity);
+          comet.group.position.copy(comet.position);
+
+          // Store trail positions
+          comet.trail.unshift(comet.position.clone());
+          if (comet.trail.length > cfg.tailSegments) {
+            comet.trail.pop();
+          }
+
+          // Update tail geometry
+          const positions = comet.tailGeometry.attributes.position.array;
+          for (let i = 0; i < cfg.tailSegments; i++) {
+            if (i < comet.trail.length) {
+              positions[i * 3] = comet.trail[i].x - comet.position.x;
+              positions[i * 3 + 1] = comet.trail[i].y - comet.position.y;
+              positions[i * 3 + 2] = comet.trail[i].z - comet.position.z;
+            }
+          }
+          comet.tailGeometry.attributes.position.needsUpdate = true;
+
+          // Life cycle
+          comet.life++;
+          if (comet.life > comet.maxLife ||
+              comet.position.x < -350 || comet.position.x > 350 ||
+              comet.position.y < -250) {
+            comet.visible = false;
+            comet.group.visible = false;
+          }
+        });
+      }
+
       setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -1222,49 +1478,88 @@
         const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
         this.scrollProgress = this.scrollY / maxScroll;
 
+        // Smooth mouse interpolation (wider parallax)
+        this.mouseX += (this.targetMouseX - this.mouseX) * 0.04;
+        this.mouseY += (this.targetMouseY - this.mouseY) * 0.04;
+
         // Camera moves through space based on scroll
         const cameraZ = 5 - this.scrollProgress * 300;
         const cameraY = -this.scrollProgress * 150;
-        this.camera.position.z = cameraZ;
-        this.camera.position.y = cameraY;
 
-        // Stars follow but lag (distant)
+        // WIDER mouse parallax - horizontal shift up to ±60 units
+        const mouseParallaxX = this.mouseX * 60;
+        const mouseParallaxY = this.mouseY * 25;
+
+        this.camera.position.z = cameraZ;
+        this.camera.position.y = cameraY + mouseParallaxY;
+        this.camera.position.x = mouseParallaxX;
+
+        // Stars follow but lag (distant) - WIDER horizontal parallax
         if (this.stars) {
           this.stars.material.uniforms.time.value = this.time;
-          this.stars.position.y = cameraY * 0.4;
+          this.stars.position.x = mouseParallaxX * 0.15;
+          this.stars.position.y = cameraY * 0.4 + mouseParallaxY * 0.1;
           this.stars.position.z = cameraZ * 0.3;
           this.stars.rotation.y = this.time * 0.001;
         }
 
-        // Milky Way (very distant)
+        // Milky Way (very distant) - subtle parallax
         if (this.milkyWay) {
           this.milkyWay.material.uniforms.time.value = this.time;
-          this.milkyWay.position.y = cameraY * 0.15;
+          this.milkyWay.position.x = mouseParallaxX * 0.08;
+          this.milkyWay.position.y = cameraY * 0.15 + mouseParallaxY * 0.05;
           this.milkyWay.position.z = cameraZ * 0.1;
         }
 
-        // Nebulae at different depths
+        // Nebulae at different depths - variable parallax
         this.nebulae.forEach((nebula, i) => {
           nebula.material.uniforms.time.value = this.time;
           const depth = 0.2 + i * 0.12;
-          nebula.position.y = nebula.userData.baseY + cameraY * depth;
+          nebula.position.x = nebula.userData.baseX + mouseParallaxX * (0.1 + i * 0.08);
+          nebula.position.y = nebula.userData.baseY + cameraY * depth + mouseParallaxY * (0.08 + i * 0.04);
           nebula.position.z = nebula.userData.baseZ + cameraZ * depth * 0.4;
           nebula.lookAt(this.camera.position);
         });
 
-        // Cosmic dust (close, fast parallax)
+        // Cosmic dust (close, fast parallax) - STRONG horizontal parallax
         if (this.cosmicDust) {
           this.cosmicDust.material.uniforms.time.value = this.time;
           this.cosmicDust.material.uniforms.scrollOffset.value = this.scrollProgress * 400;
-          this.cosmicDust.position.y = cameraY * 0.85;
+          this.cosmicDust.position.x = mouseParallaxX * 0.6;
+          this.cosmicDust.position.y = cameraY * 0.85 + mouseParallaxY * 0.4;
           this.cosmicDust.position.z = cameraZ * 0.8;
         }
+
+        // Update comets
+        this.updateComets();
 
         this.composer.render();
       }
 
       setupEventListeners() {
         window.addEventListener('scroll', () => { this.targetScrollY = window.scrollY; }, { passive: true });
+
+        // Mouse tracking for wider parallax
+        window.addEventListener('mousemove', (e) => {
+          // Normalize to -1 to 1 range
+          this.targetMouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+          this.targetMouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+        }, { passive: true });
+
+        // Touch support for mobile
+        window.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) {
+            this.targetMouseX = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
+            this.targetMouseY = (e.touches[0].clientY / window.innerHeight - 0.5) * 2;
+          }
+        }, { passive: true });
+
+        // Reset on mouse leave
+        document.addEventListener('mouseleave', () => {
+          this.targetMouseX = 0;
+          this.targetMouseY = 0;
+        });
+
         window.addEventListener('resize', () => {
           const w = window.innerWidth, h = window.innerHeight;
           this.camera.aspect = w / h;
