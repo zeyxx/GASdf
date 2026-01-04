@@ -642,7 +642,7 @@ async function processTokenForBatch(token, pendingBurns) {
         mint: config.ASDF_MINT,
         amount: balance,
         type: 'asdf',
-        symbol: '$ASDF',
+        symbol: 'asdfasdfa',
       });
       asdfBurned = balance;
 
@@ -698,7 +698,7 @@ async function processTokenForBatch(token, pendingBurns) {
             mint: config.ASDF_MINT,
             amount: burnAmount,
             type: 'asdf',
-            symbol: '$ASDF',
+            symbol: 'asdfasdfa',
             sourceToken: mint,
           });
           asdfBurned = burnAmount;

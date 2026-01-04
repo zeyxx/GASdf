@@ -2871,13 +2871,18 @@
     }
 
     function updateFeeBreakdown(quote) {
-      const feeText = quote.feeFormatted || `${quote.feeAmount} ${selectedToken.symbol}`;
+      // feeAmount is RAW (with decimals), feeFormatted is display-ready
+      const decimals = quote.paymentToken?.decimals || selectedToken.decimals || 6;
+      const feeRaw = parseFloat(quote.feeAmount) || 0;
+      const feeDisplay = feeRaw / Math.pow(10, decimals);
+      const symbol = selectedToken.symbol;
+
+      const feeText = quote.feeFormatted || `${feeDisplay.toFixed(4)} ${symbol}`;
       document.getElementById('feeUser').textContent = feeText;
       document.getElementById('feeTotal').textContent = feeText;
 
-      // Calculate burn amount (76.4% of fee)
-      const feeNum = parseFloat(quote.feeAmount) || 0;
-      const burnAmount = (feeNum * 0.764).toFixed(4);
+      // Calculate burn amount (76.4% of fee) - use display amount
+      const burnAmount = (feeDisplay * 0.764).toFixed(4);
       document.getElementById('feeBurn').textContent = `~${burnAmount} $asdfasdfa`;
 
       // Update transaction preview
@@ -2886,9 +2891,9 @@
       // Show simulation badge (quote came back successfully)
       document.getElementById('simBadge').style.display = 'inline-flex';
 
-      // Update fee cap with the actual quote fee
-      const feeCap = feeNum * 1.5; // 50% buffer
-      document.getElementById('feeCapAmount').textContent = `${feeCap.toFixed(4)} ${selectedToken.symbol}`;
+      // Update fee cap with the actual quote fee (display amount + 50% buffer)
+      const feeCap = feeDisplay * 1.5;
+      document.getElementById('feeCapAmount').textContent = `${feeCap.toFixed(4)} ${symbol}`;
 
       // Show discount if applicable
       if (quote.holderDiscount && quote.holderDiscount > 0) {

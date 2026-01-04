@@ -360,10 +360,10 @@ describe('Token Gate Service', () => {
       expect(sol.tier).toBe('Diamond');
     });
 
-    it('should include $ASDF when configured', () => {
+    it('should include $asdfasdfa when configured', () => {
       const tokens = tokenGate.getDiamondTokensList();
 
-      const asdf = tokens.find((t) => t.symbol === 'ASDF');
+      const asdf = tokens.find((t) => t.symbol === 'asdfasdfa');
       expect(asdf).toBeDefined();
       expect(asdf.mint).toBe('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
       expect(asdf.tier).toBe('Diamond');

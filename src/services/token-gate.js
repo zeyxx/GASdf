@@ -179,8 +179,8 @@ function getDiamondTokensList() {
       ? [
           {
             mint: config.ASDF_MINT,
-            symbol: 'ASDF',
-            name: '$ASDF',
+            symbol: 'asdfasdfa',
+            name: 'asdfasdf',
             decimals: 6,
             tier: 'Diamond',
           },

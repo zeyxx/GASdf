@@ -283,7 +283,7 @@ function formatAsdf(amount) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${formatted} $ASDF`;
+  return `${formatted} $asdfasdfa`;
 }
 
 function formatSol(lamports) {
