@@ -2,9 +2,10 @@
 
 **Gasless transactions for Solana.** Pay network fees with any token instead of SOL.
 
-All fees are converted to **$ASDF** and burned. Pure golden ratio economics.
+All fees become **$asdfasdfa** and burn forever. Pure golden ratio economics (φ).
 
-[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](https://github.com/zeyxx/GASdf/releases)
+[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](https://github.com/zeyxx/GASdf/releases)
+[![Live](https://img.shields.io/badge/status-live-brightgreen)](https://gasdf-43r8.onrender.com)
 [![Tests](https://img.shields.io/badge/tests-741%20passing-brightgreen.svg)](#testing)
 [![Security](https://img.shields.io/badge/security-12%2F12%20layers-brightgreen.svg)](#security)
 
