@@ -1364,8 +1364,8 @@
     document.getElementById('silverDiscount').textContent = formatDiscount(TIER_THRESHOLDS.silver);
     document.getElementById('bronzeDiscount').textContent = formatDiscount(TIER_THRESHOLDS.bronze);
 
-    // Load HolDex data
-    const HOLDEX_API = 'https://alonisthe.dev/holdex/api';
+    // Load HolDex data (beta: holdex-api.onrender.com, prod: alonisthe.dev/holdex)
+    const HOLDEX_API = 'https://holdex-api.onrender.com/api';
     const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
     let lastHolDexUpdate = Date.now();
 
