@@ -133,27 +133,42 @@ public/
 ## Key Concepts
 
 ### Token Gating (K-Score)
-Tokens must be verified by [HolDex](https://holdex-api.onrender.com) before acceptance:
+Tokens must be verified by [HolDex](https://holdex-api.onrender.com) before acceptance.
+*Source: `src/services/holdex.js:104-113`*
 
 | Tier | K-Score | Fee Multiplier | Status |
 |------|---------|----------------|--------|
-| Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
-| Platinum | 80-89 | 1.0x | Accepted |
-| Gold | 70-79 | 1.0x | Accepted |
-| Silver | 60-69 | 1.1x | Accepted |
-| Bronze | 50-59 | 1.2x | Accepted |
-| Copper | < 50 | — | **Rejected** |
+| 💎 Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
+| 💠 Platinum | 80-89 | 1.0x | Accepted |
+| 🥇 Gold | 70-79 | 1.0x | Accepted |
+| 🥈 Silver | 60-69 | 1.1x | Accepted |
+| 🥉 Bronze | 50-59 | 1.2x | Accepted (minimum for gas) |
+| 🟤 Copper | 40-49 | — | **Rejected** |
+| ⚫ Iron | 20-39 | — | **Rejected** |
+| 🔩 Rust | 0-19 | — | **Rejected** |
 
 ### Holder Tiers (Discounts)
-$asdfasdfa holders get fee discounts based on share of total supply:
+$asdfasdfa holders get fee discounts based on share of total supply.
+*Source: `src/services/holder-tiers.js:146-153`*
 
-| Tier | Share of Supply | Discount | Formula |
-|------|-----------------|----------|---------|
-| Diamond | ≥ 1% | 95% | `min(95, (log₁₀(share)+5)/3)` |
-| Platinum | ≥ 0.1% | 67% | Logarithmic scaling |
-| Gold | ≥ 0.01% | 33% | Virtuous flywheel |
-| Silver | ≥ 0.001% | 0% | As burns grow, share grows |
-| Bronze | < 0.001% | 0% | Still welcome! |
+| Tier | Share of Supply | Discount |
+|------|-----------------|----------|
+| DIAMOND | ≥ 1% | 95% (cap) |
+| PLATINUM | ≥ 0.1% | 67% |
+| GOLD | ≥ 0.01% | 33% |
+| SILVER | ≥ 0.001% | 0% |
+| BRONZE | < 0.001% | 0% |
+
+Formula: `discount = min(95%, (log₁₀(share) + 5) / 3)`
+
+### E-Score (Harmony)
+Engagement-based discount with 7 φ-weighted dimensions:
+- Hold (φ⁶), Burn (φ⁵), Use (φ⁴), Build (φ³), Node (φ²), Refer (φ¹), Duration (φ⁰)
+
+Formula: `discount = min(95%, 1 - φ^(-E/25))`
+*Source: `src/services/harmony.js:66, 126-131`*
+
+**Combined**: `max(holderDiscount, eScoreDiscount)` — cap **95%**
 
 ### Burn Economics (Golden Ratio φ)
 ```
@@ -163,11 +178,16 @@ Treasury ratio:  1/φ³  = 23.6%
 Burn ratio:      1 - 1/φ³ = 76.4%
 Max eco bonus:   1/φ²  = 38.2%
 
-Fee collected from user
-         │
-         ├── 76.4% ──▶ Burned forever (deflationary)
-         │
-         └── 23.6% ──▶ Treasury (operations)
+DUAL BURN CHANNEL:
+─────────────────────────────────────────────
+Payment Token
+     │
+     ├── If $asdfasdfa ──▶ 100% BURN (zero treasury cut)
+     │
+     └── If other token ──▶ Jupiter Swap to $asdfasdfa
+                                    │
+                                    ├── 76.4% ──▶ BURN
+                                    └── 23.6% ──▶ Treasury
 ```
 
 ### Circuit Breakers

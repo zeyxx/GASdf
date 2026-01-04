@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-01-04
+
+### Changed
+
+- **Documentation Overhaul**: Complete audit and update of all documentation
+  - K-Score tiers now use correct naming (Diamond→Platinum→Gold→Silver→Bronze→Copper→Iron→Rust)
+  - Holder tiers updated to DIAMOND/PLATINUM/GOLD/SILVER/BRONZE
+  - Added E-Score (Harmony) section with 7 φ-weighted dimensions
+  - Added Dual Burn Channel explanation (100% burn for $asdfasdfa)
+  - All formulas now include source code references
+  - API documentation URLs updated to asdfasdfa.tech
+  - Combined discount formula: `max(holderDiscount, eScoreDiscount)` — cap 95%
+
+### Fixed
+
+- Documentation: Replaced deprecated TRUSTED/STANDARD/RISKY/UNKNOWN K-Score naming
+- Documentation: Fixed holder tier names (was WHALE/OG/BELIEVER)
+- Documentation: Consistent URLs across all docs
+
 ## [1.8.0] - 2026-01-04
 
 ### Added

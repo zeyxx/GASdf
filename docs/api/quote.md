@@ -5,7 +5,7 @@ Get a fee quote for a gasless transaction.
 ## Endpoint
 
 ```
-POST https://gasdf-43r8.onrender.com/v1/quote
+POST https://asdfasdfa.tech/v1/quote
 ```
 
 ## Request
@@ -52,7 +52,7 @@ POST https://gasdf-43r8.onrender.com/v1/quote
   "paymentSymbol": "USDC",
   "paymentDecimals": 6,
   "solEquivalent": 0.0001,
-  "kScore": "TRUSTED",
+  "kScore": "Diamond",
   "feeMultiplier": 1.0,
   "validUntil": 1703548800000
 }
@@ -115,21 +115,23 @@ baseFee = (computeUnits * PRIORITY_FEE_PER_CU + BASE_LAMPORTS) * (1 + priorityFe
 tokenFee = baseFee * solToTokenRate * kScoreMultiplier
 ```
 
-### K-Score Multipliers
+### K-Score Tiers (HolDex)
 
-| K-Score | Multiplier | Description |
-|---------|------------|-------------|
-| TRUSTED | 1.0x | Major tokens (USDC, SOL, USDT) |
-| STANDARD | 1.2x | Verified tokens |
-| RISKY | 1.5x | Lower liquidity tokens |
-| UNKNOWN | 2.0x | Unverified tokens |
+| Tier | K-Score | Multiplier | Status |
+|------|---------|------------|--------|
+| 💎 Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
+| 💠 Platinum | 80-89 | 1.0x | Accepted |
+| 🥇 Gold | 70-79 | 1.0x | Accepted |
+| 🥈 Silver | 60-69 | 1.1x | Accepted |
+| 🥉 Bronze | 50-59 | 1.2x | Accepted (minimum for gas) |
+| Copper/Iron/Rust | <50 | — | **Rejected** |
 
 ## Example
 
 ### cURL
 
 ```bash
-curl -X POST https://gasdf-43r8.onrender.com/v1/quote \
+curl -X POST https://asdfasdfa.tech/v1/quote \
   -H "Content-Type: application/json" \
   -d '{
     "payerPubkey": "DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK",
@@ -141,7 +143,7 @@ curl -X POST https://gasdf-43r8.onrender.com/v1/quote \
 ### JavaScript
 
 ```javascript
-const response = await fetch('https://gasdf-43r8.onrender.com/v1/quote', {
+const response = await fetch('https://asdfasdfa.tech/v1/quote', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

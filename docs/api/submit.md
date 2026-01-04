@@ -5,7 +5,7 @@ Submit a signed transaction for gasless execution.
 ## Endpoint
 
 ```
-POST https://gasdf-43r8.onrender.com/v1/submit
+POST https://asdfasdfa.tech/v1/submit
 ```
 
 ## Request
@@ -217,7 +217,7 @@ const result = await fetch('/submit', {
 ### cURL
 
 ```bash
-curl -X POST https://gasdf-43r8.onrender.com/v1/submit \
+curl -X POST https://asdfasdfa.tech/v1/submit \
   -H "Content-Type: application/json" \
   -d '{
     "transaction": "AQAAAA...base64encodedtx...",
@@ -229,7 +229,7 @@ curl -X POST https://gasdf-43r8.onrender.com/v1/submit \
 
 ```javascript
 // After building and signing transaction
-const result = await fetch('https://gasdf-43r8.onrender.com/v1/submit', {
+const result = await fetch('https://asdfasdfa.tech/v1/submit', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -252,7 +252,7 @@ Check transaction status.
 ### Request
 
 ```
-GET https://gasdf-43r8.onrender.com/v1/submit/status/qt_a1b2c3d4e5f6
+GET https://asdfasdfa.tech/v1/submit/status/qt_a1b2c3d4e5f6
 ```
 
 ### Response

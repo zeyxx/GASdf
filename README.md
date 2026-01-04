@@ -263,28 +263,68 @@ Fee Calculation (First Principles):
 └─ No magic numbers - everything derived from φ
 ```
 
-### $ASDF Holder Discounts
+### Dual Burn Channel
 
-| Tier | Share of Supply | Discount | Formula |
-|------|-----------------|----------|---------|
-| WHALE | ≥ 1% | 95% | `min(95%, (log₁₀(share) + 5) / 3)` |
-| OG | ≥ 0.1% | 67% | Logarithmic scaling |
-| BELIEVER | ≥ 0.01% | 33% | Virtuous flywheel |
-| HOLDER | ≥ 0.001% | 0% | As burns grow, your share grows |
-| NORMIE | < 0.001% | 0% | Still welcome! |
+```
+Payment Token
+     │
+     ├── If $asdfasdfa ──▶ 100% BURN (zero treasury cut)
+     │
+     └── If other token ──▶ Jupiter Swap to $asdfasdfa
+                                    │
+                                    ├── 76.4% ──▶ BURN (1 - 1/φ³)
+                                    └── 23.6% ──▶ Treasury (1/φ³)
+```
+
+### $asdfasdfa Holder Discounts
+
+Formula: `discount = min(95%, (log₁₀(share) + 5) / 3)`
+*Source: `src/services/holder-tiers.js:146-153`*
+
+| Tier | Share of Supply | Discount |
+|------|-----------------|----------|
+| DIAMOND | ≥ 1% | 95% (cap) |
+| PLATINUM | ≥ 0.1% | 67% |
+| GOLD | ≥ 0.01% | 33% |
+| SILVER | ≥ 0.001% | 0% |
+| BRONZE | < 0.001% | 0% |
+
+### E-Score (HolDex Harmony)
+
+Engagement-based discount using 7 φ-weighted dimensions:
+
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| Hold | φ⁶ | Duration of holding |
+| Burn | φ⁵ | Amount burned |
+| Use | φ⁴ | dApp interactions |
+| Build | φ³ | Developer activity |
+| Node | φ² | Validator/RPC ops |
+| Refer | φ¹ | Referral activity |
+| Duration | φ⁰ | Account age |
+
+Formula: `discount = min(95%, 1 - φ^(-E/25))`
+*Source: `src/services/harmony.js:66, 126-131`*
+
+**Combined discount**: `max(holderDiscount, eScoreDiscount)` — capped at **95%**
 
 ## K-Score Token Gating
 
-Tokens are scored by [HolDex](https://holdex-api.onrender.com/api) for trustworthiness:
+Tokens are scored by [HolDex](https://holdex-api.onrender.com/api) for trustworthiness.
+*Source: `src/services/holdex.js:104-113`*
 
-| Tier | K-Score | Acceptance |
-|------|---------|------------|
-| Diamond | 90-100 | Instant (hardcoded: SOL, USDC, USDT, $asdfasdfa) |
-| Platinum | 80-89 | Accepted |
-| Gold | 70-79 | Accepted |
-| Silver | 60-69 | Accepted |
-| Bronze | 50-59 | Accepted |
-| Copper | < 50 | **Rejected** |
+| Tier | K-Score | Fee Multiplier | Status |
+|------|---------|----------------|--------|
+| 💎 Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
+| 💠 Platinum | 80-89 | 1.0x | Accepted |
+| 🥇 Gold | 70-79 | 1.0x | Accepted |
+| 🥈 Silver | 60-69 | 1.1x | Accepted |
+| 🥉 Bronze | 50-59 | 1.2x | Accepted (minimum for gas) |
+| 🟤 Copper | 40-49 | — | **Rejected** |
+| ⚫ Iron | 20-39 | — | **Rejected** |
+| 🔩 Rust | 0-19 | — | **Rejected** |
+
+**Minimum K-Score for gas payment: 50 (Bronze)**
 
 ## Security (12 Layers)
 

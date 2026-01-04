@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GASdf is a gasless transaction layer for Solana, allowing users to pay network fees with any token instead of SOL. All fees are swapped to **$asdfasdfa** and **76.4% burned forever** (derived from φ³).
+GASdf is a gasless transaction layer for Solana, allowing users to pay network fees with any token instead of SOL.
 
-**Live:** https://gasdf-43r8.onrender.com
+**Dual Burn Channel:**
+- **$asdfasdfa payments** → 100% burned (zero treasury cut)
+- **Other tokens** → Swapped to $asdfasdfa → 76.4% burned / 23.6% treasury
+
+**Live:** https://asdfasdfa.tech
 
 ## Commands
 
@@ -93,19 +97,40 @@ All rates derived from φ - no magic numbers:
 5. Server co-signs and broadcasts
 
 ### K-score (HolDex Integration)
-Token trust score from HolDex affecting fee multiplier:
-- **Trusted** (80+): 1.0x multiplier
-- **Standard** (60-79): 1.1x multiplier
-- **Risky** (40-59): 1.25x multiplier
-- **Unknown** (<40): Rejected
+Token trust score from HolDex affecting fee multiplier.
+*See `src/services/holdex.js:104-113`*
+
+| Tier | K-Score | Multiplier |
+|------|---------|------------|
+| 💎 Diamond | 90-100 | 1.0x |
+| 💠 Platinum | 80-89 | 1.0x |
+| 🥇 Gold | 70-79 | 1.0x |
+| 🥈 Silver | 60-69 | 1.1x |
+| 🥉 Bronze | 50-59 | 1.2x |
+| Copper/Iron/Rust | <50 | **Rejected** |
+
+**Minimum for gas payment: Bronze (K-Score 50+)**
 
 ### Holder Tiers
-Discount formula: `min(95%, max(0, (log₁₀(share) + 5) / 3))`
-- **Diamond** (1% supply): -95%
-- **Platinum** (0.1%): -67%
-- **Gold** (0.01%): -33%
-- **Silver** (0.001%): 0%
-- **Bronze** (any): 0%
+*See `src/services/holder-tiers.js:146-153`*
+
+Discount formula: `min(95%, (log₁₀(share) + 5) / 3)`
+
+| Tier | Share | Discount |
+|------|-------|----------|
+| DIAMOND | ≥1% | 95% |
+| PLATINUM | ≥0.1% | 67% |
+| GOLD | ≥0.01% | 33% |
+| SILVER | ≥0.001% | 0% |
+| BRONZE | <0.001% | 0% |
+
+### E-Score (Harmony)
+*See `src/services/harmony.js:66, 126-131`*
+
+7 φ-weighted dimensions: Hold, Burn, Use, Build, Node, Refer, Duration
+Formula: `min(95%, 1 - φ^(-E/25))`
+
+**Combined discount**: `max(holderDiscount, eScoreDiscount)` — cap 95%
 
 ## Environment Variables
 
