@@ -18,6 +18,7 @@ module.exports = {
   getPayerBalances: feePayerPool.getPayerBalances,
   markPayerUnhealthy: feePayerPool.markPayerUnhealthy,
   getHealthSummary: feePayerPool.getHealthSummary,
+  isCircuitOpen: feePayerPool.isCircuitOpen,
   pool: feePayerPool.pool,
 
   // Constants

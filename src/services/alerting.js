@@ -22,43 +22,133 @@ const ALERT_TYPES = {
     id: 'fee_payer_low',
     severity: SEVERITY.WARNING,
     title: 'Fee Payer Balance Low',
-    message: (data) => `Fee payer ${data.pubkey} balance is low: ${data.balance} SOL`,
+    message: (data) => {
+      const lines = [`Fee payer ${data.pubkey} balance is low: ${data.balance} SOL`];
+      if (data.txPossible !== undefined) {
+        lines.push(`Tx remaining: ~${data.txPossible.toLocaleString()}`);
+      }
+      if (data.threshold) {
+        lines.push(`Warning threshold: ${data.threshold} SOL`);
+      }
+      if (data.reservations !== undefined) {
+        lines.push(`Active reservations: ${data.reservations}`);
+      }
+      return lines.join('\n');
+    },
   },
   FEE_PAYER_CRITICAL: {
     id: 'fee_payer_critical',
     severity: SEVERITY.CRITICAL,
     title: 'Fee Payer Balance Critical',
-    message: (data) => `Fee payer ${data.pubkey} balance critically low: ${data.balance} SOL`,
+    message: (data) => {
+      const lines = [`Fee payer ${data.pubkey} balance critically low: ${data.balance} SOL`];
+      if (data.txPossible !== undefined) {
+        lines.push(`Tx remaining: ~${data.txPossible.toLocaleString()}`);
+      }
+      if (data.threshold) {
+        lines.push(`Critical threshold: ${data.threshold} SOL`);
+      }
+      if (data.reservations !== undefined) {
+        lines.push(`Active reservations: ${data.reservations}`);
+      }
+      if (data.action) {
+        lines.push(`Action: ${data.action}`);
+      }
+      return lines.join('\n');
+    },
   },
   ALL_PAYERS_DOWN: {
     id: 'all_payers_down',
     severity: SEVERITY.CRITICAL,
     title: 'All Fee Payers Unhealthy',
-    message: () => 'No healthy fee payers available! Service cannot process transactions.',
+    message: (data = {}) => {
+      const lines = ['No healthy fee payers available! Service cannot process transactions.'];
+      if (data.total !== undefined) {
+        lines.push(`Total payers: ${data.total}`);
+      }
+      if (data.payers && data.payers.length > 0) {
+        lines.push('Status by payer:');
+        for (const p of data.payers) {
+          lines.push(`  • ${p.pubkey}: ${p.balance} SOL (${p.reason || p.status})`);
+        }
+      }
+      if (data.circuitBreakerOpen) {
+        lines.push('Circuit breaker: OPEN');
+      }
+      return lines.join('\n');
+    },
   },
   CIRCUIT_BREAKER_OPEN: {
     id: 'circuit_breaker_open',
     severity: SEVERITY.WARNING,
     title: 'Circuit Breaker Open',
-    message: (data) => `Circuit breaker '${data.name}' is open after ${data.failures} failures`,
+    message: (data) => {
+      const lines = [`Circuit breaker '${data.name}' is open after ${data.failures} failures`];
+      if (data.lastError) {
+        lines.push(`Last error: ${data.lastError}`);
+      }
+      if (data.timeUntilRetry) {
+        lines.push(`Retry in: ${Math.ceil(data.timeUntilRetry / 1000)}s`);
+      }
+      if (data.successRate !== undefined) {
+        lines.push(`Success rate: ${data.successRate}%`);
+      }
+      return lines.join('\n');
+    },
   },
   REDIS_DOWN: {
     id: 'redis_down',
     severity: SEVERITY.CRITICAL,
     title: 'Redis Connection Lost',
-    message: () => 'Redis connection lost. Service may be degraded.',
+    message: (data = {}) => {
+      const lines = ['Redis connection lost. Service may be degraded.'];
+      if (data.error) {
+        lines.push(`Error: ${data.error}`);
+      }
+      if (data.reconnectAttempts !== undefined) {
+        lines.push(`Reconnect attempts: ${data.reconnectAttempts}`);
+      }
+      if (data.fallbackActive) {
+        lines.push('Memory fallback: ACTIVE');
+      }
+      return lines.join('\n');
+    },
   },
   HIGH_ERROR_RATE: {
     id: 'high_error_rate',
     severity: SEVERITY.WARNING,
     title: 'High Error Rate',
-    message: (data) => `Error rate is ${data.rate}% over the last ${data.period}`,
+    message: (data) => {
+      const lines = [`Error rate is ${data.rate}% over the last ${data.period}`];
+      if (data.errorCount !== undefined && data.totalCount !== undefined) {
+        lines.push(`Errors: ${data.errorCount}/${data.totalCount} requests`);
+      }
+      if (data.topErrors && data.topErrors.length > 0) {
+        lines.push('Top errors:');
+        for (const err of data.topErrors.slice(0, 3)) {
+          lines.push(`  • ${err.message}: ${err.count}x`);
+        }
+      }
+      return lines.join('\n');
+    },
   },
   RECOVERY: {
     id: 'recovery',
     severity: SEVERITY.INFO,
     title: 'Service Recovered',
-    message: (data) => `${data.service} has recovered`,
+    message: (data) => {
+      const lines = [`${data.service} has recovered`];
+      if (data.downtime) {
+        lines.push(`Downtime: ${data.downtime}`);
+      }
+      if (data.currentStatus) {
+        lines.push(`Current status: ${data.currentStatus}`);
+      }
+      if (data.balance) {
+        lines.push(`Balance: ${data.balance} SOL`);
+      }
+      return lines.join('\n');
+    },
   },
 
   // Security & Anomaly Alerts
@@ -406,7 +496,15 @@ const alertingService = new AlertingService();
  */
 async function checkFeePayerAlerts() {
   try {
-    const { getPayerBalances, getHealthSummary } = require('./signer');
+    const {
+      getPayerBalances,
+      getHealthSummary,
+      isCircuitOpen,
+      CRITICAL_BALANCE,
+      WARNING_BALANCE,
+    } = require('./signer');
+    const { pool } = require('./fee-payer-pool');
+
     const balances = await getPayerBalances();
     const summary = getHealthSummary();
 
@@ -422,10 +520,29 @@ async function checkFeePayerAlerts() {
 
     // Check for all payers down (only if we have fresh data)
     if (summary.healthy === 0 && summary.total > 0) {
-      await alertingService.alert('ALL_PAYERS_DOWN', { total: summary.total });
+      // Build detailed payer status
+      const payerDetails = balances.map((p) => ({
+        pubkey: p.pubkey.slice(0, 8) + '...',
+        balance: p.balanceSol.toFixed(4),
+        status: p.status,
+        reason: p.status === 'critical' ? 'balance_critical' : p.isHealthy ? 'ok' : 'unhealthy',
+      }));
+
+      await alertingService.alert('ALL_PAYERS_DOWN', {
+        total: summary.total,
+        payers: payerDetails,
+        circuitBreakerOpen: isCircuitOpen ? isCircuitOpen() : false,
+      });
     } else if (summary.healthy > 0) {
-      await alertingService.recover('ALL_PAYERS_DOWN');
+      await alertingService.recover('ALL_PAYERS_DOWN', {
+        currentStatus: `${summary.healthy}/${summary.total} healthy`,
+      });
     }
+
+    // Constants for thresholds (in SOL)
+    const criticalThresholdSol = (CRITICAL_BALANCE || 50_000_000) / 1e9;
+    const warningThresholdSol = (WARNING_BALANCE || 200_000_000) / 1e9;
+    const avgTxCost = 5000; // lamports per tx
 
     // Check individual payers
     for (const payer of balances) {
@@ -438,22 +555,37 @@ async function checkFeePayerAlerts() {
         continue;
       }
 
+      const pubkeyShort = payer.pubkey.slice(0, 8) + '...';
+      const txPossible = Math.floor(payer.balance / avgTxCost);
+      const reservationCount = pool?.reservationsByPayer?.get(payer.pubkey)?.size || 0;
+
       if (payer.status === 'critical') {
         await alertingService.alert('FEE_PAYER_CRITICAL', {
-          pubkey: payer.pubkey.slice(0, 8) + '...',
+          pubkey: pubkeyShort,
           balance: payer.balanceSol.toFixed(4),
+          txPossible,
+          threshold: criticalThresholdSol.toFixed(2),
+          reservations: reservationCount,
+          action: 'Fund immediately or service will halt',
         });
       } else if (payer.status === 'warning') {
         await alertingService.alert('FEE_PAYER_LOW', {
-          pubkey: payer.pubkey.slice(0, 8) + '...',
+          pubkey: pubkeyShort,
           balance: payer.balanceSol.toFixed(4),
+          txPossible,
+          threshold: warningThresholdSol.toFixed(2),
+          reservations: reservationCount,
         });
       } else {
         await alertingService.recover('FEE_PAYER_CRITICAL', {
-          pubkey: payer.pubkey.slice(0, 8) + '...',
+          pubkey: pubkeyShort,
+          balance: payer.balanceSol.toFixed(4),
+          currentStatus: 'healthy',
         });
         await alertingService.recover('FEE_PAYER_LOW', {
-          pubkey: payer.pubkey.slice(0, 8) + '...',
+          pubkey: pubkeyShort,
+          balance: payer.balanceSol.toFixed(4),
+          currentStatus: 'healthy',
         });
       }
     }
@@ -472,12 +604,25 @@ function checkCircuitBreakerAlerts() {
 
     for (const [name, status] of Object.entries(breakers)) {
       if (status.state === 'open') {
+        const timeUntilRetry = status.openedAt
+          ? Math.max(0, status.openedAt + status.resetTimeout - Date.now())
+          : 0;
+
         alertingService.alert('CIRCUIT_BREAKER_OPEN', {
           name,
           failures: status.failures,
+          lastError: status.lastError || null,
+          timeUntilRetry,
+          successRate:
+            status.stats?.successRate !== 'N/A'
+              ? parseFloat(status.stats?.successRate || 0).toFixed(1)
+              : undefined,
         });
       } else if (status.state === 'closed') {
-        alertingService.recover('CIRCUIT_BREAKER_OPEN', { name });
+        alertingService.recover('CIRCUIT_BREAKER_OPEN', {
+          name,
+          currentStatus: 'closed',
+        });
       }
     }
   } catch (error) {
@@ -494,9 +639,15 @@ function checkRedisAlerts() {
     const state = redis.getConnectionState();
 
     if (!state.isHealthy && !state.isMemoryFallback) {
-      alertingService.alert('REDIS_DOWN');
+      alertingService.alert('REDIS_DOWN', {
+        error: state.lastError || 'Connection failed',
+        reconnectAttempts: state.reconnectAttempts || 0,
+        fallbackActive: state.isMemoryFallback || false,
+      });
     } else if (state.isHealthy) {
-      alertingService.recover('REDIS_DOWN');
+      alertingService.recover('REDIS_DOWN', {
+        currentStatus: 'connected',
+      });
     }
   } catch (error) {
     logger.error('ALERTING', 'Failed to check Redis alerts', { error: error.message });
@@ -512,12 +663,19 @@ function checkFeePayerPoolCircuitBreaker() {
 
     if (isCircuitOpen()) {
       const state = getCircuitState();
+      const timeUntilRetry = state.closesAt ? Math.max(0, state.closesAt - Date.now()) : 0;
+
       alertingService.alert('CIRCUIT_BREAKER_OPEN', {
         name: 'fee_payer_pool',
         failures: state.consecutiveFailures,
+        timeUntilRetry,
+        totalReservations: state.totalReservations || 0,
       });
     } else {
-      alertingService.recover('CIRCUIT_BREAKER_OPEN', { name: 'fee_payer_pool' });
+      alertingService.recover('CIRCUIT_BREAKER_OPEN', {
+        name: 'fee_payer_pool',
+        currentStatus: 'closed',
+      });
     }
   } catch (error) {
     logger.error('ALERTING', 'Failed to check fee payer pool circuit breaker', {
