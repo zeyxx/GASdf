@@ -2458,7 +2458,8 @@
 
         if (data.success && data.token) {
           const token = data.token;
-          const currentSupply = parseInt(token.supply) || INITIAL_SUPPLY;
+          // supply is object {current, initial, ...} from proxy, or number from direct API
+          const currentSupply = parseInt(token.supply?.current ?? token.supply) || INITIAL_SUPPLY;
           const burnedTokens = (INITIAL_SUPPLY - currentSupply) / 1e6;
 
           // Animate the big burn counter
@@ -2467,7 +2468,7 @@
             burnedTokens,
             2500,
             0,
-            ' $ASDF'
+            ' $asdfasdfa'
           );
 
           // Calculate ecosystem bonus based on burn %
