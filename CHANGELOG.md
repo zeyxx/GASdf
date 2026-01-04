@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-01-04
+
+### Added
+
+- **3D Landing Page**: Immersive space experience with Three.js
+  - Stars with Harvard spectral classification (12,000 stars)
+  - Milky Way particle cloud (6,000 particles)
+  - Volumetric nebulae with FBM noise shaders
+  - Cosmic dust with drift and parallax
+  - Post-processing bloom effects
+  - CSS singularity (black hole) fixed in background
+
+- **Enhanced Alerting**: Rich alert messages with detailed context
+  - Balance thresholds now include wallet addresses
+  - Staleness tracking prevents false-positive alerts during RPC failures
+  - Adjusted thresholds: CRITICAL=0.05 SOL, WARNING=0.2 SOL
+
+### Changed
+
+- **HolDex Integration**: Now using `holdex-api.onrender.com` (beta)
+- **Token Symbol**: Consistently use `$asdfasdfa` across all documentation
+- SDK version bumped to 1.8.0
+
+### Fixed
+
+- Prevent false-positive fee payer alerts on RPC 429 errors
+- Balance data now tracks staleness (lastBalanceRefreshSuccess, isStale)
+
+## [1.7.0] - 2026-01-03
+
+### Added
+
+- **Consumer UX Redesign**: Complete landing page overhaul
+  - Wallet connection modal with token selector
+  - Live HolDex integration for token metadata
+  - Real-time burn statistics display
+  - Mobile-responsive design
+
+- **SDK Resilience**: Enhanced fetch with timeout, retry, and correlation IDs
+  - Automatic retry with exponential backoff
+  - Request correlation IDs for debugging
+  - Configurable timeouts per request type
+
+### Changed
+
+- Filter spam tokens, show only verified community tokens
+- HolDex proxy endpoints for frontend integration
+
+### Fixed
+
+- Handle supply object from proxy correctly
+- Use correct ticker symbol from HolDex
+
+## [1.6.0] - 2026-01-01
+
+### Added
+
+- **Helius Priority Fees**: Dynamic priority fee calculation using Helius SDK
+  - Automatic priority fee estimation based on network conditions
+  - Fallback to default priority fee on API failure
+
+- **Grafana Monitoring**: Complete observability stack
+  - Grafana Cloud metrics pusher (InfluxDB protocol)
+  - Pre-built dashboard with key metrics
+  - Dashboard compatible with Grafana 11 (schema v39)
+  - Metrics include: tx count, burn rate, fee payer balance, RPC health
+
+### Changed
+
+- Alerting now delays on startup to avoid duplicate alerts during deploys
+- Improved test coverage across multiple services:
+  - data-sync: 7% → 94%
+  - db.js: 21% → 73%
+  - redis.js: 49% → 59%
+  - rpc.js: 51% → 60%
+
+### Security
+
+- **Patched bigint-buffer vulnerability (CVE-2025-3194)**
+  - Override with `@gsknnft/bigint-buffer@1.4.7`
+  - `npm audit` now reports 0 vulnerabilities
+
 ## [1.5.4] - 2025-12-31
 
 ### Fixed

@@ -1,6 +1,6 @@
 # GASdf Architecture
 
-> Gasless transactions for Solana. Pay fees with any token. Fees burn $ASDF.
+> Gasless transactions for Solana. Pay fees with any token. All fees become **$asdfasdfa** and burn forever.
 
 ## Overview
 
@@ -10,12 +10,12 @@
 │  (Wallet)   │     │    API      │     │  Mainnet    │
 └─────────────┘     └─────────────┘     └─────────────┘
                            │
-                    ┌──────┴──────┐
-                    ▼             ▼
-              ┌─────────┐   ┌─────────┐
-              │  Redis  │   │ Jupiter │
-              │  Cache  │   │   Swap  │
-              └─────────┘   └─────────┘
+          ┌────────────────┼────────────────┐
+          ▼                ▼                ▼
+    ┌─────────┐      ┌─────────┐      ┌─────────┐
+    │  Redis  │      │ Jupiter │      │ HolDex  │
+    │  Cache  │      │   Swap  │      │ K-score │
+    └─────────┘      └─────────┘      └─────────┘
 ```
 
 ## Transaction Flow
@@ -24,7 +24,7 @@
 ```
 Client                    GASdf                      External
   │                         │                           │
-  │──POST /quote───────────▶│                           │
+  │──POST /v1/quote────────▶│                           │
   │   paymentToken          │──isTokenAccepted()───────▶│ HolDex
   │   userPubkey            │◀─────────────────────────│
   │                         │                           │
@@ -45,7 +45,7 @@ Client                    GASdf                      Solana
   │  (builds tx with        │                           │
   │   feePayer, signs)      │                           │
   │                         │                           │
-  │──POST /submit──────────▶│                           │
+  │──POST /v1/submit───────▶│                           │
   │   quoteId               │──validateTransaction()    │
   │   signedTx              │  (signer, validator)      │
   │                         │                           │
@@ -61,14 +61,14 @@ Client                    GASdf                      Solana
 ```
 Burn Worker                Treasury                  Solana
   │                           │                         │
-  │  (every 5 min)            │                         │
+  │  (every 60s)              │                         │
   │──check pending fees──────▶│                         │
   │                           │                         │
   │  if fees > threshold:     │                         │
-  │──swap to $ASDF via Jupiter│                         │
+  │──swap to $asdfasdfa via Jupiter                     │
   │                           │                         │
-  │──burn 76.4% of $ASDF─────────────────────────────▶│
-  │  (retain 23.6% for treasury)                       │
+  │──burn 76.4% of $asdfasdfa──────────────────────────▶│
+  │  (retain 23.6% for treasury)                        │
   │                           │                         │
   │──record burn proof────────│                         │
 ```
@@ -80,79 +80,102 @@ src/
 ├── index.js                 # Express app entry point
 │
 ├── routes/
-│   ├── quote.js            # POST /quote - Fee quotes
-│   ├── submit.js           # POST /submit - Transaction submission
-│   ├── tokens.js           # GET /tokens - Accepted tokens
-│   ├── stats.js            # GET /stats - Burn statistics
-│   ├── health.js           # GET /health - Health checks
-│   └── admin.js            # Admin endpoints (auth required)
+│   ├── quote.js             # POST /v1/quote - Fee quotes
+│   ├── submit.js            # POST /v1/submit - Transaction submission
+│   ├── tokens.js            # GET /v1/tokens - Accepted tokens
+│   ├── stats.js             # GET /v1/stats - Burn statistics
+│   ├── health.js            # GET /health - Health checks
+│   └── admin.js             # Admin endpoints (auth required)
 │
 ├── services/
-│   ├── jupiter.js          # Jupiter swap API integration
-│   ├── signer.js           # Fee payer wallet management
-│   ├── validator.js        # Transaction validation
-│   ├── burn.js             # Background burn worker
-│   ├── token-gate.js       # Token acceptance logic
-│   ├── holder-tiers.js     # $ASDF holder discount tiers
-│   ├── fee-payer-pool.js   # Fee payer balance management
-│   ├── treasury-ata.js     # Treasury token accounts
-│   ├── jito.js             # Jito bundles (optional)
-│   ├── pyth.js             # Pyth oracle for stablecoin prices
-│   ├── holdex.js           # HolDex API for token verification
-│   ├── alerting.js         # Discord/Slack alerts
-│   ├── audit.js            # Audit logging
-│   ├── anomaly-detector.js # Rate limit & abuse detection
-│   └── tx-queue.js         # Transaction retry queue
+│   ├── jupiter.js           # Jupiter swap API integration
+│   ├── signer.js            # Fee payer wallet management
+│   ├── validator.js         # Transaction validation (Ed25519)
+│   ├── burn.js              # Background burn worker
+│   ├── token-gate.js        # Token acceptance logic (K-score)
+│   ├── holder-tiers.js      # $asdfasdfa holder discount tiers
+│   ├── fee-payer-pool.js    # Fee payer balance management
+│   ├── treasury-ata.js      # Treasury token accounts
+│   ├── pyth.js              # Pyth oracle for stablecoin prices
+│   ├── holdex.js            # HolDex API for token verification
+│   ├── alerting.js          # Discord/Slack alerts
+│   ├── audit.js             # Audit logging (PII anonymized)
+│   ├── anomaly-detector.js  # Rate limit & abuse detection
+│   └── tx-queue.js          # Transaction retry queue
 │
 ├── middleware/
-│   ├── security.js         # Rate limiting, IP blocking
-│   └── validation.js       # Request validation (Zod)
+│   ├── security.js          # Rate limiting, IP blocking
+│   └── validation.js        # Request validation (Joi)
 │
 └── utils/
-    ├── config.js           # Environment configuration
-    ├── redis.js            # Redis client & helpers
-    ├── rpc.js              # Solana RPC connection pool
-    ├── logger.js           # Structured logging
-    ├── metrics.js          # Prometheus metrics
-    ├── db.js               # PostgreSQL client
-    ├── circuit-breaker.js  # Circuit breaker pattern
-    ├── safe-math.js        # Overflow-safe math
-    ├── revenue-channels.js # Fee flow tracking
-    └── fetch-timeout.js    # HTTP with timeout
+    ├── config.js            # Environment configuration
+    ├── redis.js             # Redis client & helpers
+    ├── rpc.js               # Solana RPC connection pool
+    ├── logger.js            # Structured logging
+    ├── metrics.js           # Prometheus metrics
+    ├── db.js                # PostgreSQL client
+    ├── circuit-breaker.js   # Circuit breaker pattern
+    ├── safe-math.js         # Overflow-safe math
+    └── fetch-timeout.js     # HTTP with timeout
+
+packages/
+└── sdk/                     # gasdf-sdk npm package
+    ├── src/
+    │   ├── index.ts         # Main SDK class
+    │   └── react.tsx        # React hooks
+    └── package.json
+
+public/
+├── index.html               # Landing page (Three.js + CSS singularity)
+└── og-image.svg             # Social sharing image
 ```
 
 ## Key Concepts
 
-### Token Gating
-Tokens must be verified before acceptance:
-1. **Diamond tier**: SOL, USDC, USDT (always accepted)
-2. **HolDex verified**: Tokens with K-score > 70
-3. **Rejected**: Unverified tokens
+### Token Gating (K-Score)
+Tokens must be verified by [HolDex](https://holdex-api.onrender.com) before acceptance:
 
-### Holder Tiers
-$ASDF holders get fee discounts:
-| Tier | Min Balance | Discount |
-|------|-------------|----------|
-| WHALE | 1M+ $ASDF | 50% |
-| OG | 500K $ASDF | 40% |
-| BELIEVER | 100K $ASDF | 30% |
-| HOLDER | 10K $ASDF | 20% |
-| NORMIE | 0 $ASDF | 0% |
+| Tier | K-Score | Fee Multiplier | Status |
+|------|---------|----------------|--------|
+| Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
+| Platinum | 80-89 | 1.0x | Accepted |
+| Gold | 70-79 | 1.0x | Accepted |
+| Silver | 60-69 | 1.1x | Accepted |
+| Bronze | 50-59 | 1.2x | Accepted |
+| Copper | < 50 | — | **Rejected** |
 
-### Burn Economics (Golden Ratio)
+### Holder Tiers (Discounts)
+$asdfasdfa holders get fee discounts based on share of total supply:
+
+| Tier | Share of Supply | Discount | Formula |
+|------|-----------------|----------|---------|
+| Diamond | ≥ 1% | 95% | `min(95, (log₁₀(share)+5)/3)` |
+| Platinum | ≥ 0.1% | 67% | Logarithmic scaling |
+| Gold | ≥ 0.01% | 33% | Virtuous flywheel |
+| Silver | ≥ 0.001% | 0% | As burns grow, share grows |
+| Bronze | < 0.001% | 0% | Still welcome! |
+
+### Burn Economics (Golden Ratio φ)
 ```
-Fee collected
-    │
-    ├── 76.4% ──▶ Burned (deflationary)
-    │
-    └── 23.6% ──▶ Treasury (operations)
+φ = 1.618033988749894...
+
+Treasury ratio:  1/φ³  = 23.6%
+Burn ratio:      1 - 1/φ³ = 76.4%
+Max eco bonus:   1/φ²  = 38.2%
+
+Fee collected from user
+         │
+         ├── 76.4% ──▶ Burned forever (deflationary)
+         │
+         └── 23.6% ──▶ Treasury (operations)
 ```
 
 ### Circuit Breakers
 Automatic protection against cascading failures:
-- Redis connection failures
-- RPC endpoint failures
-- Fee payer balance depletion
+- Redis connection failures → in-memory fallback
+- RPC endpoint failures → multi-RPC failover pool
+- Fee payer balance depletion → unhealthy marking + alerts
+- Jupiter API failures → burn worker retry
 
 ## Environment Variables
 
@@ -161,16 +184,18 @@ Automatic protection against cascading failures:
 | `HELIUS_API_KEY` | Yes | Helius RPC API key |
 | `REDIS_URL` | Yes | Redis connection URL |
 | `FEE_PAYER_PRIVATE_KEY` | Yes | Base58 encoded private key |
-| `ASDF_MINT` | Yes | $ASDF token mint address |
+| `ASDF_MINT` | Yes | $asdfasdfa token mint address |
+| `DATABASE_URL` | No | PostgreSQL connection URL |
 | `PROMETHEUS_ENABLED` | No | Enable /metrics endpoint |
 | `METRICS_API_KEY` | No | API key for /metrics |
-| `HOLDEX_API_URL` | No | HolDex API endpoint |
-| `JITO_ENABLED` | No | Enable Jito bundles |
+| `HOLDEX_API_URL` | No | HolDex API endpoint (default: holdex-api.onrender.com) |
+| `ALERTING_WEBHOOK` | No | Slack/Discord webhook for alerts |
 
 ## Testing
 
 ```bash
-npm test              # Unit tests (1053 tests)
+npm test              # Unit tests (741+ tests)
+npm run test:coverage # With coverage report
 npm run test:e2e      # E2E tests against production
 npm run monitor       # Health check (JSON output)
 ```
@@ -178,11 +203,21 @@ npm run monitor       # Health check (JSON output)
 ## Monitoring
 
 - **Health**: `GET /health` - Full system status
+- **Ready**: `GET /health/ready` - Kubernetes readiness probe
 - **Metrics**: `GET /metrics` - Prometheus format (requires API key)
-- **Stats**: `GET /stats` - Burn statistics
+- **Stats**: `GET /v1/stats` - Burn statistics
+
+## API Versioning
+
+All endpoints available under `/v1/` prefix:
+- `POST /v1/quote`
+- `POST /v1/submit`
+- `GET /v1/tokens`
+- `GET /v1/stats`
+- `GET /v1/stats/burns`
 
 ## Related Repositories
 
-- [HolDex](https://github.com/zeyxx/HolDex) - Token verification oracle
-- [ASDev](https://github.com/zeyxx/ASDev) - Backend API
-- [$ASDF Token](https://solscan.io/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump)
+- [HolDex](https://github.com/zeyxx/HolDex) - Token K-score verification oracle
+- [gasdf-sdk](https://www.npmjs.com/package/gasdf-sdk) - JavaScript/TypeScript SDK
+- [$asdfasdfa Token](https://solscan.io/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump)

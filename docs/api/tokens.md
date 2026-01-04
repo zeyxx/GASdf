@@ -5,7 +5,7 @@ Get list of supported payment tokens.
 ## Endpoint
 
 ```
-GET https://api.gasdf.io/tokens
+GET https://gasdf-43r8.onrender.com/v1/tokens
 ```
 
 ## Response
@@ -74,13 +74,13 @@ K-Score indicates the token's trust level, affecting the fee multiplier:
 ### cURL
 
 ```bash
-curl https://api.gasdf.io/tokens
+curl https://gasdf-43r8.onrender.com/v1/tokens
 ```
 
 ### JavaScript
 
 ```javascript
-const response = await fetch('https://api.gasdf.io/tokens');
+const response = await fetch('https://gasdf-43r8.onrender.com/v1/tokens');
 const { tokens } = await response.json();
 
 // Filter trusted tokens

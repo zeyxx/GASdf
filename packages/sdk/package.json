@@ -1,7 +1,7 @@
 {
   "name": "gasdf-sdk",
-  "version": "1.1.0",
-  "description": "GASdf SDK - Add gasless transactions to your Solana app",
+  "version": "1.8.0",
+  "description": "GASdf SDK - Gasless Solana transactions. Pay fees with any token. All fees burn $asdfasdfa.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -33,7 +33,10 @@
     "gasless",
     "meta-transactions",
     "sdk",
-    "react"
+    "react",
+    "asdfasdfa",
+    "burn",
+    "golden-ratio"
   ],
   "author": "GASdf",
   "license": "MIT",

@@ -5,7 +5,7 @@ Get a fee quote for a gasless transaction.
 ## Endpoint
 
 ```
-POST https://api.gasdf.io/quote
+POST https://gasdf-43r8.onrender.com/v1/quote
 ```
 
 ## Request
@@ -129,7 +129,7 @@ tokenFee = baseFee * solToTokenRate * kScoreMultiplier
 ### cURL
 
 ```bash
-curl -X POST https://api.gasdf.io/quote \
+curl -X POST https://gasdf-43r8.onrender.com/v1/quote \
   -H "Content-Type: application/json" \
   -d '{
     "payerPubkey": "DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK",
@@ -141,7 +141,7 @@ curl -X POST https://api.gasdf.io/quote \
 ### JavaScript
 
 ```javascript
-const response = await fetch('https://api.gasdf.io/quote', {
+const response = await fetch('https://gasdf-43r8.onrender.com/v1/quote', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

@@ -275,11 +275,11 @@ Fee Calculation (First Principles):
 
 ## K-Score Token Gating
 
-Tokens are scored by [HolDex](https://asdev-backend.onrender.com/api) for trustworthiness:
+Tokens are scored by [HolDex](https://holdex-api.onrender.com/api) for trustworthiness:
 
 | Tier | K-Score | Acceptance |
 |------|---------|------------|
-| Diamond | 90-100 | Instant (hardcoded: SOL, USDC, USDT, $ASDF) |
+| Diamond | 90-100 | Instant (hardcoded: SOL, USDC, USDT, $asdfasdfa) |
 | Platinum | 80-89 | Accepted |
 | Gold | 70-79 | Accepted |
 | Silver | 60-69 | Accepted |
@@ -399,7 +399,7 @@ docker run -p 3000:3000 --env-file .env gasdf
 - **Live API**: https://asdfasdfa.tech
 - **Analytics**: https://asdfasdfa.tech/analytics.html
 - **Burns**: https://alonisthe.dev/burns
-- **HolDex**: https://asdev-backend.onrender.com/api
+- **HolDex**: https://holdex-api.onrender.com/api
 - **$ASDF Ecosystem**: https://alonisthe.dev
 
 ## Known Issues

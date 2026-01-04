@@ -1,19 +1,20 @@
-# @gasdf/sdk
+# gasdf-sdk
 
-Add gasless transactions to your Solana app in 5 minutes.
+Gasless transactions for Solana. Pay fees with any token. All fees become **$asdfasdfa** and burn forever.
 
-Users pay fees in USDC, USDT, or any supported token. GASdf handles the SOL.
+[![npm](https://img.shields.io/npm/v/gasdf-sdk)](https://www.npmjs.com/package/gasdf-sdk)
+[![License](https://img.shields.io/npm/l/gasdf-sdk)](./LICENSE)
 
 ## Installation
 
 ```bash
-npm install @gasdf/sdk @solana/web3.js
+npm install gasdf-sdk @solana/web3.js
 ```
 
 ## Quick Start
 
 ```typescript
-import { GASdf } from '@gasdf/sdk';
+import { GASdf } from 'gasdf-sdk';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 
 const gasdf = new GASdf();
@@ -51,9 +52,8 @@ Create a new GASdf client.
 
 ```typescript
 const gasdf = new GASdf({
-  endpoint: 'https://asdfasdfa.tech', // optional, default
-  apiKey: 'your-api-key',             // optional, for higher rate limits
-  timeout: 30000,                      // optional, request timeout in ms
+  endpoint: 'https://gasdf-43r8.onrender.com', // optional, production endpoint
+  timeout: 30000,                               // optional, request timeout in ms
 });
 ```
 
@@ -106,16 +106,7 @@ Get list of supported payment tokens.
 
 ```typescript
 const tokens = await gasdf.getTokens();
-// [{ mint, symbol, name, decimals, logoURI }, ...]
-```
-
-### `gasdf.getTokenScore(mint)`
-
-Get K-score for a token (affects fee multiplier).
-
-```typescript
-const score = await gasdf.getTokenScore('token-mint');
-// { mint, score, tier: 'TRUSTED' | 'STANDARD' | 'RISKY', feeMultiplier }
+// [{ mint, symbol, name, decimals, logoURI, kScore, tier }, ...]
 ```
 
 ### `gasdf.health()`
@@ -130,12 +121,7 @@ const health = await gasdf.health();
 ## Error Handling
 
 ```typescript
-import {
-  GASdfError,
-  QuoteExpiredError,
-  ValidationError,
-  RateLimitError,
-} from '@gasdf/sdk';
+import { GASdfError, QuoteExpiredError, ValidationError, RateLimitError } from 'gasdf-sdk';
 
 try {
   await gasdf.submit(signedTx, quoteId);
@@ -158,13 +144,13 @@ try {
 For React apps using `@solana/wallet-adapter-react`:
 
 ```bash
-npm install @gasdf/sdk @solana/wallet-adapter-react
+npm install gasdf-sdk @solana/wallet-adapter-react
 ```
 
 ### Setup
 
 ```tsx
-import { GASdfProvider } from '@gasdf/sdk/react';
+import { GASdfProvider } from 'gasdf-sdk/react';
 
 function App() {
   return (
@@ -184,7 +170,7 @@ function App() {
 Main hook for executing gasless transactions:
 
 ```tsx
-import { useGaslessTransaction } from '@gasdf/sdk/react';
+import { useGaslessTransaction } from 'gasdf-sdk/react';
 
 function SendButton() {
   const { execute, status, isLoading } = useGaslessTransaction({
@@ -213,7 +199,7 @@ function SendButton() {
 Auto-refreshing fee quotes:
 
 ```tsx
-import { useQuote } from '@gasdf/sdk/react';
+import { useQuote } from 'gasdf-sdk/react';
 
 function FeeDisplay() {
   const { quote, isLoading, isValid } = useQuote({
@@ -231,7 +217,7 @@ function FeeDisplay() {
 Get supported payment tokens:
 
 ```tsx
-import { useTokens } from '@gasdf/sdk/react';
+import { useTokens } from 'gasdf-sdk/react';
 
 function TokenSelect({ onChange }) {
   const { tokens, isLoading } = useTokens();
@@ -246,35 +232,33 @@ function TokenSelect({ onChange }) {
 }
 ```
 
-### useGASdf
-
-Access the GASdf client directly:
-
-```tsx
-import { useGASdf } from '@gasdf/sdk/react';
-
-function Stats() {
-  const { client } = useGASdf();
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    client.stats().then(setStats);
-  }, [client]);
-
-  return <div>Total burned: {stats?.burnedFormatted}</div>;
-}
-```
-
 ## Supported Tokens
 
-| Token | Mint | Fee Multiplier |
-|-------|------|----------------|
-| SOL | `So11...112` | 1.0x |
-| USDC | `EPjF...t1v` | 1.0x |
-| USDT | `Es9v...NYB` | 1.0x |
-| $ASDF | `9zB5...ump` | 1.0x |
-| mSOL | `mSoL...7So` | 1.0x |
-| Other | - | 1.25x - 2.0x |
+All tokens verified by [HolDex](https://holdex-api.onrender.com) with K-score >= 50 (Bronze+) are accepted.
+
+| Tier | K-Score | Fee Multiplier |
+|------|---------|----------------|
+| Diamond | 90-100 | 1.0x (hardcoded: SOL, USDC, USDT, $asdfasdfa) |
+| Platinum | 80-89 | 1.0x |
+| Gold | 70-79 | 1.0x |
+| Silver | 60-69 | 1.1x |
+| Bronze | 50-59 | 1.2x |
+| Copper | < 50 | **Rejected** |
+
+## Golden Ratio Economics (φ)
+
+All fees become $asdfasdfa:
+- **76.4%** burned forever (1 - 1/φ³)
+- **23.6%** treasury for operations (1/φ³)
+
+$asdfasdfa holders get discounts based on their share of supply:
+
+| Tier | Share | Discount |
+|------|-------|----------|
+| Diamond | 1%+ | 95% |
+| Platinum | 0.1%+ | 67% |
+| Gold | 0.01%+ | 33% |
+| Silver/Bronze | < 0.01% | 0% |
 
 ## How It Works
 
@@ -282,7 +266,7 @@ function Stats() {
 2. **Build**: Transaction is built with GASdf as fee payer
 3. **Sign**: User signs (paying token fee, not SOL)
 4. **Submit**: GASdf validates, co-signs, and broadcasts
-5. **Burn**: Fees are swapped to $ASDF and burned
+5. **Burn**: Fees are swapped to $asdfasdfa and burned
 
 ## Examples
 
