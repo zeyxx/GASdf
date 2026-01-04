@@ -2506,23 +2506,30 @@
 
         if (!data.success || !data.tokens) return;
 
-        const tokens = data.tokens;
+        // Filter out spam: require name, image, and community verification
+        const validTokens = data.tokens.filter(t =>
+          t.name &&
+          t.name !== 'Unknown' &&
+          t.ticker !== 'UNK' &&
+          t.image &&
+          t.hasCommunityUpdate === true
+        );
 
-        // Update tokens count - EXACT number, no "+"
-        document.getElementById('tokensAccepted').textContent = tokens.length;
+        // Update tokens count - verified tokens only
+        document.getElementById('tokensAccepted').textContent = validTokens.length;
 
         // Sort for categories
-        const trending = [...tokens]
-          .filter(t => t.volume24h > 0)
+        const trending = [...validTokens]
+          .filter(t => t.volume24h > 1000) // Minimum $1k volume
           .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
           .slice(0, 6);
 
-        const trusted = [...tokens]
-          .filter(t => (t.kScore || 0) >= 80)
+        const trusted = [...validTokens]
+          .filter(t => (t.kScore || 0) >= 70)
           .sort((a, b) => (b.kScore || 0) - (a.kScore || 0))
           .slice(0, 6);
 
-        const newest = [...tokens]
+        const newest = [...validTokens]
           .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
           .slice(0, 6);
 
