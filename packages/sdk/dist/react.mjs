@@ -71,6 +71,79 @@ function parseApiError(status, body) {
   }
 }
 
+// src/fetch.ts
+var DEFAULT_TIMEOUT_MS = 3e4;
+var DEFAULT_RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 100,
+  maxDelayMs: 5e3,
+  // 429 is NOT included - let client handle rate limiting via RateLimitError
+  // Only retry on transient server errors
+  retryableStatusCodes: [500, 502, 503, 504]
+};
+function generateCorrelationId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `gasdf_${timestamp}_${random}`;
+}
+function calculateBackoff(attempt, config) {
+  const exponentialDelay = config.baseDelayMs * Math.pow(2, attempt);
+  const jitter = Math.random() * config.baseDelayMs;
+  return Math.min(exponentialDelay + jitter, config.maxDelayMs);
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function fetchWithTimeout(url, options = {}) {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retryConfig = {
+    ...DEFAULT_RETRY_CONFIG,
+    ...options.retry
+  };
+  const correlationId = options.correlationId ?? generateCorrelationId();
+  const headersInit = options.headers instanceof Headers ? options.headers : options.headers || {};
+  const headers = {
+    ...headersInit,
+    "x-correlation-id": correlationId
+  };
+  let lastResponse = null;
+  for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (retryConfig.retryableStatusCodes.includes(response.status) && attempt < retryConfig.maxRetries) {
+        lastResponse = response;
+        await sleep(calculateBackoff(attempt, retryConfig));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          throw new NetworkError(`Request timeout after ${timeoutMs}ms`);
+        }
+        throw new NetworkError(error.message);
+      }
+      throw new NetworkError("Unknown network error");
+    }
+  }
+  if (lastResponse) {
+    throw new GASdfError(
+      `Request failed with status ${lastResponse.status} after ${retryConfig.maxRetries + 1} attempts`,
+      "MAX_RETRIES_EXCEEDED",
+      lastResponse.status
+    );
+  }
+  throw new NetworkError("Network error");
+}
+
 // src/client.ts
 var DEFAULT_ENDPOINT = "https://asdfasdfa.tech";
 var DEFAULT_TIMEOUT = 3e4;
@@ -79,6 +152,7 @@ var GASdf = class {
     this.endpoint = (config.endpoint || DEFAULT_ENDPOINT).replace(/\/$/, "");
     this.apiKey = config.apiKey;
     this.timeout = config.timeout || DEFAULT_TIMEOUT;
+    this.retryConfig = config.retry;
   }
   /**
    * Get a fee quote for a gasless transaction
@@ -191,39 +265,25 @@ var GASdf = class {
   // ─────────────────────────────────────────────────────────────
   async fetch(path, init) {
     const url = `${this.endpoint}${path}`;
+    const correlationId = generateCorrelationId();
     const headers = {
       "Content-Type": "application/json"
     };
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
     }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: { ...headers, ...init?.headers },
-        signal: controller.signal
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw parseApiError(response.status, data);
-      }
-      return data;
-    } catch (error) {
-      if (error instanceof GASdfError) {
-        throw error;
-      }
-      if (error instanceof Error) {
-        if (error.name === "AbortError") {
-          throw new NetworkError(`Request timeout after ${this.timeout}ms`);
-        }
-        throw new NetworkError(error.message);
-      }
-      throw new NetworkError("Unknown network error");
-    } finally {
-      clearTimeout(timeoutId);
+    const response = await fetchWithTimeout(url, {
+      ...init,
+      headers: { ...headers, ...init?.headers },
+      timeoutMs: this.timeout,
+      retry: this.retryConfig,
+      correlationId
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw parseApiError(response.status, data);
     }
+    return data;
   }
   toBase58(value) {
     if (typeof value === "string") {

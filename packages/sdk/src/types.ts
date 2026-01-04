@@ -1,5 +1,17 @@
 import type { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 
+/** Retry configuration */
+export interface RetryConfig {
+  /** Maximum retry attempts (default: 3) */
+  maxRetries: number;
+  /** Base delay in ms for exponential backoff (default: 100) */
+  baseDelayMs: number;
+  /** Maximum delay cap in ms (default: 5000) */
+  maxDelayMs: number;
+  /** HTTP status codes that trigger retry (default: 500, 502, 503, 504) */
+  retryableStatusCodes: number[];
+}
+
 /**
  * GASdf client configuration
  */
@@ -10,6 +22,8 @@ export interface GASdfConfig {
   apiKey?: string;
   /** Request timeout in ms (default: 30000) */
   timeout?: number;
+  /** Retry configuration for failed requests */
+  retry?: Partial<RetryConfig>;
 }
 
 /**

@@ -42,6 +42,7 @@ export type {
   HealthStatus,
   BurnStats,
   SupportedTransaction,
+  RetryConfig,
 } from './types';
 
 export {
@@ -53,3 +54,6 @@ export {
   RateLimitError,
   NetworkError,
 } from './errors';
+
+// Utilities for advanced usage
+export { generateCorrelationId } from './fetch';

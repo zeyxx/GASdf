@@ -7,7 +7,6 @@ import type {
   GASdfConfig,
   Quote,
   QuoteRequest,
-  SubmitRequest,
   SubmitResult,
   PaymentToken,
   TokenScore,
@@ -17,10 +16,14 @@ import type {
 } from './types';
 import {
   GASdfError,
-  NetworkError,
   parseApiError,
-  QuoteExpiredError,
 } from './errors';
+import {
+  fetchWithTimeout,
+  generateCorrelationId,
+  type FetchOptions,
+  type RetryConfig,
+} from './fetch';
 
 const DEFAULT_ENDPOINT = 'https://asdfasdfa.tech';
 const DEFAULT_TIMEOUT = 30000;
@@ -59,11 +62,13 @@ export class GASdf {
   private readonly endpoint: string;
   private readonly apiKey?: string;
   private readonly timeout: number;
+  private readonly retryConfig?: Partial<RetryConfig>;
 
   constructor(config: GASdfConfig = {}) {
     this.endpoint = (config.endpoint || DEFAULT_ENDPOINT).replace(/\/$/, '');
     this.apiKey = config.apiKey;
     this.timeout = config.timeout || DEFAULT_TIMEOUT;
+    this.retryConfig = config.retry;
   }
 
   /**
@@ -204,6 +209,8 @@ export class GASdf {
 
   private async fetch(path: string, init?: RequestInit): Promise<unknown> {
     const url = `${this.endpoint}${path}`;
+    const correlationId = generateCorrelationId();
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -212,37 +219,21 @@ export class GASdf {
       headers['x-api-key'] = this.apiKey;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const response = await fetchWithTimeout(url, {
+      ...init,
+      headers: { ...headers, ...init?.headers },
+      timeoutMs: this.timeout,
+      retry: this.retryConfig,
+      correlationId,
+    });
 
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: { ...headers, ...init?.headers },
-        signal: controller.signal,
-      });
+    const data = await response.json().catch(() => ({})) as Record<string, unknown>;
 
-      const data = await response.json().catch(() => ({})) as Record<string, unknown>;
-
-      if (!response.ok) {
-        throw parseApiError(response.status, data as { error?: string; errors?: string[]; quoteId?: string });
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof GASdfError) {
-        throw error;
-      }
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          throw new NetworkError(`Request timeout after ${this.timeout}ms`);
-        }
-        throw new NetworkError(error.message);
-      }
-      throw new NetworkError('Unknown network error');
-    } finally {
-      clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw parseApiError(response.status, data as { error?: string; errors?: string[]; quoteId?: string });
     }
+
+    return data;
   }
 
   private toBase58(value: string | PublicKey): string {
