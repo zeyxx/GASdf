@@ -1216,48 +1216,57 @@
         this.scene.add(this.cosmicDust);
       }
 
-      // Comets - distant, subtle streaks of light
+      // ========================================================================
+      // 4D CHAOS COMETS - Mathematical ordered chaos
+      // Uses Lorenz attractor + 4D rotation for deterministic but complex paths
+      // ========================================================================
       createComets() {
         this.cometPool = [];
 
-        // Configuration for distant, ethereal comets
+        // Golden ratio for harmonious timing
+        const PHI = 1.618033988749;
+
         this.cometConfig = {
-          maxComets: 4,
-          spawnInterval: 5000,      // Less frequent
-          minSpeed: 1.5,
-          maxSpeed: 3.5,
-          tailSegments: 60,         // Longer, smoother tail
+          maxComets: 5,
+          tailSegments: 80,
+          // Lorenz attractor parameters (classic chaotic system)
+          lorenz: { sigma: 10, rho: 28, beta: 8/3 },
+          // 4D rotation speed (w-axis rotation projected to 3D)
+          w4dSpeed: 0.0003,
         };
 
-        // Create comet trails (purely particle-based, no spheres)
+        // Create comet geometries
         for (let i = 0; i < this.cometConfig.maxComets; i++) {
-          const comet = this.createStreakComet();
-          comet.visible = false;
+          const comet = this.createChaosComet(i);
           this.cometPool.push(comet);
           this.scene.add(comet.mesh);
         }
 
-        // Spawn first comet after delay
-        setTimeout(() => this.spawnComet(), 2500);
-
-        // Periodic spawning
-        setInterval(() => this.spawnComet(), this.cometConfig.spawnInterval);
+        // Staggered spawn using golden ratio intervals
+        this.cometPool.forEach((comet, i) => {
+          const delay = 3000 + i * 2000 * PHI;
+          setTimeout(() => this.initializeChaosComet(comet, i), delay);
+        });
       }
 
-      createStreakComet() {
+      createChaosComet(index) {
         const cfg = this.cometConfig;
 
-        // Trail as a continuous line of particles
+        // Initialize positions far off-screen (invisible until spawned)
         const positions = new Float32Array(cfg.tailSegments * 3);
         const alphas = new Float32Array(cfg.tailSegments);
         const sizes = new Float32Array(cfg.tailSegments);
 
         for (let i = 0; i < cfg.tailSegments; i++) {
+          // All particles start at invisible position
+          positions[i * 3] = -99999;
+          positions[i * 3 + 1] = -99999;
+          positions[i * 3 + 2] = -99999;
+
           const t = i / cfg.tailSegments;
-          // Head bright, exponential falloff
-          alphas[i] = Math.pow(1 - t, 2.5) * 0.6;
-          // Sizes: tiny head point, widening then fading trail
-          sizes[i] = i === 0 ? 1.2 : (1 - t) * 2.5 + 0.3;
+          // Exponential falloff with phi-based curve
+          alphas[i] = Math.pow(1 - t, 2.2) * 0.45;
+          sizes[i] = i === 0 ? 0.8 : (1 - Math.pow(t, 0.7)) * 1.8 + 0.2;
         }
 
         const geometry = new THREE.BufferGeometry();
@@ -1265,9 +1274,13 @@
         geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
+        // Color varies by comet index (subtle variation)
+        const hue = (index * 0.618033988749) % 1; // Golden angle distribution
+        const color = new THREE.Color().setHSL(0.55 + hue * 0.15, 0.3, 0.85);
+
         const material = new THREE.ShaderMaterial({
           uniforms: {
-            baseColor: { value: new THREE.Color(0.85, 0.92, 1.0) },
+            baseColor: { value: color },
             pixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
           },
           vertexShader: `
@@ -1278,8 +1291,12 @@
             void main() {
               vAlpha = alpha;
               vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-              // Distance-based sizing for 3D depth
-              gl_PointSize = size * pixelRatio * (400.0 / -mvPosition.z);
+              // Skip rendering if at init position
+              if (position.x < -9999.0) {
+                gl_PointSize = 0.0;
+              } else {
+                gl_PointSize = size * pixelRatio * (350.0 / max(-mvPosition.z, 1.0));
+              }
               gl_Position = projectionMatrix * mvPosition;
             }
           `,
@@ -1287,12 +1304,14 @@
             uniform vec3 baseColor;
             varying float vAlpha;
             void main() {
+              if (vAlpha < 0.01) discard;
               vec2 uv = gl_PointCoord - 0.5;
               float dist = length(uv);
-              // Soft, glowing falloff
-              float core = exp(-dist * 8.0);
-              float halo = exp(-dist * 3.0) * 0.3;
+              // Ethereal glow
+              float core = exp(-dist * 10.0);
+              float halo = exp(-dist * 4.0) * 0.2;
               float brightness = (core + halo) * vAlpha;
+              if (brightness < 0.01) discard;
               gl_FragColor = vec4(baseColor, brightness);
             }
           `,
@@ -1302,118 +1321,142 @@
         });
 
         const mesh = new THREE.Points(geometry, material);
+        mesh.frustumCulled = false; // Always render
 
         return {
           mesh,
           geometry,
-          visible: false,
-          position: new THREE.Vector3(),
-          velocity: new THREE.Vector3(),
+          active: false,
+          // 4D state (x, y, z, w)
+          state4D: { x: 0, y: 0, z: 0, w: 0 },
+          // Lorenz state for chaos
+          lorenz: { x: 0, y: 0, z: 0 },
           trail: [],
+          baseZ: -400,
+          scale: 1,
+          rotationW: 0, // 4D rotation angle
           life: 0,
-          maxLife: 0,
-          depth: 0  // Z-depth factor for parallax
+          seed: index
         };
       }
 
-      spawnComet() {
-        const comet = this.cometPool.find(c => !c.visible);
-        if (!comet) return;
+      initializeChaosComet(comet, index) {
+        const PHI = 1.618033988749;
 
-        const cfg = this.cometConfig;
-        const speed = cfg.minSpeed + Math.random() * (cfg.maxSpeed - cfg.minSpeed);
+        // Initialize Lorenz attractor with seed-based starting point
+        // Small variations create completely different trajectories (chaos)
+        const seed = index * PHI;
+        comet.lorenz = {
+          x: 1 + Math.sin(seed) * 0.5,
+          y: 1 + Math.cos(seed * PHI) * 0.5,
+          z: 1 + Math.sin(seed * PHI * PHI) * 0.5
+        };
 
-        // Spawn far away in Z (between stars and milky way)
-        const baseZ = -350 - Math.random() * 400;
-        comet.depth = Math.abs(baseZ) / 500; // 0.7 - 1.5 depth factor
+        // 4D initial state
+        comet.state4D = {
+          x: 0, y: 0, z: 0,
+          w: seed * 10 // Different w-phase per comet
+        };
 
-        const side = Math.random();
-
-        if (side < 0.5) {
-          // From upper right - diagonal streak
-          comet.position.set(
-            400 + Math.random() * 200,
-            200 + Math.random() * 150,
-            baseZ
-          );
-          comet.velocity.set(
-            -speed * (0.8 + Math.random() * 0.3),
-            -speed * (0.3 + Math.random() * 0.25),
-            -speed * 0.05
-          );
-        } else if (side < 0.8) {
-          // From right - mostly horizontal
-          comet.position.set(
-            450 + Math.random() * 150,
-            (Math.random() - 0.4) * 300,
-            baseZ
-          );
-          comet.velocity.set(
-            -speed * (0.9 + Math.random() * 0.2),
-            -speed * (0.1 + Math.random() * 0.15),
-            -speed * 0.03
-          );
-        } else {
-          // From upper left (rare, crossing right)
-          comet.position.set(
-            -400 - Math.random() * 150,
-            250 + Math.random() * 100,
-            baseZ - 100
-          );
-          comet.velocity.set(
-            speed * (0.7 + Math.random() * 0.3),
-            -speed * (0.4 + Math.random() * 0.2),
-            -speed * 0.02
-          );
-        }
+        // Depth and scale based on golden ratio
+        comet.baseZ = -300 - (index % 3) * 150 * PHI;
+        comet.scale = 8 + (index % 4) * 3;
 
         comet.trail = [];
         comet.life = 0;
-        comet.maxLife = 500 + Math.random() * 300;
-        comet.visible = true;
-        comet.mesh.visible = true;
+        comet.active = true;
+        comet.rotationW = 0;
+      }
+
+      // Lorenz attractor step - deterministic chaos
+      lorenzStep(state, dt, params) {
+        const { sigma, rho, beta } = params;
+        const dx = sigma * (state.y - state.x);
+        const dy = state.x * (rho - state.z) - state.y;
+        const dz = state.x * state.y - beta * state.z;
+
+        return {
+          x: state.x + dx * dt,
+          y: state.y + dy * dt,
+          z: state.z + dz * dt
+        };
+      }
+
+      // 4D rotation projection to 3D
+      rotate4Dto3D(x, y, z, w, angle) {
+        // Rotation in the XW plane (4D rotation projected to 3D)
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        const newX = x * cosA - w * sinA;
+        const newW = x * sinA + w * cosA;
+
+        // Additional YW rotation for more complexity
+        const angle2 = angle * 0.618033988749;
+        const cosB = Math.cos(angle2);
+        const sinB = Math.sin(angle2);
+        const newY = y * cosB - newW * sinB;
+
+        return { x: newX, y: newY, z };
       }
 
       updateComets() {
         const cfg = this.cometConfig;
+        const PHI = 1.618033988749;
 
-        this.cometPool.forEach(comet => {
-          if (!comet.visible) return;
+        this.cometPool.forEach((comet, idx) => {
+          if (!comet.active) return;
 
-          // Update position
-          comet.position.add(comet.velocity);
+          // Advance Lorenz attractor (chaotic trajectory)
+          const dt = 0.008;
+          comet.lorenz = this.lorenzStep(comet.lorenz, dt, cfg.lorenz);
 
-          // Store trail positions (world space)
-          comet.trail.unshift(comet.position.clone());
+          // 4D rotation advances
+          comet.rotationW += cfg.w4dSpeed;
+
+          // Map Lorenz output to 4D state
+          comet.state4D.x = comet.lorenz.x;
+          comet.state4D.y = comet.lorenz.y;
+          comet.state4D.z = comet.lorenz.z - 25; // Center the attractor
+          comet.state4D.w += 0.02;
+
+          // Project 4D to 3D with rotation
+          const projected = this.rotate4Dto3D(
+            comet.state4D.x,
+            comet.state4D.y,
+            comet.state4D.z,
+            comet.state4D.w,
+            comet.rotationW
+          );
+
+          // Scale and position in world space
+          const worldPos = new THREE.Vector3(
+            projected.x * comet.scale,
+            projected.y * comet.scale - 50,
+            comet.baseZ + projected.z * 2
+          );
+
+          // Store trail
+          comet.trail.unshift(worldPos);
           if (comet.trail.length > cfg.tailSegments) {
             comet.trail.pop();
           }
 
-          // Update geometry with trail positions
+          // Update geometry
           const positions = comet.geometry.attributes.position.array;
           for (let i = 0; i < cfg.tailSegments; i++) {
             if (i < comet.trail.length) {
               positions[i * 3] = comet.trail[i].x;
               positions[i * 3 + 1] = comet.trail[i].y;
               positions[i * 3 + 2] = comet.trail[i].z;
-            } else if (comet.trail.length > 0) {
-              // Fill remaining with last position
-              const last = comet.trail[comet.trail.length - 1];
-              positions[i * 3] = last.x;
-              positions[i * 3 + 1] = last.y;
-              positions[i * 3 + 2] = last.z;
             }
           }
           comet.geometry.attributes.position.needsUpdate = true;
 
-          // Life cycle - despawn when off screen or expired
+          // Life cycle - reset after long duration (infinite loop)
           comet.life++;
-          const outOfBounds = comet.position.x < -500 || comet.position.x > 600 ||
-                              comet.position.y < -400 || comet.position.y > 400;
-
-          if (comet.life > comet.maxLife || outOfBounds) {
-            comet.visible = false;
-            comet.mesh.visible = false;
+          if (comet.life > 2000 + idx * 500) {
+            // Reinitialize with slightly different seed for variation
+            this.initializeChaosComet(comet, idx + this.time * 0.001);
           }
         });
       }
