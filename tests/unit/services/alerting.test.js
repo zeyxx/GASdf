@@ -447,9 +447,7 @@ describe('Alerting Service', () => {
       await alertingService.recover('CIRCUIT_BREAKER_OPEN', { name: 'test-breaker' });
 
       const activeAlerts = alertingService.getActiveAlerts();
-      const breakerAlert = activeAlerts.find(
-        (a) => a.id === 'circuit_breaker_open:test-breaker'
-      );
+      const breakerAlert = activeAlerts.find((a) => a.id === 'circuit_breaker_open:test-breaker');
       expect(breakerAlert).toBeUndefined();
     });
 

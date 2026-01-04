@@ -329,7 +329,9 @@ describe('Anomaly Detector Service', () => {
       it('should update baseline thresholds', () => {
         const beforeThresholds = { ...anomalyDetector.baseline.thresholds };
         // Add some samples
-        anomalyDetector.baseline.samples.quotesPerWallet = new Array(20).fill(0).map(() => Math.random() * 100);
+        anomalyDetector.baseline.samples.quotesPerWallet = new Array(20)
+          .fill(0)
+          .map(() => Math.random() * 100);
         anomalyDetector.updateThresholds();
         // Thresholds object should still exist
         expect(anomalyDetector.baseline.thresholds).toBeDefined();
@@ -367,6 +369,5 @@ describe('Anomaly Detector Service', () => {
         await expect(anomalyDetector.trackIp('192.168.1.1', 'quote')).resolves.not.toThrow();
       });
     });
-
   });
 });

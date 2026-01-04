@@ -13,10 +13,9 @@ jest.mock('@solana/web3.js', () => ({
       lastValidBlockHeight: 100000,
     }),
     getBalance: jest.fn().mockResolvedValue(1000000000),
-    getMultipleAccountsInfo: jest.fn().mockResolvedValue([
-      { lamports: 1000000000 },
-      { lamports: 2000000000 },
-    ]),
+    getMultipleAccountsInfo: jest
+      .fn()
+      .mockResolvedValue([{ lamports: 1000000000 }, { lamports: 2000000000 }]),
     sendRawTransaction: jest.fn().mockResolvedValue('TestSignature123'),
     confirmTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
     isBlockhashValid: jest.fn().mockResolvedValue({ value: true }),
@@ -46,10 +45,9 @@ describe('RPC Failover', () => {
           lastValidBlockHeight: 100000,
         }),
         getBalance: jest.fn().mockResolvedValue(1000000000),
-        getMultipleAccountsInfo: jest.fn().mockResolvedValue([
-          { lamports: 1000000000 },
-          { lamports: 2000000000 },
-        ]),
+        getMultipleAccountsInfo: jest
+          .fn()
+          .mockResolvedValue([{ lamports: 1000000000 }, { lamports: 2000000000 }]),
         isBlockhashValid: jest.fn().mockResolvedValue({ value: true }),
         simulateTransaction: jest.fn().mockResolvedValue({
           value: { err: null, logs: [], unitsConsumed: 200000 },
@@ -287,10 +285,7 @@ describe('RPC Failover', () => {
     });
 
     test('getMultipleBalances() should return balances map', async () => {
-      const pubkeys = [
-        { toBase58: () => 'Pubkey1' },
-        { toBase58: () => 'Pubkey2' },
-      ];
+      const pubkeys = [{ toBase58: () => 'Pubkey1' }, { toBase58: () => 'Pubkey2' }];
       const balances = await rpc.getMultipleBalances(pubkeys);
       expect(typeof balances).toBe('object');
     });

@@ -289,11 +289,7 @@ describe('Data Sync Service', () => {
 
       expect(result.synced).toBe(true);
       expect(mockRedisClient.set).toHaveBeenCalledWith('gasdf:burn:wallet:ABC123', '700');
-      expect(mockRedisClient.zIncrBy).toHaveBeenCalledWith(
-        'gasdf:burn:leaderboard',
-        200,
-        'ABC123'
-      );
+      expect(mockRedisClient.zIncrBy).toHaveBeenCalledWith('gasdf:burn:leaderboard', 200, 'ABC123');
     });
 
     it('should not update leaderboard for txcount keys', async () => {

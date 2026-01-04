@@ -16,7 +16,9 @@ function getHelius() {
       apiKey: config.HELIUS_API_KEY,
       network: config.USE_MAINNET ? 'mainnet' : 'devnet',
     });
-    logger.info('HELIUS', 'SDK initialized', { network: config.USE_MAINNET ? 'mainnet' : 'devnet' });
+    logger.info('HELIUS', 'SDK initialized', {
+      network: config.USE_MAINNET ? 'mainnet' : 'devnet',
+    });
   }
   return helius;
 }
@@ -57,7 +59,11 @@ async function getPriorityFeeEstimate(options = {}) {
 
   // Check cache (only if no specific accounts - global estimate)
   const now = Date.now();
-  if (accountKeys.length === 0 && priorityFeeCache.estimate && (now - priorityFeeCache.timestamp) < priorityFeeCache.ttl) {
+  if (
+    accountKeys.length === 0 &&
+    priorityFeeCache.estimate &&
+    now - priorityFeeCache.timestamp < priorityFeeCache.ttl
+  ) {
     return {
       ...priorityFeeCache.estimate,
       cached: true,
@@ -97,7 +103,6 @@ async function getPriorityFeeEstimate(options = {}) {
     });
 
     return estimate;
-
   } catch (error) {
     logger.warn('HELIUS', 'Failed to get priority fee estimate', {
       error: error.message,

@@ -436,7 +436,10 @@ describe('Database Client - With Initialized Pool', () => {
 
   describe('getBurnHistory() with pool', () => {
     it('should return burns and total count', async () => {
-      const burns = [{ id: 1, signature: 'sig1' }, { id: 2, signature: 'sig2' }];
+      const burns = [
+        { id: 1, signature: 'sig1' },
+        { id: 2, signature: 'sig2' },
+      ];
       mockQuery
         .mockResolvedValueOnce({ rows: burns })
         .mockResolvedValueOnce({ rows: [{ count: '2' }] });

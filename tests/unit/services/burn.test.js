@@ -531,7 +531,9 @@ describe('Burn Service', () => {
 
       // SOL: 9 decimals, 1B units = 1 SOL
       mockConnection.getParsedTokenAccountsByOwner.mockResolvedValue({
-        value: [createMockTokenAccount('So11111111111111111111111111111111111111112', 1000000000, 9)],
+        value: [
+          createMockTokenAccount('So11111111111111111111111111111111111111112', 1000000000, 9),
+        ],
       });
 
       const balances = await burnService.getTreasuryTokenBalances();
