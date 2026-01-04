@@ -1168,6 +1168,10 @@
       }
 
       /* === BLACK HOLE - Mobile optimized + Tappable === */
+      .singularity {
+        z-index: 15; /* Above .content (z-index: 10) for taps */
+      }
+
       .black-hole {
         width: 150px;
         height: 150px;
@@ -3173,7 +3177,8 @@
       setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
-        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.3, 0.75);
+        // Reduced bloom: strength 0.12 (was 0.2), radius 0.2 (was 0.3) - more subtle
+        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.12, 0.2, 0.8);
         this.composer.addPass(this.bloomPass);
       }
 
@@ -3191,9 +3196,9 @@
         const cameraZ = 5 - this.scrollProgress * 300;
         const cameraY = -this.scrollProgress * 150;
 
-        // WIDER mouse parallax
-        const mouseParallaxX = this.mouseX * 60;
-        const mouseParallaxY = this.mouseY * 25;
+        // Reduced mouse parallax (was 60/25 - now 30/12 for subtler effect)
+        const mouseParallaxX = this.mouseX * 30;
+        const mouseParallaxY = this.mouseY * 12;
 
         this.camera.position.z = cameraZ;
         this.camera.position.y = cameraY + mouseParallaxY;
