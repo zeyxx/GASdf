@@ -1,22 +1,29 @@
 /**
  * Harmony E-Score - User Engagement Oracle
  *
- * Calculates discounts based on 7 participation dimensions using Golden Ratio (φ).
- * Integration with HolDex for holistic user scoring.
+ * Integration with HolDex Oracle API for user engagement scoring.
  *
- * Dimensions:
- *   1. Holding     - $ASDF holdings relative to supply
- *   2. Burning     - Lifetime burn contribution
- *   3. API Usage   - Developer API calls
- *   4. App Dev     - Built applications using GASdf
- *   5. Node Ops    - Running infrastructure
- *   6. Referrals   - User acquisition
- *   7. Duration    - Time as active participant
+ * HolDex Endpoints:
+ *   /oracle/escore/:wallet              - Get E-Score + tier + benefits
+ *   /oracle/discount/:wallet/:operation - Get operation-specific discount
  *
- * E-Score range: 0-100 (like K-Score)
- * Discount formula: discount = min(95%, E-Score × 0.95)
+ * E-Score Dimensions (stored in HolDex participants table):
+ *   1. holdings        - $ASDF holdings relative to supply (todo)
+ *   2. total_burned    - Lifetime burn contribution (via /oracle/webhook/burns)
+ *   3. api_calls_30d   - Developer API calls (todo)
+ *   4. apps_live       - Built applications using GASdf (todo)
+ *   5. nodes_active    - Running infrastructure (todo)
+ *   6. referrals_active- User acquisition (todo)
+ *   7. first_activity_at - Duration (calculated)
  *
- * @see https://github.com/zeyxx/HolDex/blob/kscore-v8-rebased/GASDF_INTEGRATION_GUIDE.md
+ * E-Score Tiers:
+ *   Observer (0)    → Seedling (0.1) → Sprout (1) → Sapling (5)
+ *   → Tree (15)     → Grove (30)     → Forest (50) → Ecosystem (75)
+ *
+ * E-Score range: 0-100
+ * Discount formula: discount = min(95%, 1 - φ^(-E/25))
+ *
+ * @see https://github.com/zeyxx/HolDex
  */
 
 const config = require('../utils/config');
@@ -132,10 +139,17 @@ function eScoreToDiscount(eScore) {
 }
 
 /**
- * Fetch E-Score from HolDex Harmony API
+ * Fetch E-Score from HolDex Oracle API
+ *
+ * Endpoint: /oracle/escore/:wallet
+ * Response: {
+ *   wallet, e_score, tier: {name, icon}, is_registered,
+ *   benefits: {theoreticalDiscount, freeCalls, rateLimit, priority},
+ *   progress: {currentTier, nextTier, remaining}
+ * }
  *
  * @param {string} userPubkey - User's wallet address
- * @returns {Promise<{eScore: number, dimensions: Object, discount: number, cached: boolean}>}
+ * @returns {Promise<{eScore: number, tier: Object, discount: number, benefits: Object, cached: boolean}>}
  */
 async function getEScore(userPubkey) {
   // Check cache
@@ -147,7 +161,7 @@ async function getEScore(userPubkey) {
   const holdexUrl = process.env.HOLDEX_API_URL || config.HOLDEX_URL;
   if (!holdexUrl) {
     logger.debug('HARMONY', 'HOLDEX_API_URL not configured, returning 0');
-    return { eScore: 0, dimensions: {}, discount: 0, cached: false };
+    return { eScore: 0, tier: null, discount: 0, benefits: null, cached: false };
   }
 
   try {
@@ -159,7 +173,8 @@ async function getEScore(userPubkey) {
       headers['x-api-key'] = config.HOLDEX_API_KEY;
     }
 
-    const res = await fetch(`${holdexUrl}/harmony/user/${userPubkey}`, {
+    // Correct endpoint: /oracle/escore/:wallet
+    const res = await fetch(`${holdexUrl}/oracle/escore/${userPubkey}`, {
       signal: controller.signal,
       headers,
     });
@@ -168,26 +183,36 @@ async function getEScore(userPubkey) {
     if (!res.ok) {
       if (res.status === 404) {
         // User not found = new user, score 0
-        const result = { eScore: 0, dimensions: {}, discount: 0 };
+        const result = {
+          eScore: 0,
+          tier: { name: 'Observer', icon: '👁️' },
+          discount: 0,
+          benefits: null,
+        };
         escoreCache.set(userPubkey, { data: result, timestamp: Date.now() });
         return { ...result, cached: false };
       }
-      throw new Error(`Harmony API returned ${res.status}`);
+      throw new Error(`Oracle API returned ${res.status}`);
     }
 
     const data = await res.json();
 
-    const dimensions = data.dimensions || {};
-    const eScore = data.eScore ?? calculateEScore(dimensions);
-    const discount = data.discount ?? eScoreToDiscount(eScore);
+    // Map HolDex response format to GASdf format
+    const eScore = data.e_score ?? 0;
+    const tier = data.tier || { name: 'Observer', icon: '👁️' };
+    const discount = data.benefits?.theoreticalDiscount ?? eScoreToDiscount(eScore);
+    const benefits = data.benefits || null;
+    const progress = data.progress || null;
 
-    const result = { eScore, dimensions, discount };
+    const result = { eScore, tier, discount, benefits, progress, isRegistered: data.is_registered };
     escoreCache.set(userPubkey, { data: result, timestamp: Date.now() });
 
-    logger.debug('HARMONY', 'E-Score fetched', {
+    logger.debug('HARMONY', 'E-Score fetched from Oracle', {
       user: userPubkey.slice(0, 8),
       eScore,
+      tier: tier.name,
       discount: (discount * 100).toFixed(1) + '%',
+      isRegistered: data.is_registered,
     });
 
     return { ...result, cached: false };
@@ -197,7 +222,14 @@ async function getEScore(userPubkey) {
       error: error.message,
     });
 
-    return { eScore: 0, dimensions: {}, discount: 0, cached: false, error: error.message };
+    return {
+      eScore: 0,
+      tier: null,
+      discount: 0,
+      benefits: null,
+      cached: false,
+      error: error.message,
+    };
   }
 }
 
@@ -205,17 +237,18 @@ async function getEScore(userPubkey) {
  * Get combined discount (holder tier + E-Score)
  *
  * Takes the maximum of holder discount and E-Score discount.
+ * E-Score discount comes from HolDex /oracle/escore/:wallet
  *
  * @param {string} userPubkey - User's wallet address
  * @param {number} holdings - User's $ASDF holdings
  * @param {number} totalSupply - Total $ASDF supply
- * @returns {Promise<{discount: number, source: string, holderTier: string, eScore: number}>}
+ * @returns {Promise<{discount: number, source: string, holderTier: string, eScore: number, eScoreTier: Object}>}
  */
 async function getDiscount(userPubkey, holdings = 0, totalSupply = 0) {
   // Get holder-based discount
   const holderData = getHolderDiscount(holdings, totalSupply);
 
-  // Get E-Score based discount
+  // Get E-Score based discount from HolDex Oracle
   const eScoreData = await getEScore(userPubkey);
 
   // Use the higher of the two discounts
@@ -232,11 +265,75 @@ async function getDiscount(userPubkey, holdings = 0, totalSupply = 0) {
   return {
     discount,
     source,
+    // Holder data
     holderTier: holderData.tier,
     holderDiscount: holderData.discount,
+    // E-Score data (from HolDex Oracle)
     eScore: eScoreData.eScore,
+    eScoreTier: eScoreData.tier,
     eScoreDiscount: eScoreData.discount,
+    // Extra HolDex data
+    benefits: eScoreData.benefits,
+    progress: eScoreData.progress,
+    isRegistered: eScoreData.isRegistered,
   };
+}
+
+/**
+ * Get operation-specific discount from HolDex Oracle
+ *
+ * Endpoint: /oracle/discount/:wallet/:operation
+ * Operations: 'gasdf_fee', 'holdex_api', etc.
+ *
+ * @param {string} userPubkey - User's wallet address
+ * @param {string} operation - Operation type (default: 'gasdf_fee')
+ * @returns {Promise<{discount: number, cached: boolean}>}
+ */
+async function getOperationDiscount(userPubkey, operation = 'gasdf_fee') {
+  const holdexUrl = process.env.HOLDEX_API_URL || config.HOLDEX_URL;
+  if (!holdexUrl) {
+    return { discount: 0, cached: false, error: 'HOLDEX_API_URL not configured' };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HOLDEX_HARMONY_TIMEOUT);
+
+    const headers = { Accept: 'application/json' };
+    if (config.HOLDEX_API_KEY) {
+      headers['x-api-key'] = config.HOLDEX_API_KEY;
+    }
+
+    const res = await fetch(`${holdexUrl}/oracle/discount/${userPubkey}/${operation}`, {
+      signal: controller.signal,
+      headers,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        return { discount: 0, cached: false };
+      }
+      throw new Error(`Oracle discount API returned ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    logger.debug('HARMONY', 'Operation discount fetched', {
+      user: userPubkey.slice(0, 8),
+      operation,
+      discount: (data.discount * 100).toFixed(1) + '%',
+    });
+
+    return { discount: data.discount ?? 0, cached: false };
+  } catch (error) {
+    logger.warn('HARMONY', 'Operation discount fetch failed', {
+      user: userPubkey.slice(0, 8),
+      operation,
+      error: error.message,
+    });
+    return { discount: 0, cached: false, error: error.message };
+  }
 }
 
 /**
@@ -372,11 +469,12 @@ function getCacheStats() {
 }
 
 module.exports = {
-  // E-Score
+  // E-Score (via HolDex Oracle /oracle/escore/:wallet)
   getEScore,
   calculateEScore,
   eScoreToDiscount,
   getDiscount,
+  getOperationDiscount, // /oracle/discount/:wallet/:operation
 
   // Holder tiers
   getHolderDiscount,
