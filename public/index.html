@@ -18,24 +18,25 @@
       --space-lg: 34px;
       --space-xl: 55px;
       --space-2xl: 89px;
-      --text-xs: 12px;
-      --text-sm: 14px;
-      --text-md: 16px;
-      --text-lg: 20px;
-      --text-xl: 28px;
-      --text-2xl: 40px;
-      --text-3xl: 56px;
+      --space-3xl: 144px;
+      --text-xs: 13px;
+      --text-sm: 15px;
+      --text-md: 17px;
+      --text-lg: 22px;
+      --text-xl: 32px;
+      --text-2xl: 44px;
+      --text-3xl: 60px;
       --white: #ffffff;
-      --white-90: rgba(255,255,255,0.9);
-      --white-70: rgba(255,255,255,0.7);
-      --white-50: rgba(255,255,255,0.5);
-      --white-30: rgba(255,255,255,0.3);
-      --white-10: rgba(255,255,255,0.1);
+      --white-90: rgba(255,255,255,0.90);
+      --white-70: rgba(255,255,255,0.70);
+      --white-50: rgba(255,255,255,0.50);
+      --white-30: rgba(255,255,255,0.30);
+      --white-10: rgba(255,255,255,0.10);
       --white-05: rgba(255,255,255,0.05);
       --gold: #c9a227;
-      --gold-soft: rgba(201,162,39,0.15);
+      --gold-soft: rgba(201,162,39,0.12);
       --flame: #ff6b35;
-      --bg: #050508;
+      --bg: #000000;
     }
 
     html { scroll-behavior: smooth; }
@@ -46,102 +47,90 @@
       color: var(--white);
       -webkit-font-smoothing: antialiased;
       font-weight: 300;
-      line-height: 1.6;
+      line-height: 1.7;
       overflow-x: hidden;
     }
 
     /* ================================================================
-       SINGULARITY - Pure CSS
+       THREE.JS SPACE CONTAINER
+       ================================================================ */
+    #space-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* ================================================================
+       SINGULARITY - Fixed CSS Black Hole
+       The space flows around it, but it stays fixed
        ================================================================ */
     .singularity {
       position: fixed;
       inset: 0;
-      z-index: 0;
-      overflow: hidden;
-      background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(15, 10, 25, 1) 0%, var(--bg) 100%);
-    }
-
-    /* Cosmic ambient glow */
-    .singularity::before {
-      content: '';
-      position: absolute;
-      width: 200%;
-      height: 200%;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -30%);
-      background:
-        radial-gradient(ellipse 40% 30% at 50% 80%, rgba(201,162,39,0.03) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 40% at 30% 70%, rgba(100,80,150,0.02) 0%, transparent 60%),
-        radial-gradient(ellipse 50% 35% at 70% 75%, rgba(80,100,150,0.02) 0%, transparent 60%);
+      z-index: 2;
       pointer-events: none;
+      overflow: hidden;
     }
 
-    /* The Black Hole */
     .black-hole {
       position: absolute;
-      bottom: -60vh;
+      bottom: -40vh;
       left: 50%;
       transform: translateX(-50%);
-      width: 280px;
-      height: 280px;
-      transition: bottom 0.1s ease-out;
+      width: 320px;
+      height: 320px;
+      transition: bottom 0.15s ease-out, transform 0.15s ease-out;
     }
 
-    /* Event Horizon - The void */
     .event-horizon {
       position: absolute;
       inset: 0;
       border-radius: 50%;
       background: #000;
       box-shadow:
-        0 0 0 1px rgba(201,162,39,0.1),
-        inset 0 0 60px 20px rgba(0,0,0,1);
+        0 0 0 1px rgba(201,162,39,0.15),
+        inset 0 0 80px 30px rgba(0,0,0,1);
     }
 
-    /* Photon Ring - Golden glow at the edge */
     .photon-ring {
       position: absolute;
-      inset: -8px;
+      inset: -10px;
       border-radius: 50%;
       background: transparent;
       box-shadow:
-        0 0 40px 8px rgba(201,162,39,0.4),
-        0 0 80px 20px rgba(201,162,39,0.2),
-        0 0 120px 40px rgba(201,162,39,0.1),
-        inset 0 0 20px 5px rgba(201,162,39,0.3);
+        0 0 60px 12px rgba(201,162,39,0.5),
+        0 0 100px 30px rgba(201,162,39,0.25),
+        0 0 150px 50px rgba(201,162,39,0.1),
+        inset 0 0 30px 8px rgba(201,162,39,0.4);
       animation: photon-pulse 4s ease-in-out infinite;
     }
 
     @keyframes photon-pulse {
-      0%, 100% { opacity: 0.8; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.02); }
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.03); }
     }
 
-    /* Accretion Disk */
     .accretion-disk {
       position: absolute;
-      inset: -100px;
+      inset: -120px;
       border-radius: 50%;
-      border: 2px solid transparent;
       background:
-        linear-gradient(90deg, transparent 0%, rgba(201,162,39,0.15) 25%, rgba(255,180,80,0.2) 50%, rgba(201,162,39,0.15) 75%, transparent 100%);
+        linear-gradient(90deg, transparent 0%, rgba(201,162,39,0.2) 25%, rgba(255,180,80,0.25) 50%, rgba(201,162,39,0.2) 75%, transparent 100%);
       background-size: 200% 100%;
       transform: rotateX(75deg);
-      animation: accretion-spin 20s linear infinite;
-      opacity: 0.7;
+      animation: accretion-spin 18s linear infinite;
+      opacity: 0.8;
     }
 
     .accretion-disk::before {
       content: '';
       position: absolute;
-      inset: 20px;
+      inset: 25px;
       border-radius: 50%;
-      border: 1px solid rgba(201,162,39,0.1);
       background:
-        linear-gradient(90deg, transparent 0%, rgba(255,200,100,0.1) 30%, rgba(201,162,39,0.15) 50%, rgba(255,200,100,0.1) 70%, transparent 100%);
+        linear-gradient(90deg, transparent 0%, rgba(255,200,100,0.15) 30%, rgba(201,162,39,0.2) 50%, rgba(255,200,100,0.15) 70%, transparent 100%);
       background-size: 200% 100%;
-      animation: accretion-spin 15s linear infinite reverse;
+      animation: accretion-spin 12s linear infinite reverse;
     }
 
     @keyframes accretion-spin {
@@ -149,45 +138,23 @@
       to { background-position: 200% 50%; }
     }
 
-    /* Stars - Subtle CSS dots */
-    .stars {
+    /* Gravitational lensing effect */
+    .lensing {
       position: absolute;
-      inset: 0;
-      background-image:
-        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 30% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 40% 60%, rgba(255,255,255,0.2) 0%, transparent 100%),
-        radial-gradient(1px 1px at 50% 30%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 70% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 80% 45%, rgba(255,255,255,0.2) 0%, transparent 100%),
-        radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 25% 35%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 35% 75%, rgba(255,255,255,0.2) 0%, transparent 100%),
-        radial-gradient(1px 1px at 45% 5%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 55% 55%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(1px 1px at 65% 25%, rgba(255,255,255,0.4) 0%, transparent 100%),
-        radial-gradient(1px 1px at 75% 90%, rgba(255,255,255,0.2) 0%, transparent 100%),
-        radial-gradient(1px 1px at 85% 40%, rgba(255,255,255,0.5) 0%, transparent 100%),
-        radial-gradient(1px 1px at 95% 65%, rgba(255,255,255,0.3) 0%, transparent 100%),
-        radial-gradient(2px 2px at 5% 45%, rgba(255,255,255,0.6) 0%, transparent 100%),
-        radial-gradient(2px 2px at 95% 15%, rgba(255,255,255,0.5) 0%, transparent 100%);
-      animation: stars-twinkle 8s ease-in-out infinite alternate;
+      inset: -200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center,
+        transparent 30%,
+        rgba(201,162,39,0.02) 40%,
+        rgba(201,162,39,0.04) 50%,
+        transparent 70%
+      );
+      animation: lensing-rotate 60s linear infinite;
     }
 
-    @keyframes stars-twinkle {
-      0% { opacity: 0.6; }
-      100% { opacity: 0.9; }
-    }
-
-    /* Vignette */
-    .vignette {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse 70% 60% at 50% 50%, transparent 0%, var(--bg) 100%);
-      pointer-events: none;
+    @keyframes lensing-rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     /* ================================================================
@@ -198,270 +165,436 @@
       z-index: 10;
     }
 
+    section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-3xl) var(--space-lg);
+      position: relative;
+    }
+
+    section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.3) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .display-title {
+      font-size: clamp(var(--text-2xl), 10vw, var(--text-3xl));
+      font-weight: 200;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      text-shadow: 0 2px 40px rgba(0,0,0,0.8);
+    }
+
+    .section-title {
+      font-size: clamp(var(--text-xl), 6vw, var(--text-2xl));
+      font-weight: 200;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: var(--space-md);
+      text-shadow: 0 2px 30px rgba(0,0,0,0.6);
+    }
+
+    .body-text {
+      font-size: var(--text-md);
+      font-weight: 300;
+      color: var(--white-70);
+      line-height: 1.8;
+      max-width: 550px;
+      text-shadow: 0 1px 10px rgba(0,0,0,0.5);
+    }
+
+    .label {
+      font-size: var(--text-xs);
+      font-weight: 400;
+      color: var(--white-50);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: var(--space-lg);
+    }
+
+    .highlight { color: var(--gold); }
+    .flame-text { color: var(--flame); }
+
+    /* Navigation */
     nav {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       z-index: 1000;
-      padding: var(--space-md) var(--space-lg);
+      padding: var(--space-lg) var(--space-xl);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: linear-gradient(180deg, rgba(5,5,8,0.95) 0%, transparent 100%);
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(30px);
     }
 
-    .logo { font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.05em; }
+    .logo { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0.05em; }
     .logo span { color: var(--gold); }
 
-    .nav-links { display: flex; gap: var(--space-lg); }
-    .nav-links a { color: var(--white-50); text-decoration: none; font-size: var(--text-xs); font-weight: 400; transition: color 0.2s; }
+    .nav-progress { display: flex; align-items: center; gap: var(--space-sm); }
+    .progress-dots { display: flex; gap: 4px; }
+    .progress-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--white-10);
+      transition: all 0.4s;
+    }
+    .progress-dot.active { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+    .progress-label { font-size: var(--text-xs); color: var(--gold); font-weight: 500; }
+
+    .nav-links { display: flex; gap: var(--space-xl); }
+    .nav-links a {
+      font-size: var(--text-xs);
+      font-weight: 400;
+      color: var(--white-50);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
     .nav-links a:hover { color: var(--white); }
 
     .nav-cta {
-      background: var(--gold);
-      color: var(--bg);
-      border: none;
-      padding: var(--space-xs) var(--space-md);
-      border-radius: 6px;
+      background: transparent;
+      border: 1px solid var(--white-30);
+      padding: var(--space-sm) var(--space-lg);
       font-size: var(--text-xs);
-      font-weight: 600;
+      font-weight: 400;
+      color: var(--white-70);
+      letter-spacing: 0.1em;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: all 0.3s;
     }
-    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(201,162,39,0.3); }
+    .nav-cta:hover { background: var(--white); color: #000; }
 
-    section {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl) var(--space-lg);
-      position: relative;
-    }
-
-    .container { width: 100%; max-width: 900px; margin: 0 auto; }
-
-    .display-title {
-      font-size: clamp(var(--text-2xl), 8vw, var(--text-3xl));
-      font-weight: 200;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin-bottom: var(--space-md);
-    }
-
-    .section-title {
-      font-size: clamp(var(--text-xl), 5vw, var(--text-2xl));
-      font-weight: 200;
-      letter-spacing: -0.02em;
-      line-height: 1.15;
-      margin-bottom: var(--space-sm);
-    }
-
-    .highlight { color: var(--gold); }
-    .flame { color: var(--flame); }
-
-    .body-text { font-size: var(--text-md); color: var(--white-70); max-width: 500px; }
-    .label { font-size: var(--text-xs); font-weight: 500; color: var(--white-50); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: var(--space-md); }
-
-    #hero { min-height: 100vh; text-align: center; }
+    /* Hero */
+    #hero { text-align: center; padding-top: var(--space-3xl); }
 
     .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-xs);
-      background: var(--white-05);
-      border: 1px solid var(--white-10);
-      padding: var(--space-xs) var(--space-md);
-      border-radius: 20px;
+      gap: var(--space-sm);
       font-size: var(--text-xs);
-      color: var(--white-70);
-      margin-bottom: var(--space-lg);
+      color: var(--white-50);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-2xl);
     }
-
-    .live-dot {
-      width: 6px;
-      height: 6px;
-      background: #00ff88;
-      border-radius: 50%;
-      animation: pulse-live 2s infinite;
-    }
-
-    @keyframes pulse-live {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .hero-subtitle { font-size: var(--text-lg); color: var(--white-70); margin-bottom: var(--space-xl); }
-
-    .hero-cta {
+    .hero-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
       background: var(--gold);
-      color: var(--bg);
-      border: none;
-      padding: var(--space-md) var(--space-xl);
-      border-radius: 8px;
-      font-size: var(--text-md);
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-bottom: var(--space-xl);
+      border-radius: 50%;
+      animation: pulse 3s ease-in-out infinite;
     }
-    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
 
-    .hero-stats { display: flex; justify-content: center; gap: var(--space-2xl); margin-bottom: var(--space-lg); }
-    .stat-value { font-size: var(--text-xl); font-weight: 300; font-variant-numeric: tabular-nums; }
-    .stat-label { font-size: var(--text-xs); color: var(--white-50); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
+    }
+
+    .hero-subtitle {
+      font-size: var(--text-lg);
+      font-weight: 300;
+      color: var(--white-70);
+      max-width: 500px;
+      margin: var(--space-xl) auto var(--space-2xl);
+      line-height: 1.7;
+    }
 
     .live-ticker {
       display: inline-flex;
       align-items: center;
       gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-md);
+      padding: var(--space-sm) var(--space-lg);
       background: rgba(201,162,39,0.08);
       border: 1px solid rgba(201,162,39,0.15);
       border-radius: 100px;
       font-size: var(--text-xs);
       color: var(--gold);
-      margin-bottom: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+    .ticker-icon { animation: pulse 1.5s ease-in-out infinite; }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: var(--gold);
+      color: #000;
+      border: none;
+      padding: var(--space-md) var(--space-2xl);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.3s;
+      animation: cta-glow 2s ease-in-out infinite;
+    }
+    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
+
+    @keyframes cta-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(201,162,39,0.4); }
+      50% { box-shadow: 0 0 20px 5px rgba(201,162,39,0.2); }
     }
 
-    .ticker-icon { animation: pulse-ticker 1.5s ease-in-out infinite; }
-    @keyframes pulse-ticker {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(0.9); }
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-3xl);
+      margin-top: var(--space-2xl);
+      padding-top: var(--space-xl);
+      border-top: 1px solid var(--white-10);
     }
 
-    .cta-secondary-link {
+    .stat-value {
+      font-size: var(--text-xl);
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-label {
+      font-size: var(--text-xs);
+      color: var(--white-50);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-top: var(--space-sm);
+    }
+
+    .cta-secondary {
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
       font-size: var(--text-xs);
       color: var(--gold);
       text-decoration: none;
-      cursor: pointer;
       margin-top: var(--space-lg);
-      transition: gap 0.3s ease;
+      cursor: pointer;
+      transition: gap 0.3s;
     }
-    .cta-secondary-link:hover { gap: var(--space-sm); }
-    .cta-secondary-link::after { content: '→'; transition: transform 0.3s ease; }
-    .cta-secondary-link:hover::after { transform: translateX(4px); }
+    .cta-secondary:hover { gap: var(--space-sm); }
+    .cta-secondary::after { content: '→'; transition: transform 0.3s; }
+    .cta-secondary:hover::after { transform: translateX(4px); }
 
-    .steps { display: flex; flex-direction: column; gap: var(--space-lg); }
-    .step {
+    /* Steps */
+    .section-header { text-align: center; margin-bottom: var(--space-2xl); }
+
+    .steps-vertical {
       display: flex;
-      gap: var(--space-lg);
-      align-items: flex-start;
-      padding: var(--space-lg);
-      background: var(--white-05);
-      border: 1px solid var(--white-10);
-      border-radius: 12px;
-      transition: border-color 0.3s;
+      flex-direction: column;
+      gap: var(--space-xl);
+      max-width: 500px;
+      margin: 0 auto;
     }
-    .step:hover { border-color: var(--white-30); }
-    .step-number { font-size: var(--text-2xl); font-weight: 200; color: var(--gold); opacity: 0.5; }
-    .step-title { font-size: var(--text-lg); font-weight: 400; margin-bottom: 4px; }
-    .step-desc { font-size: var(--text-sm); color: var(--white-50); }
 
-    #ecosystem { min-height: 100vh; background: radial-gradient(ellipse at center, rgba(201,162,39,0.05) 0%, transparent 60%); }
-    .ecosystem-header { text-align: center; margin-bottom: var(--space-xl); }
-
-    .token-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-md); margin-top: var(--space-xl); }
-    .token-card {
-      background: var(--white-05);
-      border: 1px solid var(--white-10);
-      border-radius: 10px;
-      padding: var(--space-md);
-      text-align: center;
-      transition: all 0.3s;
+    .step { display: flex; gap: var(--space-lg); align-items: flex-start; }
+    .step-number {
+      font-size: var(--text-2xl);
+      font-weight: 200;
+      color: var(--white-30);
+      line-height: 1;
+      min-width: 60px;
     }
-    .token-card:hover { border-color: var(--white-30); transform: translateY(-2px); }
-    .token-icon { width: 36px; height: 36px; border-radius: 50%; margin: 0 auto var(--space-sm); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); font-weight: 600; }
-    .token-symbol { font-size: var(--text-sm); font-weight: 500; margin-bottom: 2px; }
-    .token-burn { font-size: var(--text-xs); color: var(--flame); }
+    .step-title { font-size: var(--text-lg); font-weight: 400; margin-bottom: var(--space-xs); }
+    .step-desc { font-size: var(--text-sm); color: var(--white-70); line-height: 1.8; }
 
-    .tiers-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-sm); margin: var(--space-xl) 0; }
-    .tier {
-      background: var(--white-05);
+    /* Cards */
+    .cards-row { display: flex; gap: var(--space-md); flex-wrap: wrap; justify-content: center; }
+    .card {
+      background: rgba(0,0,0,0.5);
       border: 1px solid var(--white-10);
-      border-radius: 10px;
-      padding: var(--space-md);
-      text-align: center;
-      transition: all 0.3s;
+      backdrop-filter: blur(10px);
+      padding: var(--space-xl);
+      max-width: 320px;
+      transition: all 0.4s;
     }
-    .tier:hover { border-color: var(--gold-soft); background: var(--gold-soft); }
-    .tier-emoji { font-size: var(--text-xl); margin-bottom: var(--space-xs); }
-    .tier-name { font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.05em; margin-bottom: var(--space-xs); }
-    .tier-discount { font-size: var(--text-lg); font-weight: 300; color: var(--gold); margin-bottom: var(--space-xs); }
-    .tier-tokens { font-size: var(--text-xs); color: var(--white-50); }
-    .tier-usd { font-size: var(--text-xs); color: var(--white-30); margin-top: 2px; }
-    .tier-note { text-align: center; font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-md); }
+    .card:hover { border-color: var(--gold-soft); transform: translateY(-5px); }
+    .card-icon { font-size: var(--text-lg); margin-bottom: var(--space-lg); opacity: 0.8; }
+    .card-title { font-size: var(--text-md); font-weight: 400; margin-bottom: var(--space-xs); }
+    .card-subtitle { font-size: var(--text-xs); color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-md); }
+    .card-body { font-size: var(--text-sm); color: var(--white-70); line-height: 1.8; }
 
-    .token-stats { display: flex; justify-content: center; gap: var(--space-xl); margin: var(--space-lg) 0; padding: var(--space-md) var(--space-xl); background: var(--white-05); border: 1px solid var(--white-10); border-radius: 10px; }
+    /* Flywheel */
+    .flywheel-minimal { text-align: center; padding: var(--space-2xl) 0; }
+    .flywheel-icon { font-size: 80px; margin-bottom: var(--space-xl); opacity: 0.9; }
+    .flywheel-steps { display: flex; justify-content: center; gap: var(--space-lg); flex-wrap: wrap; margin-bottom: var(--space-xl); }
+    .flywheel-step {
+      font-size: var(--text-sm);
+      color: var(--white-70);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    .flywheel-step::after { content: '→'; color: var(--white-30); margin-left: var(--space-sm); }
+    .flywheel-step:last-child::after { content: ''; }
+
+    /* Tiers */
+    .token-stats {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+      margin-top: var(--space-xl);
+      padding: var(--space-md) var(--space-xl);
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border: 1px solid var(--white-10);
+    }
     .token-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .token-stat-value { font-size: var(--text-lg); font-weight: 400; color: var(--white); font-variant-numeric: tabular-nums; }
+    .token-stat-value { font-size: var(--text-lg); font-weight: 400; font-variant-numeric: tabular-nums; }
     .token-stat-label { font-size: var(--text-xs); color: var(--white-50); text-transform: uppercase; letter-spacing: 0.1em; }
 
+    .tiers-linear { display: flex; justify-content: center; gap: var(--space-xl); flex-wrap: wrap; margin: var(--space-xl) 0; }
+    .tier {
+      text-align: center;
+      padding: var(--space-lg);
+      min-width: 100px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .tier:hover { transform: translateY(-5px); }
+    .tier-emoji { font-size: var(--text-xl); margin-bottom: var(--space-sm); display: inline-block; transition: transform 0.3s; }
+    .tier:hover .tier-emoji { transform: scale(1.3); }
+    .tier-name { font-size: var(--text-xs); font-weight: 400; color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-xs); }
+    .tier-discount { font-size: var(--text-lg); font-weight: 300; color: var(--gold); }
+    .tier-tokens { font-size: var(--text-xs); color: var(--white-70); margin-top: var(--space-xs); }
+    .tier-usd { font-size: 11px; color: var(--white-30); margin-top: 4px; }
+
+    .tier[data-tier="diamond"]:hover { border-color: rgba(185,242,255,0.3); background: rgba(185,242,255,0.05); }
+    .tier[data-tier="diamond"] .tier-discount { color: #b9f2ff; }
+    .tier[data-tier="platinum"]:hover { border-color: rgba(229,228,226,0.3); background: rgba(229,228,226,0.05); }
+    .tier[data-tier="platinum"] .tier-discount { color: #e5e4e2; }
+    .tier[data-tier="gold"]:hover { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.05); }
+    .tier[data-tier="gold"] .tier-discount { color: #ffd700; }
+    .tier[data-tier="silver"]:hover { border-color: rgba(192,192,192,0.3); background: rgba(192,192,192,0.05); }
+    .tier[data-tier="silver"] .tier-discount { color: #c0c0c0; }
+    .tier[data-tier="bronze"]:hover { border-color: rgba(205,127,50,0.3); background: rgba(205,127,50,0.05); }
+    .tier[data-tier="bronze"] .tier-discount { color: #cd7f32; }
+
+    .tier-note { text-align: center; font-size: var(--text-xs); color: var(--white-50); margin-top: var(--space-lg); }
     .tier-footer { text-align: center; margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--white-10); }
     .tier-footer a { color: var(--gold); text-decoration: none; }
     .tier-update-time { font-size: var(--text-xs); color: var(--white-30); }
 
-    .phi-symbol { font-size: 80px; font-weight: 200; color: var(--gold); text-align: center; margin-bottom: var(--space-md); text-shadow: 0 0 60px rgba(201,162,39,0.3); }
-    .phi-value { font-family: monospace; font-size: var(--text-sm); color: var(--white-30); text-align: center; margin-top: var(--space-sm); }
+    /* Phi */
+    .phi-hero { text-align: center; }
+    .phi-symbol {
+      font-size: 160px;
+      font-style: italic;
+      font-family: 'Times New Roman', Georgia, serif;
+      color: var(--gold);
+      opacity: 0.6;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.5s;
+    }
+    .phi-symbol:hover { opacity: 1; transform: rotate(360deg) scale(1.1); text-shadow: 0 0 60px var(--gold); }
+    .phi-value {
+      font-size: var(--text-sm);
+      color: var(--white-30);
+      font-family: 'SF Mono', monospace;
+      letter-spacing: 0.1em;
+      margin-top: var(--space-md);
+    }
 
-    .formulas { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-md); margin-top: var(--space-xl); }
-    .formula { background: var(--white-05); border: 1px solid var(--white-10); border-radius: 10px; padding: var(--space-lg); text-align: center; }
-    .formula-label { font-size: 10px; font-weight: 600; color: var(--white-30); letter-spacing: 0.15em; margin-bottom: var(--space-sm); }
-    .formula-code { font-family: monospace; font-size: var(--text-xs); color: var(--white-50); margin-bottom: var(--space-sm); }
-    .formula-result { font-size: var(--text-lg); font-weight: 300; }
+    .formulas { display: flex; flex-direction: column; gap: var(--space-lg); max-width: 500px; margin: var(--space-2xl) auto 0; }
+    .formula {
+      padding: var(--space-lg);
+      border-left: 1px solid var(--white-10);
+      background: rgba(0,0,0,0.3);
+    }
+    .formula-label { font-size: var(--text-xs); font-weight: 400; color: var(--white-50); letter-spacing: 0.1em; margin-bottom: var(--space-sm); }
+    .formula-code { font-family: 'SF Mono', monospace; font-size: var(--text-sm); color: var(--white-70); }
+    .formula-result { font-size: var(--text-lg); font-weight: 300; margin-top: var(--space-sm); }
 
-    #cta { text-align: center; background: radial-gradient(ellipse at center, rgba(201,162,39,0.1) 0%, transparent 50%); }
-    .cta-buttons { display: flex; justify-content: center; gap: var(--space-md); margin-top: var(--space-xl); }
-    .cta-primary { background: var(--gold); color: var(--bg); border: none; padding: var(--space-md) var(--space-xl); border-radius: 8px; font-size: var(--text-md); font-weight: 600; cursor: pointer; transition: all 0.3s; }
-    .cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
-    .cta-secondary { background: transparent; color: var(--white); border: 1px solid var(--white-30); padding: var(--space-md) var(--space-xl); border-radius: 8px; font-size: var(--text-md); cursor: pointer; transition: all 0.3s; text-decoration: none; }
-    .cta-secondary:hover { border-color: var(--white); background: var(--white-05); }
+    /* CTA */
+    .cta-minimal { text-align: center; max-width: 500px; margin: 0 auto; }
+    .cta-buttons { display: flex; gap: var(--space-md); justify-content: center; margin-top: var(--space-xl); }
+    .cta-btn-primary {
+      background: var(--gold);
+      color: #000;
+      border: none;
+      padding: var(--space-md) var(--space-2xl);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .cta-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,162,39,0.4); }
+    .cta-btn-secondary {
+      background: transparent;
+      color: var(--white-70);
+      border: 1px solid var(--white-30);
+      padding: var(--space-md) var(--space-2xl);
+      font-size: var(--text-sm);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .cta-btn-secondary:hover { border-color: var(--white); color: var(--white); }
 
-    footer { padding: var(--space-xl) var(--space-lg); text-align: center; border-top: 1px solid var(--white-10); }
-    .footer-links { display: flex; justify-content: center; gap: var(--space-lg); margin-bottom: var(--space-md); }
-    .footer-links a { color: var(--white-50); text-decoration: none; font-size: var(--text-xs); }
+    /* Footer */
+    footer {
+      padding: var(--space-2xl) var(--space-lg);
+      text-align: center;
+      border-top: 1px solid var(--white-10);
+      background: rgba(0,0,0,0.5);
+    }
+    .footer-links { display: flex; justify-content: center; gap: var(--space-2xl); margin-bottom: var(--space-lg); }
+    .footer-links a { font-size: var(--text-xs); color: var(--white-30); text-decoration: none; letter-spacing: 0.1em; transition: color 0.3s; }
     .footer-links a:hover { color: var(--white); }
     .footer-copy { font-size: var(--text-xs); color: var(--white-30); }
 
-    .nav-progress { display: flex; align-items: center; gap: var(--space-sm); }
-    .progress-dots { display: flex; gap: 4px; }
-    .progress-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--white-10); transition: all 0.4s; }
-    .progress-dot.active { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
-    .progress-label { font-size: var(--text-xs); color: var(--gold); font-weight: 500; }
-
+    /* Tooltip */
     .tooltip-trigger { border-bottom: 1px dotted var(--white-30); cursor: help; }
 
-    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    /* Reveal animation */
+    .reveal { opacity: 0; transform: translateY(15px); transition: opacity 0.8s ease, transform 0.8s ease; }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
+    /* Responsive */
     @media (max-width: 768px) {
-      .nav-links { display: none; }
-      .nav-progress { display: none; }
-      .hero-stats { flex-direction: column; gap: var(--space-lg); }
-      .tiers-grid { grid-template-columns: repeat(2, 1fr); }
-      .tiers-grid .tier:last-child { grid-column: span 2; }
-      .formulas { grid-template-columns: 1fr; }
-      .cta-buttons { flex-direction: column; }
+      section { padding: var(--space-2xl) var(--space-md); }
+      .hero-stats { flex-direction: column; gap: var(--space-xl); }
+      .nav-links, .nav-progress { display: none; }
+      .cards-row { flex-direction: column; align-items: center; }
+      .tiers-linear { gap: var(--space-md); }
+      .tier { min-width: 80px; padding: var(--space-md); }
       .token-stats { flex-wrap: wrap; gap: var(--space-md); }
-      .black-hole { width: 180px; height: 180px; }
+      .cta-buttons { flex-direction: column; }
+      .black-hole { width: 220px; height: 220px; }
     }
   </style>
 </head>
 <body>
+  <!-- Three.js Space -->
+  <div id="space-container"></div>
 
-  <!-- Singularity Background -->
+  <!-- CSS Singularity - Fixed in background -->
   <div class="singularity">
-    <div class="stars"></div>
-    <div class="black-hole">
+    <div class="black-hole" id="blackHole">
+      <div class="lensing"></div>
       <div class="accretion-disk"></div>
       <div class="photon-ring"></div>
       <div class="event-horizon"></div>
     </div>
-    <div class="vignette"></div>
   </div>
 
   <nav>
@@ -470,48 +603,48 @@
       <div class="progress-dots">
         <span class="progress-dot active" data-section="hero"></span>
         <span class="progress-dot" data-section="how"></span>
-        <span class="progress-dot" data-section="ecosystem"></span>
+        <span class="progress-dot" data-section="flywheel"></span>
+        <span class="progress-dot" data-section="tiers"></span>
         <span class="progress-dot" data-section="phi"></span>
-        <span class="progress-dot" data-section="cta"></span>
       </div>
       <span class="progress-label">Explorer</span>
     </div>
     <div class="nav-links">
-      <a href="#how">How it works</a>
-      <a href="#ecosystem">Ecosystem</a>
+      <a href="#how">Process</a>
+      <a href="#flywheel">Flywheel</a>
       <a href="#tiers">Tiers</a>
       <a href="#phi">Mathematics</a>
     </div>
-    <button class="nav-cta">LAUNCH APP</button>
+    <button class="nav-cta">LAUNCH</button>
   </nav>
 
   <div class="content">
-
     <section id="hero">
       <div class="container">
-        <div class="hero-badge reveal">
-          <span class="live-dot"></span>
-          Live on Solana Mainnet
-        </div>
+        <div class="hero-badge reveal">Live on Mainnet</div>
         <h1 class="display-title reveal">
-          No SOL?<br>
-          <span class="highlight">No problem.</span>
+          Stuck without SOL?<br>
+          <span class="highlight">Not anymore.</span>
         </h1>
         <p class="hero-subtitle reveal">
-          Pay gas with <strong>any token</strong>. We turn it into <span class="highlight">$asdfasdfa</span> and burn <span class="tooltip-trigger" id="burnRateHero">76.4%</span> forever.
+          Pay with <strong>any token you want</strong>.<br>
+          We turn it all into flames. <span class="tooltip-trigger"><span id="burnRateHero">76.4%</span> burned</span>. Forever.
         </p>
+
         <div class="live-ticker reveal">
           <span class="ticker-icon">🔥</span>
-          <span class="ticker-text" id="liveTicker">Loading live burns...</span>
+          <span id="liveTicker">Loading live burns...</span>
         </div>
-        <button class="hero-cta reveal">START BURNING</button>
+
+        <button class="hero-cta reveal">BREAK FREE NOW</button>
+
         <div class="hero-stats reveal">
           <div>
-            <div class="stat-value flame" id="statBurned">$0</div>
-            <div class="stat-label">Total Burned</div>
+            <div class="stat-value flame-text" id="statBurned">—</div>
+            <div class="stat-label">Burned Forever</div>
           </div>
           <div>
-            <div class="stat-value" id="statTx">0</div>
+            <div class="stat-value" id="statTx">—</div>
             <div class="stat-label">Transactions</div>
           </div>
           <div>
@@ -519,7 +652,8 @@
             <div class="stat-label">Burn Rate</div>
           </div>
         </div>
-        <div class="cta-secondary-link reveal" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
+
+        <div class="cta-secondary reveal" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
           See how it works
         </div>
       </div>
@@ -527,227 +661,793 @@
 
     <section id="how">
       <div class="container">
-        <div class="label reveal">The Process</div>
-        <h2 class="section-title reveal">Three steps to <span class="highlight">freedom</span></h2>
-        <div class="steps">
+        <div class="section-header">
+          <div class="label reveal">The Magic</div>
+          <h2 class="section-title reveal">How we turn <span class="highlight">anything</span> into fuel</h2>
+        </div>
+        <div class="steps-vertical">
           <div class="step reveal">
             <div class="step-number">01</div>
             <div>
-              <div class="step-title">Pick <span class="highlight">your</span> token</div>
-              <div class="step-desc">SOL, USDC, JUP, or any Bronze+ verified token from HolDex. Your choice.</div>
+              <div class="step-title">Pick <span class="highlight">YOUR</span> token</div>
+              <div class="step-desc">USDC, SOL, mSOL, or any Bronze+ verified token from HolDex</div>
             </div>
           </div>
           <div class="step reveal">
             <div class="step-number">02</div>
             <div>
-              <div class="step-title">We cover the <span class="highlight">SOL</span></div>
+              <div class="step-title">We cover the SOL <span class="highlight">for you</span></div>
               <div class="step-desc">GASdf fronts the network fee. You pay in your favorite token. Simple.</div>
             </div>
           </div>
           <div class="step reveal">
             <div class="step-number">03</div>
             <div>
-              <div class="step-title">Swap → <span class="flame">Burn</span></div>
-              <div class="step-desc">Your payment becomes $asdfasdfa. <span id="burnRateStep">76.4%</span> burned, rest sustains operations.</div>
+              <div class="step-title">Swap → <span class="flame-text">🔥 Burn</span></div>
+              <div class="step-desc">Your payment becomes $asdfasdfa: <span class="highlight" id="burnRateStep">76.4%</span> burned, rest sustains operations</div>
             </div>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <div class="cta-secondary reveal" onclick="document.getElementById('flywheel').scrollIntoView({behavior:'smooth'})">
+            Understand the flywheel
           </div>
         </div>
       </div>
     </section>
 
-    <section id="ecosystem">
+    <section id="flywheel">
       <div class="container">
-        <div class="ecosystem-header">
-          <div class="label reveal">Solana Ecosystem</div>
-          <h2 class="section-title reveal">All roads lead to <span class="flame">the singularity</span></h2>
-          <p class="body-text reveal" style="margin: 0 auto;">
-            Every accepted token flows to the center. Different tokens, different burn rates.<br>
-            <span style="color: var(--white-50);">Look ahead — the singularity awaits.</span>
+        <div class="flywheel-minimal reveal">
+          <div class="flywheel-icon">🔥</div>
+          <h2 class="section-title">The Eternal <span class="highlight">Flywheel</span></h2>
+          <div class="flywheel-steps">
+            <span class="flywheel-step">Pay in anything</span>
+            <span class="flywheel-step">Swapped to $asdfasdfa</span>
+            <span class="flywheel-step">🔥 Burned forever</span>
+            <span class="flywheel-step">Supply shrinks</span>
+          </div>
+          <p class="body-text" style="text-align: center; margin: var(--space-xl) auto 0;">
+            All fees become $asdfasdfa before burning.<br>
+            Pay directly in $asdfasdfa? <span class="highlight">100% burned</span>.
           </p>
+          <div class="cta-secondary" onclick="document.getElementById('trust').scrollIntoView({behavior:'smooth'})">
+            How we pick tokens
+          </div>
         </div>
-        <div class="token-grid reveal" id="tokenGrid"></div>
+      </div>
+    </section>
+
+    <section id="trust">
+      <div class="container">
+        <div class="section-header">
+          <div class="label reveal">Protection</div>
+          <h2 class="section-title reveal">🛡️ Only <span class="highlight">trusted</span> tokens</h2>
+          <p class="body-text reveal" style="text-align: center; margin: 0 auto;">We only accept tokens where holders <strong>accumulate</strong>, not dump.</p>
+        </div>
+        <div class="cards-row">
+          <div class="card reveal">
+            <div class="card-icon">📊</div>
+            <div class="card-title">K-score</div>
+            <div class="card-subtitle">CONVICTION METRIC</div>
+            <div class="card-body">
+              Measures if holders accumulate or extract.<br>
+              <strong style="color: var(--gold)">Minimum: Bronze (50/100)</strong>
+            </div>
+          </div>
+          <div class="card reveal">
+            <div class="card-icon">🔥</div>
+            <div class="card-title">Ecosystem Bonus</div>
+            <div class="card-subtitle">DUAL BURN</div>
+            <div class="card-body">
+              Deflationary tokens get a bonus.<br>
+              <strong style="color: var(--gold)">Up to +<span id="ecosystemBonusCard">38.2%</span> extra burn</strong>
+            </div>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <div class="cta-secondary reveal" onclick="document.getElementById('tiers').scrollIntoView({behavior:'smooth'})">
+            Discover holder benefits
+          </div>
+        </div>
       </div>
     </section>
 
     <section id="tiers">
       <div class="container">
-        <div style="text-align: center;">
-          <div class="label reveal">Holder Benefits</div>
-          <h2 class="section-title reveal">Hold $asdfasdfa = <span class="highlight">Pay less</span></h2>
-          <p class="body-text reveal" style="margin: 0 auto var(--space-md);">
-            The more you hold, the bigger your discount. Formula-based, transparent.
-          </p>
+        <div class="section-header">
+          <div class="label reveal">Become a legend</div>
+          <h2 class="section-title reveal">Hold $asdfasdfa = <span class="highlight">Massive discounts</span></h2>
+          <p class="body-text reveal" style="text-align: center; margin: 0 auto var(--space-md);">The more you hold, the less you pay. Simple.</p>
+
           <div class="token-stats reveal">
             <div class="token-stat">
-              <span class="token-stat-value" id="tokenPrice">$0.00000</span>
+              <span class="token-stat-value" id="tokenPrice">$0.00014</span>
               <span class="token-stat-label">Price</span>
             </div>
             <div class="token-stat">
-              <span class="token-stat-value" id="tokenMcap">$0</span>
+              <span class="token-stat-value" id="tokenMcap">$132K</span>
               <span class="token-stat-label">Market Cap</span>
             </div>
             <div class="token-stat">
-              <span class="token-stat-value" id="tokenHolders">0</span>
+              <span class="token-stat-value" id="tokenHolders">320</span>
               <span class="token-stat-label">Holders</span>
             </div>
           </div>
         </div>
-        <div class="tiers-grid reveal">
-          <div class="tier"><div class="tier-emoji">💎</div><div class="tier-name">DIAMOND</div><div class="tier-discount" id="diamondDiscount">-95%</div><div class="tier-tokens">1% supply</div><div class="tier-usd" id="diamondUsd">~$0</div></div>
-          <div class="tier"><div class="tier-emoji">🪙</div><div class="tier-name">PLATINUM</div><div class="tier-discount" id="platinumDiscount">-67%</div><div class="tier-tokens">0.1% supply</div><div class="tier-usd" id="platinumUsd">~$0</div></div>
-          <div class="tier"><div class="tier-emoji">🥇</div><div class="tier-name">GOLD</div><div class="tier-discount" id="goldDiscount">-33%</div><div class="tier-tokens">0.01% supply</div><div class="tier-usd" id="goldUsd">~$0</div></div>
-          <div class="tier"><div class="tier-emoji">🥈</div><div class="tier-name">SILVER</div><div class="tier-discount" id="silverDiscount">0%</div><div class="tier-tokens">0.001% supply</div><div class="tier-usd" id="silverUsd">~$0</div></div>
-          <div class="tier"><div class="tier-emoji">🥉</div><div class="tier-name">BRONZE</div><div class="tier-discount" id="bronzeDiscount">0%</div><div class="tier-tokens">Any amount</div><div class="tier-usd">Base rate</div></div>
+
+        <div class="tiers-linear reveal">
+          <div class="tier" data-tier="diamond">
+            <div class="tier-emoji">💎</div>
+            <div class="tier-name">DIAMOND</div>
+            <div class="tier-discount" id="diamondDiscount">-95%</div>
+            <div class="tier-tokens" id="diamondTokens">10M</div>
+            <div class="tier-usd" id="diamondUsd">~$1,400</div>
+          </div>
+          <div class="tier" data-tier="platinum">
+            <div class="tier-emoji">🪙</div>
+            <div class="tier-name">PLATINUM</div>
+            <div class="tier-discount" id="platinumDiscount">-67%</div>
+            <div class="tier-tokens" id="platinumTokens">1M</div>
+            <div class="tier-usd" id="platinumUsd">~$140</div>
+          </div>
+          <div class="tier" data-tier="gold">
+            <div class="tier-emoji">🥇</div>
+            <div class="tier-name">GOLD</div>
+            <div class="tier-discount" id="goldDiscount">-33%</div>
+            <div class="tier-tokens" id="goldTokens">100K</div>
+            <div class="tier-usd" id="goldUsd">~$14</div>
+          </div>
+          <div class="tier" data-tier="silver">
+            <div class="tier-emoji">🥈</div>
+            <div class="tier-name">SILVER</div>
+            <div class="tier-discount" id="silverDiscount">0%</div>
+            <div class="tier-tokens" id="silverTokens">10K</div>
+            <div class="tier-usd" id="silverUsd">~$1.40</div>
+          </div>
+          <div class="tier" data-tier="bronze">
+            <div class="tier-emoji">🥉</div>
+            <div class="tier-name">BRONZE</div>
+            <div class="tier-discount" id="bronzeDiscount">0%</div>
+            <div class="tier-tokens">Any</div>
+            <div class="tier-usd">Base rate</div>
+          </div>
         </div>
-        <p class="tier-note reveal">Max discount on service fee* — break-even floor ensures tx costs are always covered</p>
+
+        <p class="tier-note reveal">Max discount on service fee* — break-even floor ensures everyone covers tx cost</p>
+
         <div class="tier-footer reveal">
-          <span class="tier-update-time">Live from <a href="https://holdex.asdfasdfa.tech" target="_blank">HolDex</a> • Updated <span id="tierUpdateTime">just now</span></span>
+          <span class="tier-update-time">Live from <a href="https://alonisthe.dev/holdex" target="_blank">HolDex</a> • Updated <span id="tierUpdateTime">just now</span></span>
         </div>
       </div>
     </section>
 
     <section id="phi">
-      <div class="container" style="text-align: center;">
-        <div class="phi-symbol reveal">φ</div>
-        <h2 class="section-title reveal">Powered by <span class="highlight">mathematics</span></h2>
-        <p class="body-text reveal" style="margin: 0 auto;">Every rate, every split, every curve — derived from the golden ratio.</p>
-        <div class="phi-value reveal">1.618033988749894</div>
+      <div class="container">
+        <div class="phi-hero reveal">
+          <div class="phi-symbol">&phi;</div>
+          <h2 class="section-title">The Universe's <span class="highlight">Secret</span></h2>
+          <p class="body-text" style="text-align: center; margin: var(--space-md) auto 0;">
+            Everything is built on <strong>PHI</strong> (φ = 1.618...)<br>
+            <span style="color: var(--white-50)">The golden ratio found in galaxies, seashells, and now... your fees.</span>
+          </p>
+          <div class="phi-value">1.618033988749894</div>
+        </div>
         <div class="formulas">
-          <div class="formula reveal"><div class="formula-label">BURN SPLIT</div><div class="formula-code">1 − 1/φ³</div><div class="formula-result"><span class="flame">🔥</span> <span id="burnRatePhi">76.4%</span></div></div>
-          <div class="formula reveal"><div class="formula-label">MAX DISCOUNT</div><div class="formula-code">min(95%, log₁₀ curve)</div><div class="formula-result"><span class="highlight" id="maxDiscountPhi">95%</span></div></div>
-          <div class="formula reveal"><div class="formula-label">ECO BONUS</div><div class="formula-code">1/φ² × decay</div><div class="formula-result"><span class="highlight">+<span id="ecosystemBonusPhi">38.2%</span></span></div></div>
+          <div class="formula reveal">
+            <div class="formula-label">TREASURY SPLIT</div>
+            <div class="formula-code">Burn = 1 - 1/φ³</div>
+            <div class="formula-result">🔥 <span id="burnRatePhi">76.4%</span></div>
+          </div>
+          <div class="formula reveal">
+            <div class="formula-label">HOLDER DISCOUNT</div>
+            <div class="formula-code">discount = min(95, (log₁₀(share)+5)/3)</div>
+            <div class="formula-result">Up to <span class="highlight" id="maxDiscountPhi">95%</span></div>
+          </div>
+          <div class="formula reveal">
+            <div class="formula-label">ECOSYSTEM BONUS</div>
+            <div class="formula-code">bonus = (1/φ²) × (1 - φ^(-burn%/30))</div>
+            <div class="formula-result" style="color: var(--gold);">Up to +<span id="ecosystemBonusPhi">38.2%</span></div>
+          </div>
         </div>
       </div>
     </section>
 
     <section id="cta">
       <div class="container">
-        <h2 class="section-title reveal">Ready to <span class="highlight">break free</span>?</h2>
-        <p class="body-text reveal" style="text-align: center; margin: 0 auto;">Connect your wallet. Pay with any token. Watch it burn forever.</p>
-        <div class="cta-buttons reveal">
-          <button class="cta-primary">LAUNCH APP</button>
-          <a href="https://github.com/zeyxx/GASdf" target="_blank" class="cta-secondary">View on GitHub</a>
+        <div class="cta-minimal reveal">
+          <h2 class="section-title">Ready to <span class="highlight">break free</span>?</h2>
+          <p class="body-text" style="text-align: center; margin: var(--space-md) auto 0;">
+            Connect your wallet. Pay with any token.<br>
+            🔥 Watch it burn forever.
+          </p>
+          <div class="cta-buttons">
+            <button class="cta-btn-primary">LAUNCH NOW</button>
+            <a href="https://github.com/zeyxx/GASdf" target="_blank" class="cta-btn-secondary">View on GitHub</a>
+          </div>
         </div>
       </div>
     </section>
 
-    <footer>
+    <footer class="reveal">
       <div class="footer-links">
         <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
         <a href="https://x.com/asdfasdfa_" target="_blank">Twitter</a>
-        <a href="https://holdex.asdfasdfa.tech" target="_blank">HolDex</a>
+        <a href="https://alonisthe.dev/holdex" target="_blank">HolDex</a>
       </div>
       <div class="footer-copy">Built for Solana. Powered by φ.</div>
     </footer>
   </div>
 
-  <script>
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    // ============================================================================
+    // SPACE RENDERER - Stars, Milky Way, Nebulae, Cosmic Dust
+    // The space flows around the fixed CSS singularity
+    // ============================================================================
+
+    class SpaceRenderer {
+      constructor(container) {
+        this.container = container;
+        this.time = 0;
+        this.scrollY = 0;
+        this.targetScrollY = 0;
+        this.scrollProgress = 0;
+
+        this.init();
+        this.createStars();
+        this.createMilkyWay();
+        this.createNebulae();
+        this.createCosmicDust();
+        this.setupPostProcessing();
+        this.animate();
+        this.setupEventListeners();
+      }
+
+      init() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        this.camera.position.z = 5;
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setClearColor(0x000000, 1);
+        this.container.appendChild(this.renderer.domElement);
+      }
+
+      // Stars with Harvard spectral classification
+      createStars() {
+        const spectralColors = [
+          new THREE.Color(0x9bb0ff), new THREE.Color(0xaabfff), new THREE.Color(0xcad7ff),
+          new THREE.Color(0xf8f7ff), new THREE.Color(0xfff4e8), new THREE.Color(0xffd2a1), new THREE.Color(0xffbb7b)
+        ];
+        const spectralProbs = [0.00003, 0.0013, 0.006, 0.03, 0.076, 0.121, 0.765];
+
+        const starCount = 12000;
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+        const sizes = new Float32Array(starCount);
+        const brightness = new Float32Array(starCount);
+
+        for (let i = 0; i < starCount; i++) {
+          const i3 = i * 3;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const radius = 400 + Math.random() * 1200;
+
+          const galacticConcentration = Math.exp(-Math.abs(phi - Math.PI/2) * 2);
+          const r = radius * (0.5 + 0.5 * galacticConcentration);
+
+          positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i3 + 2] = r * Math.cos(phi);
+
+          let rand = Math.random(), cumulative = 0, spectralIndex = 6;
+          for (let j = 0; j < spectralProbs.length; j++) {
+            cumulative += spectralProbs[j];
+            if (rand < cumulative) { spectralIndex = j; break; }
+          }
+
+          const color = spectralColors[spectralIndex];
+          colors[i3] = color.r;
+          colors[i3 + 1] = color.g;
+          colors[i3 + 2] = color.b;
+
+          const magRand = Math.random();
+          let magnitude = magRand < 0.002 ? Math.random() : magRand < 0.02 ? 1 + Math.random() : magRand < 0.1 ? 2 + Math.random() : magRand < 0.3 ? 3 + Math.random() : 4 + Math.random() * 2;
+          sizes[i] = magnitude < 1 ? 3.0 : magnitude < 2 ? 2.0 : magnitude < 3 ? 1.3 : 0.7;
+          brightness[i] = Math.pow(2.512, (5 - magnitude) / 2.5);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        geometry.setAttribute('brightness', new THREE.BufferAttribute(brightness, 1));
+
+        const material = new THREE.ShaderMaterial({
+          uniforms: { time: { value: 0 }, pixelRatio: { value: this.renderer.getPixelRatio() } },
+          vertexShader: `
+            attribute float size;
+            attribute float brightness;
+            varying vec3 vColor;
+            varying float vBrightness;
+            uniform float time;
+            uniform float pixelRatio;
+            void main() {
+              vColor = color;
+              vBrightness = brightness;
+              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+              float sizeVar = 1.0 + sin(time * 0.2 + position.x * 0.01) * 0.08;
+              gl_PointSize = size * sizeVar * pixelRatio * (250.0 / -mvPosition.z);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vBrightness;
+            void main() {
+              vec2 uv = gl_PointCoord - 0.5;
+              float dist = length(uv);
+              float core = exp(-dist * 5.0);
+              float glow = exp(-dist * 2.0) * 0.25;
+              float alpha = (core + glow) * vBrightness;
+              gl_FragColor = vec4(vColor, clamp(alpha, 0.0, 1.0));
+            }
+          `,
+          transparent: true,
+          vertexColors: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        this.stars = new THREE.Points(geometry, material);
+        this.scene.add(this.stars);
+      }
+
+      // Milky Way particle cloud
+      createMilkyWay() {
+        const particleCount = 6000;
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const alphas = new Float32Array(particleCount);
+
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const x = (Math.random() - 0.5) * 2500;
+          const ySpread = 60 + Math.random() * 100;
+          const y = (Math.random() - 0.5) * ySpread * (0.3 + Math.random() * 0.7);
+          const z = -500 - Math.random() * 700;
+
+          positions[i3] = x;
+          positions[i3 + 1] = y;
+          positions[i3 + 2] = z;
+
+          const warmth = 0.85 + Math.random() * 0.15;
+          colors[i3] = warmth;
+          colors[i3 + 1] = warmth * 0.92;
+          colors[i3 + 2] = warmth * 0.78;
+
+          sizes[i] = 1 + Math.random() * 2.5;
+          const distFromCenter = Math.abs(y) / 80;
+          alphas[i] = (1 - distFromCenter) * (0.015 + Math.random() * 0.025);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+
+        const material = new THREE.ShaderMaterial({
+          uniforms: { time: { value: 0 } },
+          vertexShader: `
+            attribute float size;
+            attribute float alpha;
+            varying vec3 vColor;
+            varying float vAlpha;
+            uniform float time;
+            void main() {
+              vColor = color;
+              vAlpha = alpha;
+              vec3 pos = position;
+              pos.x += sin(time * 0.08 + position.z * 0.008) * 1.5;
+              pos.y += cos(time * 0.06 + position.x * 0.008) * 0.8;
+              vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+              gl_PointSize = size * (350.0 / -mvPosition.z);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              vec2 center = gl_PointCoord - 0.5;
+              float dist = length(center);
+              float alpha = smoothstep(0.5, 0.0, dist) * vAlpha;
+              gl_FragColor = vec4(vColor, alpha);
+            }
+          `,
+          transparent: true,
+          vertexColors: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        this.milkyWay = new THREE.Points(geometry, material);
+        this.milkyWay.rotation.z = -12 * Math.PI / 180;
+        this.scene.add(this.milkyWay);
+      }
+
+      // Nebulae with FBM noise
+      createNebulae() {
+        this.nebulae = [];
+        const configs = [
+          { x: -350, y: 180, z: -550, size: 280, color: new THREE.Color(0x4466aa), opacity: 0.035 },
+          { x: 450, y: -130, z: -650, size: 230, color: new THREE.Color(0x884488), opacity: 0.03 },
+          { x: -180, y: -280, z: -450, size: 180, color: new THREE.Color(0xaa4455), opacity: 0.025 },
+          { x: 280, y: 350, z: -800, size: 320, color: new THREE.Color(0x446688), opacity: 0.02 },
+        ];
+
+        const geometry = new THREE.PlaneGeometry(1, 1);
+
+        configs.forEach(cfg => {
+          const material = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 }, baseColor: { value: cfg.color }, opacity: { value: cfg.opacity } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+              uniform float time;
+              uniform vec3 baseColor;
+              uniform float opacity;
+              varying vec2 vUv;
+              float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+              float noise(vec2 p) {
+                vec2 i = floor(p), f = fract(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return mix(mix(hash(i), hash(i + vec2(1,0)), f.x), mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+              }
+              float fbm(vec2 p) {
+                float v = 0.0, a = 0.5;
+                for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+                return v;
+              }
+              void main() {
+                vec2 uv = vUv - 0.5;
+                float dist = length(uv);
+                float falloff = pow(1.0 - smoothstep(0.0, 0.5, dist), 1.5);
+                float structure = fbm(uv * 3.0 + time * 0.015) * 0.5 + fbm(uv * 6.0 - time * 0.01) * 0.3 + fbm(uv * 9.0 + time * 0.008) * 0.2;
+                vec3 color = baseColor + vec3(structure * 0.15);
+                gl_FragColor = vec4(color, falloff * structure * opacity);
+              }
+            `,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+          });
+
+          const nebula = new THREE.Mesh(geometry, material);
+          nebula.scale.set(cfg.size, cfg.size, 1);
+          nebula.position.set(cfg.x, cfg.y, cfg.z);
+          nebula.userData.baseY = cfg.y;
+          nebula.userData.baseZ = cfg.z;
+          this.nebulae.push(nebula);
+          this.scene.add(nebula);
+        });
+      }
+
+      // Cosmic dust particles
+      createCosmicDust() {
+        const dustCount = 1500;
+        const positions = new Float32Array(dustCount * 3);
+        const velocities = new Float32Array(dustCount * 3);
+
+        for (let i = 0; i < dustCount; i++) {
+          const i3 = i * 3;
+          positions[i3] = (Math.random() - 0.5) * 180;
+          positions[i3 + 1] = (Math.random() - 0.5) * 180;
+          positions[i3 + 2] = (Math.random() - 0.5) * 180;
+          velocities[i3] = (Math.random() - 0.5) * 0.015;
+          velocities[i3 + 1] = (Math.random() - 0.5) * 0.015;
+          velocities[i3 + 2] = (Math.random() - 0.5) * 0.015;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+
+        const material = new THREE.ShaderMaterial({
+          uniforms: { time: { value: 0 }, scrollOffset: { value: 0 } },
+          vertexShader: `
+            attribute vec3 velocity;
+            uniform float time;
+            uniform float scrollOffset;
+            varying float vAlpha;
+            void main() {
+              vec3 pos = position + velocity * time * 8.0;
+              pos.y += scrollOffset * 0.03;
+              pos = mod(pos + 90.0, 180.0) - 90.0;
+              vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+              vAlpha = 0.25 * (1.0 - smoothstep(10.0, 90.0, -mvPosition.z));
+              gl_PointSize = 1.2 * (40.0 / -mvPosition.z);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            varying float vAlpha;
+            void main() {
+              float dist = length(gl_PointCoord - 0.5);
+              float alpha = (1.0 - smoothstep(0.0, 0.5, dist)) * vAlpha;
+              gl_FragColor = vec4(0.85, 0.8, 0.75, alpha);
+            }
+          `,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        this.cosmicDust = new THREE.Points(geometry, material);
+        this.scene.add(this.cosmicDust);
+      }
+
+      setupPostProcessing() {
+        this.composer = new EffectComposer(this.renderer);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.35, 0.5, 0.65);
+        this.composer.addPass(this.bloomPass);
+      }
+
+      animate() {
+        requestAnimationFrame(() => this.animate());
+        this.time += 0.016;
+
+        // Smooth scroll interpolation
+        this.scrollY += (this.targetScrollY - this.scrollY) * 0.06;
+        const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
+        this.scrollProgress = this.scrollY / maxScroll;
+
+        // Camera moves through space based on scroll
+        const cameraZ = 5 - this.scrollProgress * 300;
+        const cameraY = -this.scrollProgress * 150;
+        this.camera.position.z = cameraZ;
+        this.camera.position.y = cameraY;
+
+        // Stars follow but lag (distant)
+        if (this.stars) {
+          this.stars.material.uniforms.time.value = this.time;
+          this.stars.position.y = cameraY * 0.4;
+          this.stars.position.z = cameraZ * 0.3;
+          this.stars.rotation.y = this.time * 0.001;
+        }
+
+        // Milky Way (very distant)
+        if (this.milkyWay) {
+          this.milkyWay.material.uniforms.time.value = this.time;
+          this.milkyWay.position.y = cameraY * 0.15;
+          this.milkyWay.position.z = cameraZ * 0.1;
+        }
+
+        // Nebulae at different depths
+        this.nebulae.forEach((nebula, i) => {
+          nebula.material.uniforms.time.value = this.time;
+          const depth = 0.2 + i * 0.12;
+          nebula.position.y = nebula.userData.baseY + cameraY * depth;
+          nebula.position.z = nebula.userData.baseZ + cameraZ * depth * 0.4;
+          nebula.lookAt(this.camera.position);
+        });
+
+        // Cosmic dust (close, fast parallax)
+        if (this.cosmicDust) {
+          this.cosmicDust.material.uniforms.time.value = this.time;
+          this.cosmicDust.material.uniforms.scrollOffset.value = this.scrollProgress * 400;
+          this.cosmicDust.position.y = cameraY * 0.85;
+          this.cosmicDust.position.z = cameraZ * 0.8;
+        }
+
+        this.composer.render();
+      }
+
+      setupEventListeners() {
+        window.addEventListener('scroll', () => { this.targetScrollY = window.scrollY; }, { passive: true });
+        window.addEventListener('resize', () => {
+          const w = window.innerWidth, h = window.innerHeight;
+          this.camera.aspect = w / h;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(w, h);
+          this.composer.setSize(w, h);
+        });
+      }
+    }
+
+    // Initialize space renderer
+    const container = document.getElementById('space-container');
+    new SpaceRenderer(container);
+
+    // ========================================================================
+    // BLACK HOLE SCROLL ANIMATION - rises as you scroll
+    // ========================================================================
+    const blackHole = document.getElementById('blackHole');
+    let bhScrollY = 0, bhTargetY = 0;
+
+    function updateBlackHole() {
+      bhScrollY += (bhTargetY - bhScrollY) * 0.08;
+      const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
+      const progress = bhScrollY / maxScroll;
+
+      // Black hole rises from -40vh to 35vh as you scroll
+      const bottom = -40 + progress * 75;
+      // Slight scale increase as it gets closer
+      const scale = 1 + progress * 0.15;
+      blackHole.style.bottom = `${bottom}vh`;
+      blackHole.style.transform = `translateX(-50%) scale(${scale})`;
+
+      requestAnimationFrame(updateBlackHole);
+    }
+    window.addEventListener('scroll', () => { bhTargetY = window.scrollY; }, { passive: true });
+    updateBlackHole();
+
+    // ========================================================================
+    // REVEAL ANIMATIONS
+    // ========================================================================
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+    // ========================================================================
+    // PROGRESS DOTS
+    // ========================================================================
+    const sections = ['hero', 'how', 'flywheel', 'trust', 'tiers', 'phi', 'cta'];
+    const progressDots = document.querySelectorAll('.progress-dot');
+    const progressLabel = document.querySelector('.progress-label');
+    const labels = { hero: 'Explorer', how: 'Learning', flywheel: 'Curious', trust: 'Evaluating', tiers: 'Interested', phi: 'Deep Diver', cta: 'Ready!' };
+
+    function updateProgress() {
+      const scrollPos = window.scrollY + window.innerHeight / 2;
+      let active = 'hero';
+      for (const s of sections) {
+        const el = document.getElementById(s);
+        if (el && el.offsetTop <= scrollPos) active = s;
+      }
+      progressDots.forEach((dot, i) => dot.classList.toggle('active', i <= sections.indexOf(active)));
+      if (progressLabel) progressLabel.textContent = labels[active] || 'Explorer';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+
+    // ========================================================================
+    // LIVE DATA
+    // ========================================================================
     const PHI = 1.618033988749894;
     const PHI_CUBED = PHI * PHI * PHI;
     const BURN_RATE = 1 - (1 / PHI_CUBED);
-    const MAX_ECO_BONUS = 1 / (PHI * PHI);
+    const ECOSYSTEM_BONUS = 1 / (PHI * PHI);
     const MAX_DISCOUNT = 0.95;
 
     const TIER_THRESHOLDS = { diamond: 0.01, platinum: 0.001, gold: 0.0001, silver: 0.00001, bronze: 0 };
 
-    const TOKENS = [
-      { symbol: 'SOL', color: '#9945FF', burnedPct: 0 },
-      { symbol: 'JUP', color: '#d4a574', burnedPct: 8.5 },
-      { symbol: 'USDC', color: '#2775CA', burnedPct: 0 },
-      { symbol: 'mSOL', color: '#00D18C', burnedPct: 0 },
-      { symbol: 'BONK', color: '#F7931A', burnedPct: 45 },
-      { symbol: 'RAY', color: '#14F195', burnedPct: 12 },
-    ];
+    function formatRate(r) { return (r * 100).toFixed(1) + '%'; }
+    function calcDiscount(s) { return s <= 0 ? 0 : Math.min(MAX_DISCOUNT, Math.max(0, (Math.log10(s) + 5) / 3)); }
+    function formatDiscount(s) { const d = calcDiscount(s); return d > 0 ? `-${Math.round(d * 100)}%` : '0%'; }
+    function formatNumber(n) { return n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n.toFixed(0); }
+    function formatUSD(n) { return n >= 1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(1)+'K' : n >= 1 ? '$'+n.toFixed(0) : '$'+n.toFixed(2); }
+    function formatPrice(p) { return p >= 1 ? '$'+p.toFixed(2) : p >= 0.01 ? '$'+p.toFixed(4) : '$'+p.toFixed(6); }
 
-    const formatRate = r => (r * 100).toFixed(1) + '%';
-    const calcDiscount = s => s <= 0 ? 0 : Math.min(MAX_DISCOUNT, Math.max(0, (Math.log10(s) + 5) / 3));
-    const formatDiscount = s => { const d = calcDiscount(s); return d > 0 ? `-${Math.round(d * 100)}%` : '0%'; };
-    const calcEcoBurn = b => b <= 0 ? 0 : MAX_ECO_BONUS * (1 - Math.pow(PHI, -b / 30));
+    // Initialize phi values
+    const burnRateStr = formatRate(BURN_RATE);
+    ['burnRateHero', 'burnRateStat', 'burnRateStep', 'burnRatePhi'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = burnRateStr;
+    });
+    document.getElementById('ecosystemBonusCard').textContent = formatRate(ECOSYSTEM_BONUS);
+    document.getElementById('ecosystemBonusPhi').textContent = formatRate(ECOSYSTEM_BONUS);
+    document.getElementById('maxDiscountPhi').textContent = Math.round(MAX_DISCOUNT * 100) + '%';
+    document.getElementById('diamondDiscount').textContent = formatDiscount(TIER_THRESHOLDS.diamond);
+    document.getElementById('platinumDiscount').textContent = formatDiscount(TIER_THRESHOLDS.platinum);
+    document.getElementById('goldDiscount').textContent = formatDiscount(TIER_THRESHOLDS.gold);
+    document.getElementById('silverDiscount').textContent = formatDiscount(TIER_THRESHOLDS.silver);
+    document.getElementById('bronzeDiscount').textContent = formatDiscount(TIER_THRESHOLDS.bronze);
 
-    function initPhiValues() {
-      const b = formatRate(BURN_RATE);
-      ['burnRateHero', 'burnRateStat', 'burnRateStep', 'burnRatePhi'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = b;
-      });
-      document.getElementById('ecosystemBonusPhi').textContent = formatRate(MAX_ECO_BONUS);
-      document.getElementById('maxDiscountPhi').textContent = Math.round(MAX_DISCOUNT * 100) + '%';
-      document.getElementById('diamondDiscount').textContent = formatDiscount(TIER_THRESHOLDS.diamond);
-      document.getElementById('platinumDiscount').textContent = formatDiscount(TIER_THRESHOLDS.platinum);
-      document.getElementById('goldDiscount').textContent = formatDiscount(TIER_THRESHOLDS.gold);
-      document.getElementById('silverDiscount').textContent = formatDiscount(TIER_THRESHOLDS.silver);
-      document.getElementById('bronzeDiscount').textContent = formatDiscount(TIER_THRESHOLDS.bronze);
+    // Load HolDex data
+    const HOLDEX_API = 'https://alonisthe.dev/holdex/api';
+    const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+    let lastHolDexUpdate = Date.now();
+
+    async function loadHolDexData() {
+      try {
+        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
+        const data = await res.json();
+        if (!data.success || !data.token) return;
+
+        const token = data.token;
+        const supply = parseInt(token.supply) / Math.pow(10, token.decimals);
+        const price = token.priceUsd || token.priceusd || 0;
+        const mcap = token.marketCap || token.marketcap || 0;
+        const holders = token.real_holders || token.holders || 0;
+
+        document.getElementById('tokenPrice').textContent = formatPrice(price);
+        document.getElementById('tokenMcap').textContent = formatUSD(mcap);
+        document.getElementById('tokenHolders').textContent = holders.toLocaleString();
+
+        const diamondTokens = supply * TIER_THRESHOLDS.diamond;
+        const platinumTokens = supply * TIER_THRESHOLDS.platinum;
+        const goldTokens = supply * TIER_THRESHOLDS.gold;
+        const silverTokens = supply * TIER_THRESHOLDS.silver;
+
+        document.getElementById('diamondTokens').textContent = formatNumber(diamondTokens);
+        document.getElementById('platinumTokens').textContent = formatNumber(platinumTokens);
+        document.getElementById('goldTokens').textContent = formatNumber(goldTokens);
+        document.getElementById('silverTokens').textContent = formatNumber(silverTokens);
+
+        document.getElementById('diamondUsd').textContent = '~' + formatUSD(diamondTokens * price);
+        document.getElementById('platinumUsd').textContent = '~' + formatUSD(platinumTokens * price);
+        document.getElementById('goldUsd').textContent = '~' + formatUSD(goldTokens * price);
+        document.getElementById('silverUsd').textContent = '~' + formatUSD(silverTokens * price);
+
+        document.getElementById('tierUpdateTime').textContent = 'just now';
+        lastHolDexUpdate = Date.now();
+      } catch (e) { console.log('HolDex fetch error:', e.message); }
     }
+    loadHolDexData();
+    setInterval(loadHolDexData, 60000);
+    setInterval(() => {
+      const sec = Math.floor((Date.now() - lastHolDexUpdate) / 1000);
+      const el = document.getElementById('tierUpdateTime');
+      if (el) el.textContent = sec < 60 ? 'just now' : sec < 120 ? '1 min ago' : Math.floor(sec/60) + ' mins ago';
+    }, 30000);
 
-    function renderTokenGrid() {
-      const grid = document.getElementById('tokenGrid');
-      grid.innerHTML = TOKENS.map(t => {
-        const total = BURN_RATE + calcEcoBurn(t.burnedPct);
-        return `<div class="token-card"><div class="token-icon" style="background:${t.color}">${t.symbol.slice(0,2)}</div><div class="token-symbol">${t.symbol}</div><div class="token-burn">${formatRate(total)} burn</div></div>`;
-      }).join('');
-    }
-
-    // Black hole scroll animation
-    function initBlackHoleScroll() {
-      const blackHole = document.querySelector('.black-hole');
-      const update = () => {
-        const maxScroll = document.body.scrollHeight - window.innerHeight;
-        const progress = Math.min(1, window.scrollY / maxScroll);
-        const bottom = -60 + progress * 90; // -60vh to 30vh
-        blackHole.style.bottom = `${bottom}vh`;
-      };
-      window.addEventListener('scroll', update, { passive: true });
-      update();
-    }
-
-    // Reveal on scroll
-    function initReveal() {
-      const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-      }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
-      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-    }
-
-    // Progress dots
-    function initProgress() {
-      const names = { hero: 'Explorer', how: 'Process', ecosystem: 'Tokens', phi: 'Math', cta: 'Launch' };
-      const dots = document.querySelectorAll('.progress-dot');
-      const label = document.querySelector('.progress-label');
-      const observer = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            dots.forEach(d => d.classList.toggle('active', d.dataset.section === e.target.id));
-            if (label) label.textContent = names[e.target.id] || 'Explorer';
-          }
-        });
-      }, { threshold: 0.3 });
-      ['hero', 'how', 'ecosystem', 'phi', 'cta'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) observer.observe(el);
-      });
-    }
-
-    // Live data
-    async function loadLiveData() {
+    // Load GASdf stats
+    async function loadStats() {
       try {
         const res = await fetch('/v1/stats');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.totalBurnedUsd !== undefined) document.getElementById('statBurned').textContent = '$' + data.totalBurnedUsd.toLocaleString();
-          if (data.totalTransactions !== undefined) document.getElementById('statTx').textContent = data.totalTransactions.toLocaleString();
-        }
-        document.getElementById('liveTicker').textContent = 'Burning live on Solana';
-      } catch { document.getElementById('liveTicker').textContent = 'Burning live on Solana'; }
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.totalBurnedUsd !== undefined) document.getElementById('statBurned').textContent = '$' + data.totalBurnedUsd.toLocaleString();
+        if (data.totalTransactions !== undefined) document.getElementById('statTx').textContent = data.totalTransactions.toLocaleString();
+      } catch (e) {}
     }
+    loadStats();
+    setInterval(loadStats, 30000);
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initPhiValues();
-      renderTokenGrid();
-      initBlackHoleScroll();
-      initReveal();
-      initProgress();
-      loadLiveData();
-    });
+    // Live ticker
+    const tickerMessages = [
+      'Burning live on Solana mainnet',
+      'Diamond tier user just burned 1,234 USDC in fees',
+      'Platinum holder saved $456 on transaction fees',
+      '12,456 transactions processed today (+34%)',
+      'Gold tier unlocked: 10K+ $asdfasdfa burned',
+      'New ATH: 2.4M tokens burned this week',
+    ];
+    let tickerIndex = 0;
+    function updateTicker() {
+      const ticker = document.getElementById('liveTicker');
+      if (ticker) {
+        ticker.style.opacity = 0;
+        setTimeout(() => {
+          ticker.textContent = tickerMessages[tickerIndex];
+          ticker.style.opacity = 1;
+          tickerIndex = (tickerIndex + 1) % tickerMessages.length;
+        }, 400);
+      }
+    }
+    updateTicker();
+    setInterval(updateTicker, 5000);
   </script>
 </body>
 </html>
