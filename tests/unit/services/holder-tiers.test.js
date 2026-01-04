@@ -99,41 +99,41 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
   });
 
   describe('getTierName()', () => {
-    it('should return NORMIE for 0% share', () => {
-      expect(getTierName(0).name).toBe('NORMIE');
-      expect(getTierName(0).emoji).toBe('👤');
+    it('should return BRONZE for 0% share', () => {
+      expect(getTierName(0).name).toBe('BRONZE');
+      expect(getTierName(0).emoji).toBe('🥉');
     });
 
-    it('should return HOLDER for 0.001%-0.01% share', () => {
-      expect(getTierName(0.001).name).toBe('HOLDER');
-      expect(getTierName(0.005).name).toBe('HOLDER');
-      expect(getTierName(0.009).name).toBe('HOLDER');
+    it('should return SILVER for 0.001%-0.01% share', () => {
+      expect(getTierName(0.001).name).toBe('SILVER');
+      expect(getTierName(0.005).name).toBe('SILVER');
+      expect(getTierName(0.009).name).toBe('SILVER');
     });
 
-    it('should return BELIEVER for 0.01%-0.1% share', () => {
-      expect(getTierName(0.01).name).toBe('BELIEVER');
-      expect(getTierName(0.05).name).toBe('BELIEVER');
-      expect(getTierName(0.099).name).toBe('BELIEVER');
+    it('should return GOLD for 0.01%-0.1% share', () => {
+      expect(getTierName(0.01).name).toBe('GOLD');
+      expect(getTierName(0.05).name).toBe('GOLD');
+      expect(getTierName(0.099).name).toBe('GOLD');
     });
 
-    it('should return OG for 0.1%-1% share', () => {
-      expect(getTierName(0.1).name).toBe('OG');
-      expect(getTierName(0.5).name).toBe('OG');
-      expect(getTierName(0.99).name).toBe('OG');
+    it('should return PLATINUM for 0.1%-1% share', () => {
+      expect(getTierName(0.1).name).toBe('PLATINUM');
+      expect(getTierName(0.5).name).toBe('PLATINUM');
+      expect(getTierName(0.99).name).toBe('PLATINUM');
     });
 
-    it('should return WHALE for 1%+ share', () => {
-      expect(getTierName(1).name).toBe('WHALE');
-      expect(getTierName(5).name).toBe('WHALE');
-      expect(getTierName(10).name).toBe('WHALE');
+    it('should return DIAMOND for 1%+ share', () => {
+      expect(getTierName(1).name).toBe('DIAMOND');
+      expect(getTierName(5).name).toBe('DIAMOND');
+      expect(getTierName(10).name).toBe('DIAMOND');
     });
 
     it('should include correct emojis', () => {
-      expect(getTierName(1).emoji).toBe('🐋');
-      expect(getTierName(0.1).emoji).toBe('👑');
-      expect(getTierName(0.01).emoji).toBe('💎');
-      expect(getTierName(0.001).emoji).toBe('🙌');
-      expect(getTierName(0).emoji).toBe('👤');
+      expect(getTierName(1).emoji).toBe('💎');
+      expect(getTierName(0.1).emoji).toBe('🪙');
+      expect(getTierName(0.01).emoji).toBe('🥇');
+      expect(getTierName(0.001).emoji).toBe('🥈');
+      expect(getTierName(0).emoji).toBe('🥉');
     });
   });
 
@@ -238,10 +238,10 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
       expect(result).toHaveProperty('isAtBreakEven');
     });
 
-    it('should return NORMIE tier when balance lookup fails', async () => {
+    it('should return BRONZE tier when balance lookup fails', async () => {
       const result = await calculateDiscountedFee('NonExistentWallet', 100000, 5000);
 
-      expect(result.tier).toBe('NORMIE');
+      expect(result.tier).toBe('BRONZE');
       expect(result.balance).toBe(0);
       expect(result.sharePercent).toBe(0);
     });
@@ -255,10 +255,10 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
       expect(result.isAtBreakEven).toBe(true);
     });
 
-    it('should not floor high base fees for NORMIE', async () => {
+    it('should not floor high base fees for BRONZE', async () => {
       const result = await calculateDiscountedFee('TestWallet', 100000, 5000);
 
-      expect(result.discountedFee).toBe(100000); // No discount for NORMIE
+      expect(result.discountedFee).toBe(100000); // No discount for BRONZE
       expect(result.isAtBreakEven).toBe(false);
     });
 
@@ -290,28 +290,28 @@ describe('Holder Tiers Service - Supply-Based Discount', () => {
       const tiers = getAllTiers();
       const tierNames = tiers.map((t) => t.name);
 
-      expect(tierNames).toContain('WHALE');
-      expect(tierNames).toContain('OG');
-      expect(tierNames).toContain('BELIEVER');
-      expect(tierNames).toContain('HOLDER');
-      expect(tierNames).toContain('NORMIE');
+      expect(tierNames).toContain('DIAMOND');
+      expect(tierNames).toContain('PLATINUM');
+      expect(tierNames).toContain('GOLD');
+      expect(tierNames).toContain('SILVER');
+      expect(tierNames).toContain('BRONZE');
     });
 
     it('should have correct discount percentages', () => {
       const tiers = getAllTiers();
 
-      const whale = tiers.find((t) => t.name === 'WHALE');
-      expect(whale.discountPercent).toBe(95);
-      expect(whale.minSharePercent).toBe(1);
+      const diamond = tiers.find((t) => t.name === 'DIAMOND');
+      expect(diamond.discountPercent).toBe(95);
+      expect(diamond.minSharePercent).toBe(1);
 
-      const normie = tiers.find((t) => t.name === 'NORMIE');
-      expect(normie.discountPercent).toBe(0);
-      expect(normie.minSharePercent).toBe(0);
+      const bronze = tiers.find((t) => t.name === 'BRONZE');
+      expect(bronze.discountPercent).toBe(0);
+      expect(bronze.minSharePercent).toBe(0);
     });
   });
 
   describe('Economic Sustainability', () => {
-    it('should always have minimum 5% fee contribution from whales', () => {
+    it('should always have minimum 5% fee contribution from Diamond tier', () => {
       // Max discount is 95%, so min contribution is 5%
       const maxDiscount = calculateDiscountFromShare(1.0); // 100% of supply
       expect(1 - maxDiscount).toBeGreaterThanOrEqual(0.05);

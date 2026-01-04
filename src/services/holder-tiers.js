@@ -182,15 +182,16 @@ async function getHolderTier(walletAddress) {
 
 /**
  * Get tier name based on share percentage
+ * Uses metals naming for normie-friendly branding (matching HolDex K-score style)
  * @param {number} sharePercent - Share as percentage (0.001 to 100)
  * @returns {Object} - Tier name and emoji
  */
 function getTierName(sharePercent) {
-  if (sharePercent >= 1) return { name: 'WHALE', emoji: '🐋' };
-  if (sharePercent >= 0.1) return { name: 'OG', emoji: '👑' };
-  if (sharePercent >= 0.01) return { name: 'BELIEVER', emoji: '💎' };
-  if (sharePercent >= 0.001) return { name: 'HOLDER', emoji: '🙌' };
-  return { name: 'NORMIE', emoji: '👤' };
+  if (sharePercent >= 1) return { name: 'DIAMOND', emoji: '💎' };
+  if (sharePercent >= 0.1) return { name: 'PLATINUM', emoji: '🪙' };
+  if (sharePercent >= 0.01) return { name: 'GOLD', emoji: '🥇' };
+  if (sharePercent >= 0.001) return { name: 'SILVER', emoji: '🥈' };
+  return { name: 'BRONZE', emoji: '🥉' };
 }
 
 /**
@@ -291,15 +292,16 @@ async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
 
 /**
  * Get tier structure for display
- * Shows what % of supply gives what discount
+ * Shows what % of supply gives what max discount
+ * Metals naming for normie-friendly branding (matching HolDex K-score)
  */
 function getAllTiers() {
   return [
-    { name: 'WHALE', emoji: '🐋', minSharePercent: 1, discountPercent: 95 },
-    { name: 'OG', emoji: '👑', minSharePercent: 0.1, discountPercent: 67 },
-    { name: 'BELIEVER', emoji: '💎', minSharePercent: 0.01, discountPercent: 33 },
-    { name: 'HOLDER', emoji: '🙌', minSharePercent: 0.001, discountPercent: 0 },
-    { name: 'NORMIE', emoji: '👤', minSharePercent: 0, discountPercent: 0 },
+    { name: 'DIAMOND', emoji: '💎', minSharePercent: 1, discountPercent: 95 },
+    { name: 'PLATINUM', emoji: '🪙', minSharePercent: 0.1, discountPercent: 67 },
+    { name: 'GOLD', emoji: '🥇', minSharePercent: 0.01, discountPercent: 33 },
+    { name: 'SILVER', emoji: '🥈', minSharePercent: 0.001, discountPercent: 0 },
+    { name: 'BRONZE', emoji: '🥉', minSharePercent: 0, discountPercent: 0 },
   ];
 }
 

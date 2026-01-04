@@ -1,0 +1,3026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GASdf - Gasless Transactions for Solana</title>
+  <meta name="description" content="Pay Solana transaction fees with any token. No SOL needed. Fees are burned to $asdfasdfa.">
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="GASdf - Gasless Solana Transactions">
+  <meta property="og:description" content="Pay transaction fees with any token. No SOL needed. 76.4% of fees burned forever.">
+  <meta property="og:url" content="https://asdfasdfa.tech">
+  <meta property="og:image" content="https://asdfasdfa.tech/og-image.svg">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="GASdf - Gasless Solana Transactions">
+  <meta name="twitter:description" content="Pay transaction fees with any token. No SOL needed.">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Golden Ratio */
+      --phi: 1.618033988749;
+
+      /* Golden Percentages */
+      --treasury-pct: 23.6;
+      --burn-pct: 76.4;
+
+      /* Colors - Fire/Golden Theme */
+      --bg-dark: #050508;
+      --bg-card: #0a0a10;
+      --bg-card-hover: #12121a;
+      --border-subtle: #1a1a25;
+      --border-golden: #b8860b33;
+
+      /* Golden palette */
+      --gold-primary: #ffd700;
+      --gold-secondary: #daa520;
+      --gold-muted: #b8860b;
+
+      /* Fire palette */
+      --fire-red: #ff4444;
+      --fire-orange: #ff6b35;
+      --fire-yellow: #ffaa00;
+
+      /* Category colors */
+      --cat-trending: #ff6b35;
+      --cat-trusted: #00d4ff;
+      --cat-new: #00ff88;
+
+      /* Text */
+      --text-primary: #f0f0f5;
+      --text-secondary: #8888a0;
+      --text-muted: #55556a;
+
+      /* NEW: Glassmorphism */
+      --glass-bg: rgba(10, 10, 16, 0.85);
+      --glass-border: rgba(255, 215, 0, 0.15);
+      --glass-glow: rgba(255, 215, 0, 0.1);
+
+      /* NEW: Depth & Shadows */
+      --shadow-glow: 0 0 60px rgba(255, 215, 0, 0.12);
+      --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+      /* NEW: Transitions */
+      --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+      /* NEW: Success/Error */
+      --success: #00ff88;
+      --error: #ff4444;
+      --warning: #ffaa00;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle golden glow background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      height: 60vh;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.03) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       HERO SECTION - The Hook
+       ═══════════════════════════════════════════════════════════ */
+    .hero {
+      min-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 4rem 1rem;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      color: var(--gold-primary);
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.6s ease;
+    }
+
+    .hero-badge .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--gold-primary);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(255, 215, 0, 0); }
+    }
+
+    .hero-burn-counter {
+      animation: fadeInUp 0.6s ease 0.1s both;
+      cursor: pointer;
+      padding: 1rem 2rem;
+      border-radius: 16px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .hero-burn-counter:hover {
+      background: rgba(255, 107, 53, 0.05);
+    }
+
+    .hero-burn-counter::after {
+      content: 'Click to verify on Solscan';
+      position: absolute;
+      bottom: -1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .hero-burn-counter:hover::after {
+      opacity: 1;
+    }
+
+    .burn-amount {
+      font-size: clamp(3rem, 10vw, 7rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--fire-yellow) 0%, var(--fire-orange) 50%, var(--fire-red) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .burn-label {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .burn-label .fire {
+      animation: flicker 0.3s infinite alternate;
+    }
+
+    @keyframes flicker {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    .hero-tagline {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      color: var(--text-primary);
+      margin-top: 2rem;
+      animation: fadeInUp 0.6s ease 0.2s both;
+    }
+
+    .hero-tagline strong {
+      color: var(--gold-primary);
+    }
+
+    .hero-sub {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-top: 0.75rem;
+      max-width: 500px;
+      animation: fadeInUp 0.6s ease 0.3s both;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 3rem;
+      margin-top: 3rem;
+      animation: fadeInUp 0.6s ease 0.4s both;
+    }
+
+    .hero-stat {
+      text-align: center;
+      cursor: pointer;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .hero-stat:hover {
+      background: rgba(255, 215, 0, 0.05);
+    }
+
+    .hero-stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .hero-stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 0.25rem;
+    }
+
+    .hero-stat .verify-icon {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .hero-stat:hover .verify-icon {
+      opacity: 1;
+    }
+
+    /* Verification tooltip */
+    .verify-tooltip {
+      position: fixed;
+      background: var(--bg-card);
+      border: 1px solid var(--gold-muted);
+      border-radius: 12px;
+      padding: 1rem;
+      max-width: 320px;
+      z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .verify-tooltip h4 {
+      color: var(--gold-primary);
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .verify-tooltip p {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .verify-tooltip a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--cat-trusted);
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+
+    .verify-tooltip a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       ACTION CARD - The Main CTA
+       ═══════════════════════════════════════════════════════════ */
+    .action-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+      animation: fadeInUp 0.8s ease 0.2s both;
+      margin-bottom: 2rem;
+    }
+
+    .action-card-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .action-card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .action-card-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Wallet Connect Button */
+    .wallet-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: none;
+    }
+
+    .wallet-btn-connect {
+      background: linear-gradient(135deg, var(--gold-primary), var(--fire-orange));
+      color: #000;
+      animation: pulse-glow 2.5s infinite;
+    }
+
+    .wallet-btn-connect:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255, 215, 0, 0.35);
+    }
+
+    .wallet-btn-connect:active {
+      transform: translateY(1px);
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+      50% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+    }
+
+    .wallet-btn-connected {
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      color: var(--success);
+    }
+
+    .wallet-btn-connected:hover {
+      background: rgba(0, 255, 136, 0.15);
+    }
+
+    .wallet-address {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .wallet-icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Wallet Selector Modal */
+    .wallet-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .wallet-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .wallet-modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 360px;
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .wallet-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .wallet-modal-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .wallet-modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .wallet-modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .wallet-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-card-hover);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      margin-bottom: 8px;
+    }
+
+    .wallet-option:last-child {
+      margin-bottom: 0;
+    }
+
+    .wallet-option:hover {
+      border-color: var(--gold-primary);
+      background: rgba(255, 215, 0, 0.05);
+    }
+
+    .wallet-option:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .wallet-option img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    .wallet-option .not-installed {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Holder Tier Display */
+    .holder-tier {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(255, 215, 0, 0.05);
+      border: 1px solid rgba(255, 215, 0, 0.1);
+      border-radius: 12px;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .holder-tier.visible {
+      display: flex;
+    }
+
+    .holder-tier-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tier-icon {
+      font-size: 1.1rem;
+    }
+
+    .tier-name {
+      font-weight: 600;
+      color: var(--gold-primary);
+    }
+
+    .tier-discount {
+      color: var(--success);
+      font-weight: 500;
+    }
+
+    /* Try Transaction CTA */
+    .try-tx-btn {
+      width: 100%;
+      padding: 14px 24px;
+      margin-top: 1rem;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: none;
+    }
+
+    .try-tx-btn.visible {
+      display: block;
+    }
+
+    .try-tx-btn:hover {
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+      background: rgba(255, 215, 0, 0.05);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TRANSACTION DEMO PANEL
+       ═══════════════════════════════════════════════════════════ */
+    .tx-demo {
+      display: none;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-subtle);
+      animation: fadeInUp 0.4s ease;
+    }
+
+    .tx-demo.visible {
+      display: block;
+    }
+
+    .tx-demo-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tx-demo-title .beta {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      background: rgba(0, 212, 255, 0.15);
+      color: var(--cat-trusted);
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    /* Token Selector */
+    .token-selector {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+
+    .token-selector-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .token-selector-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .token-selector-btn:hover {
+      border-color: var(--gold-primary);
+    }
+
+    .token-selector-btn img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+
+    .token-selector-btn .token-name {
+      flex: 1;
+      text-align: left;
+    }
+
+    .token-selector-btn .chevron {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+
+    .token-selector-btn.open .chevron {
+      transform: rotate(180deg);
+    }
+
+    .token-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: var(--transition-smooth);
+    }
+
+    .token-dropdown.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .token-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .token-dropdown-item:hover {
+      background: rgba(255, 215, 0, 0.05);
+    }
+
+    .token-dropdown-item img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+
+    .token-dropdown-item .kscore {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .token-dropdown-item .kscore.trusted {
+      color: var(--cat-trusted);
+    }
+
+    /* Fee Breakdown */
+    .fee-breakdown {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 1rem;
+    }
+
+    .fee-breakdown-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      padding: 4px 0;
+    }
+
+    .fee-row .label {
+      color: var(--text-secondary);
+    }
+
+    .fee-row .value {
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .fee-row.discount .value {
+      color: var(--success);
+    }
+
+    .fee-row.total {
+      border-top: 1px solid var(--border-subtle);
+      margin-top: 8px;
+      padding-top: 10px;
+      font-weight: 600;
+    }
+
+    .fee-row.burn {
+      color: var(--fire-orange);
+    }
+
+    .fee-row.burn .value {
+      color: var(--fire-orange);
+    }
+
+    /* Execute Button */
+    .execute-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--gold-primary), var(--fire-orange));
+      color: #000;
+    }
+
+    .execute-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255, 215, 0, 0.3);
+    }
+
+    .execute-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .execute-btn.loading {
+      background: var(--bg-card-hover);
+      color: var(--gold-primary);
+      border: 1px solid var(--gold-primary);
+    }
+
+    .execute-btn.success {
+      background: var(--success);
+      color: #000;
+    }
+
+    .execute-btn.error {
+      background: var(--error);
+      color: #fff;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-top: 1rem;
+    }
+
+    .status-badge.loading {
+      background: rgba(255, 215, 0, 0.1);
+      color: var(--gold-primary);
+    }
+
+    .status-badge.loading::before {
+      content: '';
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status-badge.success {
+      background: rgba(0, 255, 136, 0.1);
+      color: var(--success);
+    }
+
+    .status-badge.error {
+      background: rgba(255, 68, 68, 0.1);
+      color: var(--error);
+    }
+
+    /* Quote Timer */
+    .quote-timer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    .quote-timer .time {
+      color: var(--gold-primary);
+      font-weight: 500;
+    }
+
+    /* Solscan Link */
+    .solscan-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 1rem;
+      padding: 10px 16px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 10px;
+      color: var(--success);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: var(--transition-smooth);
+    }
+
+    .solscan-link:hover {
+      background: rgba(0, 255, 136, 0.15);
+      transform: translateY(-1px);
+    }
+
+    /* Confetti */
+    .confetti {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      pointer-events: none;
+      animation: confetti-fall 3s ease-out forwards;
+    }
+
+    @keyframes confetti-fall {
+      0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SECURITY UI ELEMENTS - Phase 5
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Security Shield Indicator */
+    .security-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(0, 255, 136, 0.05);
+      border: 1px solid rgba(0, 255, 136, 0.15);
+      border-radius: 10px;
+      margin-bottom: 14px;
+      font-size: 0.8rem;
+      color: var(--success);
+    }
+
+    .security-indicator.warning {
+      background: rgba(255, 170, 0, 0.05);
+      border-color: rgba(255, 170, 0, 0.15);
+      color: var(--warning);
+    }
+
+    .security-indicator .shield-icon {
+      font-size: 1rem;
+    }
+
+    .security-indicator .security-text {
+      flex: 1;
+    }
+
+    .security-indicator .security-detail {
+      font-size: 0.7rem;
+      opacity: 0.8;
+    }
+
+    /* Transaction Preview Box */
+    .tx-preview {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+      font-size: 0.75rem;
+    }
+
+    .tx-preview-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .tx-preview-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed var(--border-subtle);
+    }
+
+    .tx-preview-item:last-child {
+      border-bottom: none;
+    }
+
+    .tx-preview-icon {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 1px;
+    }
+
+    .tx-preview-content {
+      flex: 1;
+    }
+
+    .tx-preview-action {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .tx-preview-detail {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      margin-top: 2px;
+    }
+
+    /* Trust Badge on Tokens */
+    .trust-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 500;
+    }
+
+    .trust-badge.verified {
+      background: rgba(0, 255, 136, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+    }
+
+    .trust-badge.caution {
+      background: rgba(255, 170, 0, 0.1);
+      color: var(--warning);
+      border: 1px solid rgba(255, 170, 0, 0.2);
+    }
+
+    .trust-badge.unknown {
+      background: rgba(136, 136, 160, 0.1);
+      color: var(--text-muted);
+      border: 1px solid rgba(136, 136, 160, 0.2);
+    }
+
+    /* Fee Cap Display */
+    .fee-cap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(255, 215, 0, 0.05);
+      border: 1px dashed rgba(255, 215, 0, 0.2);
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: var(--gold-primary);
+    }
+
+    .fee-cap .cap-icon {
+      font-size: 0.9rem;
+    }
+
+    /* Simulation Badge */
+    .simulation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 6px;
+      font-size: 0.7rem;
+      color: var(--cat-trusted);
+    }
+
+    /* Security Notice Footer */
+    .security-notice {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid var(--border-subtle);
+      margin: 14px -16px -16px;
+      border-radius: 0 0 16px 16px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .security-notice .lock-icon {
+      color: var(--success);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TOKEN CATEGORIES - Social Proof
+       ═══════════════════════════════════════════════════════════ */
+    .tokens-section {
+      padding: 4rem 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .section-title .phi {
+      color: var(--gold-primary);
+      font-size: 1.2rem;
+    }
+
+    .section-subtitle {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .token-categories {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .token-categories { grid-template-columns: 1fr; }
+    }
+
+    .token-category {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .token-category:hover {
+      border-color: var(--border-golden);
+      transform: translateY(-2px);
+    }
+
+    .category-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .category-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .category-icon.trending { background: rgba(255, 107, 53, 0.15); }
+    .category-icon.trusted { background: rgba(0, 212, 255, 0.15); }
+    .category-icon.new { background: rgba(0, 255, 136, 0.15); }
+
+    .category-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .category-title.trending { color: var(--cat-trending); }
+    .category-title.trusted { color: var(--cat-trusted); }
+    .category-title.new { color: var(--cat-new); }
+
+    .category-badge {
+      margin-left: auto;
+      font-size: 0.65rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--bg-dark);
+      color: var(--text-muted);
+    }
+
+    .token-list {
+      padding: 0.5rem;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .token-item:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .token-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      overflow: hidden;
+    }
+
+    .token-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .token-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .token-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .token-ticker {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .token-metrics {
+      text-align: right;
+    }
+
+    .token-price {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .token-change {
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+
+    .token-change.up { color: #00ff88; }
+    .token-change.down { color: #ff4444; }
+
+    .token-kscore {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: var(--bg-dark);
+      color: var(--text-muted);
+    }
+
+    .token-kscore.high { color: var(--cat-trusted); border: 1px solid rgba(0, 212, 255, 0.3); }
+    .token-kscore.medium { color: var(--gold-primary); border: 1px solid rgba(255, 215, 0, 0.3); }
+
+    /* ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .golden-section {
+      padding: 4rem 0;
+    }
+
+    .golden-card {
+      background: var(--bg-card);
+      border: 1px solid var(--gold-muted);
+      border-radius: 20px;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .golden-card::before {
+      content: 'φ';
+      position: absolute;
+      top: -40px;
+      right: 40px;
+      font-size: 12rem;
+      font-weight: 700;
+      color: var(--gold-primary);
+      opacity: 0.03;
+      pointer-events: none;
+    }
+
+    .golden-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    @media (max-width: 800px) {
+      .golden-grid { grid-template-columns: 1fr; }
+    }
+
+    .golden-visual {
+      position: relative;
+      aspect-ratio: 1.618 / 1;
+      max-width: 400px;
+    }
+
+    .spiral-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Golden Spiral SVG will be injected via JS */
+    .golden-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .golden-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .bar-label {
+      width: 100px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-align: right;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 24px;
+      background: var(--bg-dark);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 12px;
+      transition: width 1s ease;
+      position: relative;
+    }
+
+    .bar-fill.burn {
+      background: linear-gradient(90deg, var(--fire-orange), var(--fire-red));
+    }
+
+    .bar-fill.treasury {
+      background: linear-gradient(90deg, var(--gold-secondary), var(--gold-primary));
+    }
+
+    .bar-fill.ecosystem {
+      background: linear-gradient(90deg, #00ff88, #00d4ff);
+    }
+
+    .bar-value {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: rgba(0,0,0,0.8);
+    }
+
+    .golden-info {
+      position: relative;
+      z-index: 1;
+    }
+
+    .golden-info h2 {
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .golden-info h2 .phi-symbol {
+      color: var(--gold-primary);
+    }
+
+    .golden-info p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    .golden-formula {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      overflow-x: auto;
+    }
+
+    .golden-formula .phi { color: var(--gold-primary); font-weight: 600; }
+    .golden-formula .num { color: var(--fire-orange); }
+
+    /* ═══════════════════════════════════════════════════════════
+       CTA SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .cta-section {
+      padding: 4rem 0;
+    }
+
+    .cta-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 255, 136, 0.02) 100%);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 20px;
+      padding: 3rem;
+      text-align: center;
+    }
+
+    .cta-title {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .cta-title span {
+      color: var(--cat-new);
+    }
+
+    .cta-subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .cta-code {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .cta-code code {
+      font-size: 1.1rem;
+      color: var(--cat-new);
+    }
+
+    .cta-code button {
+      background: var(--cat-new);
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      color: #000;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cta-code button:hover {
+      transform: scale(1.05);
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .cta-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .cta-link.primary {
+      background: var(--gold-primary);
+      color: #000;
+    }
+
+    .cta-link.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255, 215, 0, 0.2);
+    }
+
+    .cta-link.secondary {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .cta-link.secondary:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       API SECTION
+       ═══════════════════════════════════════════════════════════ */
+    .api-section {
+      padding: 4rem 0;
+    }
+
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .api-endpoint {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: all 0.2s;
+    }
+
+    .api-endpoint:hover {
+      border-color: var(--border-golden);
+    }
+
+    .api-method {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .api-method.post { background: rgba(0, 255, 136, 0.15); color: #00ff88; }
+    .api-method.get { background: rgba(0, 212, 255, 0.15); color: #00d4ff; }
+
+    .api-path {
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    .api-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ */
+    footer {
+      padding: 3rem 1rem;
+      text-align: center;
+      border-top: 1px solid var(--border-subtle);
+      margin-top: 2rem;
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    footer a {
+      color: var(--gold-primary);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       UTILITIES
+       ═══════════════════════════════════════════════════════════ */
+    .loading-skeleton {
+      background: linear-gradient(90deg, var(--bg-dark) 25%, var(--bg-card-hover) 50%, var(--bg-dark) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-subtle);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       MOBILE RESPONSIVE - Phase 4
+       ═══════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Hero adjustments */
+      .hero {
+        min-height: auto;
+        padding: 2rem 0.75rem 3rem;
+      }
+
+      .hero-badge {
+        margin-bottom: 1.5rem;
+        font-size: 0.7rem;
+      }
+
+      /* Action Card Mobile */
+      .action-card {
+        width: calc(100% - 1rem);
+        margin: 1rem 0.5rem;
+        padding: 1.25rem;
+        border-radius: 16px;
+      }
+
+      .action-card-title {
+        font-size: 1.1rem;
+      }
+
+      .wallet-btn {
+        padding: 0.875rem 1rem;
+        font-size: 0.9rem;
+        border-radius: 10px;
+      }
+
+      .holder-tier {
+        padding: 0.875rem;
+        border-radius: 10px;
+      }
+
+      .try-tx-btn {
+        padding: 1rem;
+        font-size: 0.9rem;
+        border-radius: 10px;
+      }
+
+      /* Transaction Demo Mobile */
+      .tx-demo {
+        padding: 1rem;
+        border-radius: 12px;
+      }
+
+      .tx-demo-title {
+        font-size: 0.95rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .token-selector {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+
+      .token-selector label {
+        font-size: 0.8rem;
+      }
+
+      .token-selector-btn {
+        padding: 0.875rem;
+        border-radius: 10px;
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .token-dropdown {
+        left: 0;
+        right: 0;
+        border-radius: 12px;
+      }
+
+      .token-dropdown-item {
+        padding: 0.875rem;
+      }
+
+      .fee-breakdown {
+        padding: 0.875rem;
+        border-radius: 10px;
+        font-size: 0.8rem;
+      }
+
+      .fee-row {
+        padding: 0.5rem 0;
+      }
+
+      .execute-btn {
+        padding: 1rem;
+        font-size: 0.95rem;
+        border-radius: 10px;
+      }
+
+      /* Wallet Modal Mobile */
+      .wallet-modal-content {
+        width: 95%;
+        max-width: 340px;
+        padding: 1.25rem;
+        border-radius: 16px;
+        margin: 1rem;
+      }
+
+      .wallet-modal-title {
+        font-size: 1rem;
+      }
+
+      .wallet-option {
+        padding: 0.875rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+      }
+
+      .wallet-option-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+      }
+
+      /* Stats Mobile */
+      .hero-stats {
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0 0.5rem;
+      }
+
+      .hero-stat {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        justify-content: space-between;
+      }
+
+      .burn-amount {
+        font-size: clamp(2.5rem, 12vw, 4rem);
+      }
+
+      .burn-label {
+        font-size: 1rem;
+      }
+
+      /* Token categories mobile */
+      .token-categories {
+        gap: 1rem;
+        padding: 0 0.5rem;
+      }
+
+      .category-header {
+        padding: 1rem;
+      }
+
+      .token-item {
+        padding: 0.625rem 0.75rem;
+      }
+
+      /* Golden section mobile */
+      .golden-card {
+        padding: 1.5rem;
+        border-radius: 16px;
+      }
+
+      .golden-grid {
+        gap: 2rem;
+      }
+
+      .golden-content h2 {
+        font-size: 1.25rem;
+      }
+
+      .bar-label {
+        width: 70px;
+        font-size: 0.65rem;
+      }
+
+      /* Footer mobile */
+      footer {
+        padding: 1.5rem 1rem;
+      }
+    }
+
+    /* Extra small screens */
+    @media (max-width: 400px) {
+      .action-card {
+        padding: 1rem;
+      }
+
+      .wallet-btn {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+      }
+
+      .tx-demo {
+        padding: 0.75rem;
+      }
+
+      .fee-breakdown {
+        padding: 0.75rem;
+        font-size: 0.75rem;
+      }
+
+      .execute-btn {
+        padding: 0.875rem;
+        font-size: 0.9rem;
+      }
+
+      .hero-stat-value {
+        font-size: 0.95rem;
+      }
+
+      .burn-amount {
+        font-size: 2.25rem;
+      }
+    }
+
+    /* Touch-friendly improvements */
+    @media (hover: none) and (pointer: coarse) {
+      /* Larger touch targets */
+      .wallet-btn,
+      .try-tx-btn,
+      .execute-btn,
+      .token-selector-btn,
+      .wallet-option {
+        min-height: 48px;
+      }
+
+      .token-dropdown-item {
+        min-height: 44px;
+      }
+
+      /* Remove hover effects on touch */
+      .action-card:hover,
+      .token-category:hover,
+      .token-item:hover {
+        transform: none;
+      }
+
+      /* Tap highlight */
+      .wallet-btn:active,
+      .try-tx-btn:active,
+      .execute-btn:active,
+      .token-selector-btn:active {
+        transform: scale(0.98);
+        transition: transform 0.1s;
+      }
+    }
+
+    /* Safe area insets for notched devices */
+    @supports (padding: env(safe-area-inset-bottom)) {
+      footer {
+        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* Reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .confetti {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- ═══════════════════════════════════════════════════════════
+       HERO - Action Center
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span>Live on Mainnet</span>
+    </div>
+
+    <h1 class="hero-tagline">
+      Pay fees with <strong>any token</strong>
+    </h1>
+    <p class="hero-sub">
+      No SOL needed. 76.4% of every fee is burned. Deflationary by design.
+    </p>
+
+    <!-- ACTION CARD - The Main Experience -->
+    <div class="action-card">
+      <div class="action-card-header">
+        <div class="action-card-title">Try Gasless Transactions</div>
+        <div class="action-card-subtitle">Connect wallet to get started</div>
+      </div>
+
+      <!-- Wallet Connect Button -->
+      <button class="wallet-btn wallet-btn-connect" id="walletBtn" onclick="openWalletModal()">
+        <span>🔌</span>
+        <span>Connect Wallet</span>
+      </button>
+
+      <!-- Holder Tier Display (shown after connect) -->
+      <div class="holder-tier" id="holderTier">
+        <div class="holder-tier-badge">
+          <span class="tier-icon" id="tierIcon">🥉</span>
+          <span class="tier-name" id="tierName">BRONZE</span>
+        </div>
+        <span class="tier-discount" id="tierDiscount">0% discount</span>
+      </div>
+
+      <!-- Try Transaction CTA (shown after connect) -->
+      <button class="try-tx-btn" id="tryTxBtn" onclick="showTxDemo()">
+        🚀 Try a Gasless Transaction
+      </button>
+
+      <!-- Transaction Demo Panel -->
+      <div class="tx-demo" id="txDemo">
+        <div class="tx-demo-title">
+          <span>Send a test transaction</span>
+          <span class="beta">DEMO</span>
+        </div>
+
+        <!-- Security Indicator -->
+        <div class="security-indicator" id="securityIndicator">
+          <span class="shield-icon">🛡️</span>
+          <div class="security-text">
+            <span>Secure Transaction</span>
+            <div class="security-detail" id="securityDetail">Trusted token • No approval required</div>
+          </div>
+          <span class="simulation-badge" id="simBadge" style="display: none;">✓ Simulated</span>
+        </div>
+
+        <!-- Token Selector -->
+        <div class="token-selector">
+          <label class="token-selector-label">Pay fee with</label>
+          <button class="token-selector-btn" id="tokenSelectorBtn" onclick="toggleTokenDropdown()">
+            <img src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png" alt="USDC" id="selectedTokenImg">
+            <span class="token-name" id="selectedTokenName">USDC</span>
+            <span class="trust-badge verified" id="tokenTrustBadge">✓ Verified</span>
+            <span class="chevron">▼</span>
+          </button>
+          <div class="token-dropdown" id="tokenDropdown">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Transaction Preview -->
+        <div class="tx-preview" id="txPreview">
+          <div class="tx-preview-title">
+            <span>📋</span>
+            <span>What happens when you sign</span>
+          </div>
+          <div class="tx-preview-item">
+            <span class="tx-preview-icon">→</span>
+            <div class="tx-preview-content">
+              <div class="tx-preview-action">Transfer fee to GASdf</div>
+              <div class="tx-preview-detail" id="previewFeeAmount">~0.01 USDC from your wallet</div>
+            </div>
+          </div>
+          <div class="tx-preview-item">
+            <span class="tx-preview-icon">🔥</span>
+            <div class="tx-preview-content">
+              <div class="tx-preview-action">We burn 76.4% as $asdfasdfa</div>
+              <div class="tx-preview-detail">Automatic, verified on-chain</div>
+            </div>
+          </div>
+          <div class="tx-preview-item">
+            <span class="tx-preview-icon">✓</span>
+            <div class="tx-preview-content">
+              <div class="tx-preview-action">Demo transaction sent</div>
+              <div class="tx-preview-detail">View immediately on Solscan</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fee Breakdown -->
+        <div class="fee-breakdown" id="feeBreakdown">
+          <div class="fee-breakdown-title">
+            <span>📊</span>
+            <span>Fee Breakdown</span>
+          </div>
+          <div class="fee-row">
+            <span class="label">Network fee</span>
+            <span class="value" id="feeNetwork">~0.000005 SOL</span>
+          </div>
+          <div class="fee-row">
+            <span class="label">Priority fee</span>
+            <span class="value" id="feePriority">~0.000010 SOL</span>
+          </div>
+          <div class="fee-row">
+            <span class="label">Your fee</span>
+            <span class="value" id="feeUser">-</span>
+          </div>
+          <div class="fee-row discount" id="feeDiscountRow" style="display: none;">
+            <span class="label">Holder discount</span>
+            <span class="value" id="feeDiscount">-0%</span>
+          </div>
+          <div class="fee-row total">
+            <span class="label">You pay</span>
+            <span class="value" id="feeTotal">-</span>
+          </div>
+          <div class="fee-row burn">
+            <span class="label">🔥 We burn</span>
+            <span class="value" id="feeBurn">-</span>
+          </div>
+
+          <!-- Fee Cap -->
+          <div class="fee-cap" id="feeCap">
+            <span class="cap-icon">⚡</span>
+            <span>Maximum fee: <strong id="feeCapAmount">0.05 USDC</strong></span>
+          </div>
+        </div>
+
+        <!-- Execute Button -->
+        <button class="execute-btn" id="executeBtn" onclick="executeDemo()" disabled>
+          <span id="executeBtnText">Select a token to continue</span>
+        </button>
+
+        <!-- Quote Timer -->
+        <div class="quote-timer" id="quoteTimer" style="display: none;">
+          Quote refreshes in <span class="time" id="quoteTimeLeft">60</span>s
+        </div>
+
+        <!-- Status Messages -->
+        <div id="txStatus"></div>
+
+        <!-- Success Result -->
+        <div id="txResult" style="display: none; text-align: center;">
+          <a href="#" class="solscan-link" id="solscanLink" target="_blank">
+            <span>✓</span>
+            <span>View on Solscan</span>
+          </a>
+        </div>
+
+        <!-- Security Notice Footer -->
+        <div class="security-notice">
+          <span class="lock-icon">🔒</span>
+          <span>You only sign - we never have access to your keys</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats (now secondary) -->
+    <div class="hero-stats">
+      <div class="hero-stat" data-verify="burn" onclick="VERIFY_SOURCES.burn.verify()">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="burnAmount">-</div>
+        <div class="hero-stat-label">$asdfasdfa Burned</div>
+      </div>
+      <div class="hero-stat" data-verify="tx">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="txCount">-</div>
+        <div class="hero-stat-label">Transactions</div>
+      </div>
+      <div class="hero-stat" data-verify="treasury">
+        <span class="verify-icon">⟁</span>
+        <div class="hero-stat-value" id="treasurySOL">-</div>
+        <div class="hero-stat-label">Treasury</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Wallet Selector Modal -->
+  <div class="wallet-modal" id="walletModal" onclick="closeWalletModal(event)">
+    <div class="wallet-modal-content" onclick="event.stopPropagation()">
+      <div class="wallet-modal-header">
+        <span class="wallet-modal-title">Connect Wallet</span>
+        <button class="wallet-modal-close" onclick="closeWalletModal()">×</button>
+      </div>
+      <button class="wallet-option" id="phantomOption" onclick="connectWallet('phantom')">
+        <img src="https://phantom.com/img/logo.png" alt="Phantom">
+        <span>Phantom</span>
+        <span class="not-installed" id="phantomNotInstalled" style="display: none;">Not installed</span>
+      </button>
+      <button class="wallet-option" id="solflareOption" onclick="connectWallet('solflare')">
+        <img src="https://solflare.com/favicon.ico" alt="Solflare">
+        <span>Solflare</span>
+        <span class="not-installed" id="solflareNotInstalled" style="display: none;">Not installed</span>
+      </button>
+      <button class="wallet-option" id="backpackOption" onclick="connectWallet('backpack')">
+        <img src="https://backpack.app/favicon.ico" alt="Backpack">
+        <span>Backpack</span>
+        <span class="not-installed" id="backpackNotInstalled" style="display: none;">Not installed</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TOKEN CATEGORIES - Social Proof
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="tokens-section">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title"><span class="phi">φ</span> Ecosystem Tokens</h2>
+          <p class="section-subtitle">Live from HolDex · Sorted by K-Score</p>
+        </div>
+      </div>
+
+      <div class="token-categories">
+        <!-- TRENDING -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon trending">🔥</div>
+            <span class="category-title trending">Trending</span>
+            <span class="category-badge">24h Volume</span>
+          </div>
+          <div class="token-list" id="trendingTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- TRUSTED -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon trusted">💎</div>
+            <span class="category-title trusted">Trusted</span>
+            <span class="category-badge">K-Score 80+</span>
+          </div>
+          <div class="token-list" id="trustedTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- NEW -->
+        <div class="token-category">
+          <div class="category-header">
+            <div class="category-icon new">🌱</div>
+            <span class="category-title new">Emerging</span>
+            <span class="category-badge">New Listings</span>
+          </div>
+          <div class="token-list" id="newTokens">
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+            <div class="loading-skeleton" style="height: 50px; margin: 0.5rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       GOLDEN RATIO SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="golden-section">
+    <div class="container">
+      <div class="golden-card">
+        <div class="golden-grid">
+          <div class="golden-visual">
+            <div class="golden-bars">
+              <div class="golden-bar">
+                <span class="bar-label">$asdfasdfa Burn</span>
+                <div class="bar-track">
+                  <div class="bar-fill burn" id="burnBar" style="width: 76.4%;">
+                    <span class="bar-value">76.4%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="golden-bar">
+                <span class="bar-label">Treasury</span>
+                <div class="bar-track">
+                  <div class="bar-fill treasury" id="treasuryBar" style="width: 23.6%;">
+                    <span class="bar-value">23.6%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="golden-bar">
+                <span class="bar-label">Eco Bonus</span>
+                <div class="bar-track">
+                  <div class="bar-fill ecosystem" id="ecoBar" style="width: 0%;">
+                    <span class="bar-value" id="ecoValue">0%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="golden-info">
+            <h2><span class="phi-symbol">φ</span> Golden Economics</h2>
+            <p>
+              Every ratio derives from φ = 1.618... The treasury takes exactly 1/φ³ (23.6%).
+              The rest burns $asdfasdfa forever. Tokens that burn their own supply unlock ecosystem bonuses up to 1/φ² (38.2%).
+            </p>
+            <div class="golden-formula">
+              burn = (<span class="num">1</span> - <span class="num">1</span>/<span class="phi">φ³</span>) × fee = <span class="num">76.4%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CTA SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-card">
+        <h2 class="cta-title">Integrate in <span>5 minutes</span></h2>
+        <p class="cta-subtitle">Add gasless transactions to your dApp</p>
+
+        <div class="cta-code">
+          <code>npm install gasdf-sdk</code>
+          <button onclick="navigator.clipboard.writeText('npm install gasdf-sdk'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 1500);">Copy</button>
+        </div>
+
+        <div class="cta-links">
+          <a href="https://github.com/zeyxx/GASdf/tree/main/packages/sdk" class="cta-link primary" target="_blank">
+            View Documentation
+          </a>
+          <a href="https://github.com/zeyxx/GASdf" class="cta-link secondary" target="_blank">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       API SECTION
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="api-section">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">API Reference</h2>
+          <p class="section-subtitle">RESTful endpoints · No API key required</p>
+        </div>
+      </div>
+
+      <div class="api-grid">
+        <div class="api-endpoint">
+          <span class="api-method post">POST</span>
+          <span class="api-path">/v1/quote</span>
+          <p class="api-desc">Get a fee quote for your transaction</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method post">POST</span>
+          <span class="api-path">/v1/submit</span>
+          <p class="api-desc">Submit signed transaction for gasless execution</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method get">GET</span>
+          <span class="api-path">/v1/tokens</span>
+          <p class="api-desc">List supported payment tokens</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="api-method get">GET</span>
+          <span class="api-path">/v1/stats</span>
+          <p class="api-desc">Burn statistics and treasury data</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════════════════ -->
+  <footer>
+    <div class="container">
+      <p>
+        Powered by <span style="color: var(--gold-primary)">φ</span> Golden Ratio Economics
+        · <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
+        · Part of the <a href="https://alonisthe.dev" target="_blank">$asdfasdfa Ecosystem</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════════════════
+    const PHI = 1.618033988749;
+    const HOLDEX_API = '/v1/holdex'; // Proxy with API key
+    const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+    const INITIAL_SUPPLY = 1_000_000_000_000_000; // 1B with 6 decimals
+    const FEE_PAYER = '9F5NUrZYjP5MRmqLBc8vd3rsmXiYQdqAMNF7VdKqM68w';
+
+    // ═══════════════════════════════════════════════════════════
+    // VERIFICATION SOURCES - Every number is verifiable
+    // ═══════════════════════════════════════════════════════════
+    const VERIFY_SOURCES = {
+      tx: {
+        title: 'Transaction Count',
+        description: 'Total gasless transactions processed by GASdf API.',
+        apiUrl: '/v1/stats',
+        source: 'GASdf API',
+        verify: () => window.open('/v1/stats', '_blank')
+      },
+      tokens: {
+        title: 'Tokens Listed',
+        description: 'Live count from HolDex API. Each token is verified and scored.',
+        apiUrl: 'https://asdev-backend.onrender.com/api/tokens',
+        source: 'HolDex API',
+        verify: () => window.open('https://asdev-backend.onrender.com/api/tokens', '_blank')
+      },
+      treasury: {
+        title: 'Treasury Balance',
+        description: 'On-chain SOL balance of the fee payer wallet.',
+        apiUrl: `https://solscan.io/account/${FEE_PAYER}`,
+        source: 'Solscan',
+        verify: () => window.open(`https://solscan.io/account/${FEE_PAYER}`, '_blank')
+      },
+      burn: {
+        title: 'Total Burned',
+        description: 'Calculated from on-chain supply. Initial: 1B, Current supply from chain.',
+        apiUrl: `https://solscan.io/token/${ASDF_MINT}`,
+        source: 'Solscan',
+        verify: () => window.open(`https://solscan.io/token/${ASDF_MINT}`, '_blank')
+      }
+    };
+
+    let activeTooltip = null;
+
+    // ═══════════════════════════════════════════════════════════
+    // VERIFICATION TOOLTIP SYSTEM
+    // ═══════════════════════════════════════════════════════════
+    function showVerifyTooltip(element, verifyKey) {
+      // Remove existing tooltip
+      if (activeTooltip) {
+        activeTooltip.remove();
+        activeTooltip = null;
+      }
+
+      const source = VERIFY_SOURCES[verifyKey];
+      if (!source) return;
+
+      const rect = element.getBoundingClientRect();
+      const tooltip = document.createElement('div');
+      tooltip.className = 'verify-tooltip';
+      tooltip.innerHTML = `
+        <h4>⟁ ${source.title}</h4>
+        <p>${source.description}</p>
+        <a href="#" onclick="VERIFY_SOURCES['${verifyKey}'].verify(); return false;">
+          Verify on ${source.source} →
+        </a>
+      `;
+
+      document.body.appendChild(tooltip);
+      activeTooltip = tooltip;
+
+      // Position tooltip
+      const tooltipRect = tooltip.getBoundingClientRect();
+      let top = rect.bottom + 10;
+      let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+
+      // Keep within viewport
+      if (left < 10) left = 10;
+      if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+      }
+      if (top + tooltipRect.height > window.innerHeight - 10) {
+        top = rect.top - tooltipRect.height - 10;
+      }
+
+      tooltip.style.top = top + 'px';
+      tooltip.style.left = left + 'px';
+
+      // Close on click outside
+      setTimeout(() => {
+        document.addEventListener('click', closeTooltipOnClickOutside);
+      }, 10);
+    }
+
+    function closeTooltipOnClickOutside(e) {
+      if (activeTooltip && !activeTooltip.contains(e.target) && !e.target.closest('.hero-stat')) {
+        activeTooltip.remove();
+        activeTooltip = null;
+        document.removeEventListener('click', closeTooltipOnClickOutside);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ANIMATED COUNTER
+    // ═══════════════════════════════════════════════════════════
+    function animateCounter(element, target, duration = 2000, decimals = 0, suffix = '') {
+      const startText = element.textContent;
+      const start = startText === '-' ? 0 : (parseFloat(startText.replace(/[^0-9.-]/g, '')) || 0);
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = start + (target - start) * eased;
+
+        if (decimals === 0) {
+          element.textContent = Math.floor(current).toLocaleString() + suffix;
+        } else {
+          element.textContent = current.toFixed(decimals) + suffix;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH GASDF STATS
+    // ═══════════════════════════════════════════════════════════
+    async function fetchStats() {
+      try {
+        const res = await fetch('/v1/stats');
+        const data = await res.json();
+
+        // Update transaction count
+        const txCount = data.totalTransactions || 0;
+        animateCounter(document.getElementById('txCount'), txCount, 1500, 0);
+
+        // Update treasury - use solFormatted or convert from lamports
+        if (data.treasury?.onChain) {
+          const treasury = data.treasury.onChain;
+          // sol is in lamports, divide by 1e9 to get SOL
+          const solAmount = treasury.sol / 1e9;
+          animateCounter(document.getElementById('treasurySOL'), solAmount, 1500, 4, ' SOL');
+        }
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+        document.getElementById('txCount').textContent = '0';
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH $ASDF DATA FOR BURN COUNTER
+    // ═══════════════════════════════════════════════════════════
+    async function fetchAsdfBurnData() {
+      try {
+        const res = await fetch(`${HOLDEX_API}/token/${ASDF_MINT}`);
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          const token = data.token;
+          // supply is object {current, initial, ...} from proxy, or number from direct API
+          const currentSupply = parseInt(token.supply?.current ?? token.supply) || INITIAL_SUPPLY;
+          const burnedTokens = (INITIAL_SUPPLY - currentSupply) / 1e6;
+
+          // Animate the big burn counter
+          animateCounter(
+            document.getElementById('burnAmount'),
+            burnedTokens,
+            2500,
+            0,
+            ' $asdfasdfa'
+          );
+
+          // Calculate ecosystem bonus based on burn %
+          const burnedPercent = ((INITIAL_SUPPLY - currentSupply) / INITIAL_SUPPLY) * 100;
+          updateGoldenBars(burnedPercent);
+        }
+      } catch (err) {
+        console.error('Failed to fetch ASDF data:', err);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UPDATE GOLDEN RATIO BARS
+    // ═══════════════════════════════════════════════════════════
+    function updateGoldenBars(burnedPercent) {
+      const maxEco = 1 / (PHI * PHI);
+      const treasury = 1 / (PHI * PHI * PHI);
+      const multiplier = 1 - Math.pow(PHI, -burnedPercent / 30);
+      const eco = maxEco * multiplier;
+      const burn = (1 - treasury) - eco;
+
+      document.getElementById('burnBar').style.width = (burn * 100) + '%';
+      document.getElementById('burnBar').querySelector('.bar-value').textContent = (burn * 100).toFixed(1) + '%';
+      document.getElementById('ecoBar').style.width = (eco * 100) + '%';
+      document.getElementById('ecoValue').textContent = (eco * 100).toFixed(1) + '%';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH HOLDEX TOKENS BY CATEGORY
+    // ═══════════════════════════════════════════════════════════
+    async function fetchHoldexTokens() {
+      try {
+        const res = await fetch(`${HOLDEX_API}/tokens?limit=100`);
+        const data = await res.json();
+
+        if (!data.success || !data.tokens) return;
+
+        // Filter out spam: require name, image, and community verification
+        const validTokens = data.tokens.filter(t =>
+          t.name &&
+          t.name !== 'Unknown' &&
+          t.ticker !== 'UNK' &&
+          t.image &&
+          t.hasCommunityUpdate === true
+        );
+
+        // Update tokens count - verified tokens only (element may not exist)
+        const tokensCountEl = document.getElementById('tokensAccepted');
+        if (tokensCountEl) tokensCountEl.textContent = validTokens.length;
+
+        // Sort for categories
+        const trending = [...validTokens]
+          .filter(t => t.volume24h > 1000) // Minimum $1k volume
+          .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
+          .slice(0, 6);
+
+        const trusted = [...validTokens]
+          .filter(t => (t.kScore || 0) >= 70)
+          .sort((a, b) => (b.kScore || 0) - (a.kScore || 0))
+          .slice(0, 6);
+
+        const newest = [...validTokens]
+          .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+          .slice(0, 6);
+
+        renderTokenList('trendingTokens', trending, 'volume');
+        renderTokenList('trustedTokens', trusted, 'kscore');
+        renderTokenList('newTokens', newest, 'time');
+
+      } catch (err) {
+        console.error('Failed to fetch HolDex tokens:', err);
+        const tokensCountEl = document.getElementById('tokensAccepted');
+        if (tokensCountEl) tokensCountEl.textContent = '0';
+        ['trendingTokens', 'trustedTokens', 'newTokens'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">Failed to load</p>';
+        });
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER TOKEN LIST
+    // ═══════════════════════════════════════════════════════════
+    function renderTokenList(containerId, tokens, metric) {
+      const container = document.getElementById(containerId);
+
+      if (!tokens || tokens.length === 0) {
+        container.innerHTML = '<p style="padding: 1rem; color: var(--text-muted);">No tokens found</p>';
+        return;
+      }
+
+      container.innerHTML = tokens.map(token => {
+        const change = token.change24h || 0;
+        const changeClass = change >= 0 ? 'up' : 'down';
+        const changeText = change >= 0 ? '+' + change.toFixed(1) + '%' : change.toFixed(1) + '%';
+
+        const kScore = token.kScore || 0;
+        const kScoreClass = kScore >= 80 ? 'high' : kScore >= 50 ? 'medium' : '';
+
+        let metricHtml = '';
+        if (metric === 'volume') {
+          metricHtml = `<div class="token-price">$${formatNumber(token.volume24h || 0)}</div>`;
+        } else if (metric === 'kscore') {
+          metricHtml = `<span class="token-kscore ${kScoreClass}">K:${kScore}</span>`;
+        } else {
+          metricHtml = `<div class="token-change ${changeClass}">${changeText}</div>`;
+        }
+
+        const logoUrl = token.image || '';
+        const logoHtml = logoUrl
+          ? `<img src="${logoUrl}" alt="${token.ticker}" onerror="this.parentElement.innerHTML='${(token.ticker || '?')[0]}'">`
+          : (token.ticker || '?')[0];
+
+        return `
+          <div class="token-item" onclick="window.open('https://dexscreener.com/solana/${token.mint}', '_blank')">
+            <div class="token-logo">${logoHtml}</div>
+            <div class="token-info">
+              <div class="token-name">${token.name || token.ticker || 'Unknown'}</div>
+              <div class="token-ticker">$${token.ticker || '???'}</div>
+            </div>
+            <div class="token-metrics">
+              ${metricHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FORMAT NUMBER
+    // ═══════════════════════════════════════════════════════════
+    function formatNumber(num) {
+      if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+      if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+      if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+      return num.toFixed(0);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // WALLET CONNECTION STATE
+    // ═══════════════════════════════════════════════════════════
+    let connectedWallet = null;
+    let walletPublicKey = null;
+    let currentQuote = null;
+    let quoteTimer = null;
+    let selectedToken = {
+      mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      image: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+    };
+
+    // Payment tokens for demo (on-chain truth from HolDex)
+    const PAYMENT_TOKENS = [
+      { mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', name: 'USD Coin', decimals: 6, image: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png', trusted: true },
+      { mint: 'So11111111111111111111111111111111111111112', symbol: 'SOL', name: 'Solana', decimals: 9, image: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png', trusted: true },
+      { mint: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', symbol: 'asdfasdfa', name: 'asdfasdf', decimals: 6, image: 'https://ipfs.io/ipfs/bafkreiavxxnqexp3ft7aeb3yjrxnliuobshsqmlfzt4tbsiknlxbbp7o5q', trusted: true },
+      { mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', symbol: 'USDT', name: 'Tether', decimals: 6, image: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png', trusted: true },
+    ];
+
+    // ═══════════════════════════════════════════════════════════
+    // WALLET MODAL
+    // ═══════════════════════════════════════════════════════════
+    function openWalletModal() {
+      // Check wallet availability
+      const hasPhantom = !!window.solana;
+      const hasSolflare = !!window.solflare;
+      const hasBackpack = !!window.backpack;
+
+      document.getElementById('phantomNotInstalled').style.display = hasPhantom ? 'none' : 'inline';
+      document.getElementById('solflareNotInstalled').style.display = hasSolflare ? 'none' : 'inline';
+      document.getElementById('backpackNotInstalled').style.display = hasBackpack ? 'none' : 'inline';
+
+      document.getElementById('phantomOption').disabled = !hasPhantom;
+      document.getElementById('solflareOption').disabled = !hasSolflare;
+      document.getElementById('backpackOption').disabled = !hasBackpack;
+
+      document.getElementById('walletModal').classList.add('open');
+    }
+
+    function closeWalletModal(event) {
+      if (event && event.target !== document.getElementById('walletModal')) return;
+      document.getElementById('walletModal').classList.remove('open');
+    }
+
+    async function connectWallet(walletType) {
+      try {
+        let provider;
+
+        if (walletType === 'phantom' && window.solana) {
+          provider = window.solana;
+        } else if (walletType === 'solflare' && window.solflare) {
+          provider = window.solflare;
+        } else if (walletType === 'backpack' && window.backpack) {
+          provider = window.backpack;
+        } else {
+          alert(`${walletType} wallet not found. Please install it first.`);
+          return;
+        }
+
+        const response = await provider.connect();
+        walletPublicKey = response.publicKey.toString();
+        connectedWallet = { type: walletType, provider };
+
+        // Update UI
+        updateWalletUI();
+        closeWalletModal();
+
+        // Fetch holder tier
+        fetchHolderTier();
+
+        // Show try transaction button
+        document.getElementById('tryTxBtn').classList.add('visible');
+
+      } catch (err) {
+        console.error('Wallet connection failed:', err);
+        alert('Failed to connect wallet: ' + err.message);
+      }
+    }
+
+    function disconnectWallet() {
+      if (connectedWallet?.provider?.disconnect) {
+        connectedWallet.provider.disconnect();
+      }
+      connectedWallet = null;
+      walletPublicKey = null;
+
+      // Reset UI
+      const btn = document.getElementById('walletBtn');
+      btn.className = 'wallet-btn wallet-btn-connect';
+      btn.innerHTML = '<span>🔌</span><span>Connect Wallet</span>';
+      btn.onclick = openWalletModal;
+
+      document.getElementById('holderTier').classList.remove('visible');
+      document.getElementById('tryTxBtn').classList.remove('visible');
+      document.getElementById('txDemo').classList.remove('visible');
+    }
+
+    function updateWalletUI() {
+      const btn = document.getElementById('walletBtn');
+      const shortAddr = walletPublicKey.slice(0, 4) + '...' + walletPublicKey.slice(-4);
+
+      btn.className = 'wallet-btn wallet-btn-connected';
+      btn.innerHTML = `
+        <span>✓</span>
+        <span class="wallet-address">${shortAddr}</span>
+        <span style="margin-left: auto; font-size: 0.75rem; opacity: 0.7;">Disconnect</span>
+      `;
+      btn.onclick = disconnectWallet;
+    }
+
+    async function fetchHolderTier() {
+      if (!walletPublicKey) return;
+
+      try {
+        const res = await fetch(`/v1/tokens/tiers/${walletPublicKey}`);
+        const data = await res.json();
+
+        if (data.tier) {
+          const tierDisplay = document.getElementById('holderTier');
+          const tierIcons = { BRONZE: '🥉', SILVER: '🥈', GOLD: '🥇', DIAMOND: '💎' };
+
+          document.getElementById('tierIcon').textContent = tierIcons[data.tier] || '🥉';
+          document.getElementById('tierName').textContent = data.tier;
+          document.getElementById('tierDiscount').textContent = data.discountPercent ? `-${data.discountPercent}% discount` : 'No discount';
+
+          tierDisplay.classList.add('visible');
+        }
+      } catch (err) {
+        console.error('Failed to fetch tier:', err);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TRANSACTION DEMO
+    // ═══════════════════════════════════════════════════════════
+    function showTxDemo() {
+      document.getElementById('txDemo').classList.add('visible');
+      document.getElementById('tryTxBtn').style.display = 'none';
+      populateTokenDropdown();
+      fetchQuote();
+    }
+
+    function populateTokenDropdown() {
+      const dropdown = document.getElementById('tokenDropdown');
+      dropdown.innerHTML = PAYMENT_TOKENS.map(token => `
+        <div class="token-dropdown-item" onclick="selectToken('${token.mint}')">
+          <img src="${token.image}" alt="${token.symbol}" onerror="this.style.display='none'">
+          <span>${token.symbol}</span>
+          <span class="kscore ${token.trusted ? 'trusted' : ''}">
+            ${token.trusted ? '✓ Trusted' : 'Standard'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function toggleTokenDropdown() {
+      const btn = document.getElementById('tokenSelectorBtn');
+      const dropdown = document.getElementById('tokenDropdown');
+      const isOpen = dropdown.classList.contains('open');
+
+      btn.classList.toggle('open', !isOpen);
+      dropdown.classList.toggle('open', !isOpen);
+
+      // Close on outside click
+      if (!isOpen) {
+        setTimeout(() => {
+          document.addEventListener('click', closeTokenDropdownOnClick);
+        }, 10);
+      }
+    }
+
+    function closeTokenDropdownOnClick(e) {
+      if (!e.target.closest('.token-selector')) {
+        document.getElementById('tokenSelectorBtn').classList.remove('open');
+        document.getElementById('tokenDropdown').classList.remove('open');
+        document.removeEventListener('click', closeTokenDropdownOnClick);
+      }
+    }
+
+    function selectToken(mint) {
+      const token = PAYMENT_TOKENS.find(t => t.mint === mint);
+      if (!token) return;
+
+      selectedToken = token;
+      document.getElementById('selectedTokenImg').src = token.image;
+      document.getElementById('selectedTokenName').textContent = token.symbol;
+
+      // Update trust badge
+      const trustBadge = document.getElementById('tokenTrustBadge');
+      if (token.trusted) {
+        trustBadge.className = 'trust-badge verified';
+        trustBadge.textContent = '✓ Verified';
+      } else {
+        trustBadge.className = 'trust-badge caution';
+        trustBadge.textContent = '⚠ Unverified';
+      }
+
+      // Update security indicator
+      const secIndicator = document.getElementById('securityIndicator');
+      const secDetail = document.getElementById('securityDetail');
+      if (token.trusted) {
+        secIndicator.classList.remove('warning');
+        secDetail.textContent = 'Trusted token • No approval required';
+      } else {
+        secIndicator.classList.add('warning');
+        secDetail.textContent = 'Unverified token • Proceed with caution';
+      }
+
+      // Update fee cap display
+      document.getElementById('feeCapAmount').textContent = `0.10 ${token.symbol}`;
+
+      document.getElementById('tokenSelectorBtn').classList.remove('open');
+      document.getElementById('tokenDropdown').classList.remove('open');
+
+      fetchQuote();
+    }
+
+    async function fetchQuote() {
+      if (!walletPublicKey || !selectedToken) return;
+
+      // Clear previous timer
+      if (quoteTimer) clearInterval(quoteTimer);
+
+      try {
+        document.getElementById('executeBtn').disabled = true;
+        document.getElementById('executeBtnText').textContent = 'Getting quote...';
+
+        const res = await fetch('/v1/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentToken: selectedToken.mint,
+            userPubkey: walletPublicKey,
+            estimatedComputeUnits: 200000
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        currentQuote = data;
+        updateFeeBreakdown(data);
+
+        // Enable execute button
+        document.getElementById('executeBtn').disabled = false;
+        document.getElementById('executeBtnText').textContent = 'Execute Demo Transaction';
+
+        // Start quote timer
+        startQuoteTimer(data.expiresIn || 60);
+
+      } catch (err) {
+        console.error('Quote failed:', err);
+        document.getElementById('executeBtnText').textContent = 'Quote failed - ' + err.message;
+      }
+    }
+
+    function updateFeeBreakdown(quote) {
+      // feeAmount is RAW (with decimals), feeFormatted is display-ready
+      const decimals = quote.paymentToken?.decimals || selectedToken.decimals || 6;
+      const feeRaw = parseFloat(quote.feeAmount) || 0;
+      const feeDisplay = feeRaw / Math.pow(10, decimals);
+      const symbol = selectedToken.symbol;
+
+      const feeText = quote.feeFormatted || `${feeDisplay.toFixed(4)} ${symbol}`;
+      document.getElementById('feeUser').textContent = feeText;
+      document.getElementById('feeTotal').textContent = feeText;
+
+      // Calculate burn amount (76.4% of fee) - use display amount
+      const burnAmount = (feeDisplay * 0.764).toFixed(4);
+      document.getElementById('feeBurn').textContent = `~${burnAmount} $asdfasdfa`;
+
+      // Update transaction preview
+      document.getElementById('previewFeeAmount').textContent = `~${feeText} from your wallet`;
+
+      // Show simulation badge (quote came back successfully)
+      document.getElementById('simBadge').style.display = 'inline-flex';
+
+      // Update fee cap with the actual quote fee (display amount + 50% buffer)
+      const feeCap = feeDisplay * 1.5;
+      document.getElementById('feeCapAmount').textContent = `${feeCap.toFixed(4)} ${symbol}`;
+
+      // Show discount if applicable
+      if (quote.holderDiscount && quote.holderDiscount > 0) {
+        document.getElementById('feeDiscountRow').style.display = 'flex';
+        document.getElementById('feeDiscount').textContent = `-${quote.holderDiscount}%`;
+      } else {
+        document.getElementById('feeDiscountRow').style.display = 'none';
+      }
+    }
+
+    function startQuoteTimer(seconds) {
+      let timeLeft = seconds;
+      document.getElementById('quoteTimer').style.display = 'block';
+      document.getElementById('quoteTimeLeft').textContent = timeLeft;
+
+      quoteTimer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('quoteTimeLeft').textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+          clearInterval(quoteTimer);
+          fetchQuote(); // Auto-refresh
+        }
+      }, 1000);
+    }
+
+    async function executeDemo() {
+      if (!currentQuote || !connectedWallet) return;
+
+      const btn = document.getElementById('executeBtn');
+      const statusDiv = document.getElementById('txStatus');
+
+      try {
+        // Update UI
+        btn.disabled = true;
+        btn.className = 'execute-btn loading';
+        btn.innerHTML = '<span class="status-badge loading">Preparing transaction...</span>';
+        statusDiv.innerHTML = '';
+
+        // Note: In a real implementation, we would:
+        // 1. Build a transaction using the quote.feePayer
+        // 2. Have the user sign it with their wallet
+        // 3. Submit to /v1/submit
+
+        // For demo, we show the flow without actual transaction
+        await new Promise(r => setTimeout(r, 1500));
+        btn.innerHTML = '<span class="status-badge loading">Awaiting signature...</span>';
+
+        // Simulate wallet popup
+        await new Promise(r => setTimeout(r, 2000));
+        btn.innerHTML = '<span class="status-badge loading">Submitting...</span>';
+
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Demo success
+        btn.className = 'execute-btn success';
+        btn.innerHTML = '✓ Demo Complete!';
+
+        statusDiv.innerHTML = `
+          <div class="status-badge success" style="margin-top: 1rem;">
+            This was a demo. In production, you would:
+          </div>
+          <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); text-align: left; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 8px;">
+            1. Build your transaction with <code>feePayer: ${currentQuote.feePayer?.slice(0,8)}...</code><br>
+            2. Sign with your wallet<br>
+            3. We co-sign and broadcast<br>
+            4. You pay <strong>${currentQuote.feeFormatted}</strong>, we burn 76.4% as $asdfasdfa
+          </div>
+        `;
+
+        // Show confetti
+        createConfetti();
+
+      } catch (err) {
+        btn.className = 'execute-btn error';
+        btn.innerHTML = 'Failed: ' + err.message;
+
+        setTimeout(() => {
+          btn.className = 'execute-btn';
+          btn.disabled = false;
+          btn.innerHTML = '<span id="executeBtnText">Try Again</span>';
+        }, 3000);
+      }
+    }
+
+    function createConfetti() {
+      const colors = ['#ffd700', '#ff6b35', '#00ff88', '#00d4ff', '#ff4444'];
+      for (let i = 0; i < 50; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDelay = Math.random() * 0.5 + 's';
+        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+        document.body.appendChild(confetti);
+
+        setTimeout(() => confetti.remove(), 4000);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      // Setup verification click handlers
+      document.querySelectorAll('.hero-stat[data-verify]').forEach(stat => {
+        stat.addEventListener('click', (e) => {
+          const verifyKey = stat.dataset.verify;
+          showVerifyTooltip(stat, verifyKey);
+        });
+      });
+
+      // Make burn counter clickable too
+      document.querySelector('.hero-burn-counter')?.addEventListener('click', () => {
+        VERIFY_SOURCES.burn.verify();
+      });
+
+      // Fetch data
+      fetchStats();
+      fetchAsdfBurnData();
+      fetchHoldexTokens();
+
+      // Refresh
+      setInterval(fetchStats, 30000);
+      setInterval(fetchAsdfBurnData, 60000);
+      setInterval(fetchHoldexTokens, 60000);
+    });
+  </script>
+</body>
+</html>
