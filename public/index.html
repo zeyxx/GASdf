@@ -1368,16 +1368,17 @@
     }
 
     /* ================================================================
-       WALLET CONNECT BUTTON (Mobile)
+       WALLET CONNECT BUTTON (Desktop + Mobile)
        ================================================================ */
     .wallet-connect-btn {
-      display: none;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
       position: fixed;
-      bottom: var(--space-lg);
-      left: 50%;
-      transform: translateX(-50%);
+      top: var(--space-lg);
+      right: var(--space-lg);
       z-index: 1000;
-      padding: var(--space-md) var(--space-xl);
+      padding: var(--space-sm) var(--space-lg);
       background: var(--gold);
       color: #000;
       border: none;
@@ -1389,15 +1390,27 @@
       transition: all 0.3s;
     }
 
+    .wallet-connect-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 25px rgba(201,162,39,0.5);
+    }
+
     .wallet-connect-btn:active {
-      transform: translateX(-50%) scale(0.95);
+      transform: scale(0.95);
     }
 
     @media (max-width: 768px) {
       .wallet-connect-btn {
-        display: flex;
-        align-items: center;
-        gap: var(--space-sm);
+        top: auto;
+        bottom: var(--space-lg);
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: var(--space-md) var(--space-xl);
+      }
+
+      .wallet-connect-btn:active {
+        transform: translateX(-50%) scale(0.95);
       }
     }
 
@@ -1506,6 +1519,81 @@
 
     .wallet-option-arrow {
       color: var(--white-30);
+    }
+
+    .wallet-option:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .wallet-option.not-installed {
+      opacity: 0.6;
+    }
+
+    .wallet-option.not-installed .wallet-option-desc {
+      color: var(--flame);
+    }
+
+    /* Connected State */
+    .wallet-connected-info {
+      padding: var(--space-md);
+      text-align: center;
+    }
+
+    .wallet-address {
+      font-family: monospace;
+      font-size: var(--text-sm);
+      color: var(--gold);
+      background: var(--white-05);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: 8px;
+      margin-bottom: var(--space-lg);
+    }
+
+    .wallet-stats {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+    }
+
+    .wallet-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-sm);
+      background: var(--white-05);
+      border-radius: 8px;
+    }
+
+    .wallet-stat-label {
+      color: var(--white-50);
+      font-size: var(--text-xs);
+    }
+
+    .wallet-stat-value {
+      font-weight: 500;
+      font-size: var(--text-sm);
+    }
+
+    .wallet-stat-value.highlight {
+      color: var(--gold);
+    }
+
+    .wallet-disconnect-btn {
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      background: transparent;
+      border: 1px solid var(--white-20);
+      border-radius: 8px;
+      color: var(--white-70);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .wallet-disconnect-btn:hover {
+      border-color: var(--flame);
+      color: var(--flame);
     }
 
     /* ================================================================
@@ -2522,9 +2610,9 @@
     </footer>
   </div>
 
-  <!-- Mobile Wallet Connect Button -->
+  <!-- Wallet Connect Button (Desktop: top-right, Mobile: bottom-center) -->
   <button class="wallet-connect-btn" id="walletConnectBtn">
-    <span>👛</span> Connect Wallet
+    👛 Connect
   </button>
 
   <!-- Burn Stats Modal (Black Hole Tap) -->
@@ -2560,32 +2648,48 @@
   <div class="wallet-modal" id="walletModal">
     <div class="wallet-modal-content">
       <div class="wallet-modal-header">
-        <span class="wallet-modal-title">Connect Wallet</span>
+        <span class="wallet-modal-title" id="walletModalTitle">Connect Wallet</span>
         <button class="wallet-modal-close" id="walletModalClose">✕</button>
       </div>
-      <a href="https://phantom.app/ul/browse/https://asdfasdfa.tech?ref=asdfasdfa" class="wallet-option" id="phantomLink">
-        <div class="wallet-option-icon phantom">👻</div>
-        <div class="wallet-option-info">
-          <div class="wallet-option-name">Phantom</div>
-          <div class="wallet-option-desc">Popular Solana wallet</div>
+      <!-- Wallet Options (shown when not connected) -->
+      <div id="walletOptions">
+        <button class="wallet-option" id="phantomBtn">
+          <div class="wallet-option-icon phantom">👻</div>
+          <div class="wallet-option-info">
+            <div class="wallet-option-name">Phantom</div>
+            <div class="wallet-option-desc" id="phantomStatus">Detecting...</div>
+          </div>
+          <span class="wallet-option-arrow">→</span>
+        </button>
+        <button class="wallet-option" id="solflareBtn">
+          <div class="wallet-option-icon solflare">☀️</div>
+          <div class="wallet-option-info">
+            <div class="wallet-option-name">Solflare</div>
+            <div class="wallet-option-desc" id="solflareStatus">Detecting...</div>
+          </div>
+          <span class="wallet-option-arrow">→</span>
+        </button>
+      </div>
+      <!-- Connected State (shown when connected) -->
+      <div id="walletConnected" style="display: none;">
+        <div class="wallet-connected-info">
+          <div class="wallet-address" id="walletAddress">Loading...</div>
+          <div class="wallet-stats">
+            <div class="wallet-stat">
+              <span class="wallet-stat-label">$ASDF Balance</span>
+              <span class="wallet-stat-value" id="userAsdfBalance">---</span>
+            </div>
+            <div class="wallet-stat">
+              <span class="wallet-stat-label">Holder Tier</span>
+              <span class="wallet-stat-value" id="userHolderTier">---</span>
+            </div>
+            <div class="wallet-stat">
+              <span class="wallet-stat-label">Your Discount</span>
+              <span class="wallet-stat-value highlight" id="userDiscount">---</span>
+            </div>
+          </div>
+          <button class="wallet-disconnect-btn" id="disconnectBtn">Disconnect</button>
         </div>
-        <span class="wallet-option-arrow">→</span>
-      </a>
-      <a href="https://solflare.com/ul/v1/browse/https://asdfasdfa.tech?ref=asdfasdfa" class="wallet-option" id="solflareLink">
-        <div class="wallet-option-icon solflare">☀️</div>
-        <div class="wallet-option-info">
-          <div class="wallet-option-name">Solflare</div>
-          <div class="wallet-option-desc">Feature-rich wallet</div>
-        </div>
-        <span class="wallet-option-arrow">→</span>
-      </a>
-      <div class="wallet-option" id="walletConnectOption" style="opacity: 0.5; cursor: not-allowed;">
-        <div class="wallet-option-icon walletconnect">🔗</div>
-        <div class="wallet-option-info">
-          <div class="wallet-option-name">WalletConnect</div>
-          <div class="wallet-option-desc">Coming soon</div>
-        </div>
-        <span class="wallet-option-arrow">→</span>
       </div>
     </div>
   </div>
@@ -3528,21 +3632,204 @@
     }
 
     // ========================================================================
-    // MOBILE: WALLET CONNECT MODAL
+    // WALLET CONNECTION (Phantom / Solflare)
     // ========================================================================
     const walletBtn = document.getElementById('walletConnectBtn');
     const walletModal = document.getElementById('walletModal');
     const walletModalClose = document.getElementById('walletModalClose');
+    const walletModalTitle = document.getElementById('walletModalTitle');
+    const walletOptions = document.getElementById('walletOptions');
+    const walletConnected = document.getElementById('walletConnected');
+    const phantomBtn = document.getElementById('phantomBtn');
+    const solflareBtn = document.getElementById('solflareBtn');
+    const phantomStatus = document.getElementById('phantomStatus');
+    const solflareStatus = document.getElementById('solflareStatus');
+    const disconnectBtn = document.getElementById('disconnectBtn');
 
+    // Wallet state
+    let connectedWallet = null;
+    let connectedAddress = null;
+
+    // Detect installed wallets
+    function detectWallets() {
+      const hasPhantom = window.phantom?.solana?.isPhantom || window.solana?.isPhantom;
+      const hasSolflare = window.solflare?.isSolflare;
+
+      if (hasPhantom) {
+        phantomStatus.textContent = 'Click to connect';
+        phantomBtn.classList.remove('not-installed');
+      } else {
+        phantomStatus.textContent = 'Not installed → Get Phantom';
+        phantomBtn.classList.add('not-installed');
+      }
+
+      if (hasSolflare) {
+        solflareStatus.textContent = 'Click to connect';
+        solflareBtn.classList.remove('not-installed');
+      } else {
+        solflareStatus.textContent = 'Not installed → Get Solflare';
+        solflareBtn.classList.add('not-installed');
+      }
+
+      return { hasPhantom, hasSolflare };
+    }
+
+    // Connect to Phantom
+    async function connectPhantom() {
+      try {
+        const provider = window.phantom?.solana || window.solana;
+        if (!provider?.isPhantom) {
+          window.open('https://phantom.app/', '_blank');
+          return;
+        }
+
+        phantomStatus.textContent = 'Connecting...';
+        const resp = await provider.connect();
+        connectedWallet = 'phantom';
+        connectedAddress = resp.publicKey.toString();
+        await onWalletConnected();
+      } catch (err) {
+        console.error('Phantom connect error:', err);
+        phantomStatus.textContent = err.message || 'Connection failed';
+      }
+    }
+
+    // Connect to Solflare
+    async function connectSolflare() {
+      try {
+        const provider = window.solflare;
+        if (!provider?.isSolflare) {
+          window.open('https://solflare.com/', '_blank');
+          return;
+        }
+
+        solflareStatus.textContent = 'Connecting...';
+        await provider.connect();
+        connectedWallet = 'solflare';
+        connectedAddress = provider.publicKey.toString();
+        await onWalletConnected();
+      } catch (err) {
+        console.error('Solflare connect error:', err);
+        solflareStatus.textContent = err.message || 'Connection failed';
+      }
+    }
+
+    // After wallet connected - fetch user stats
+    async function onWalletConnected() {
+      // Update UI
+      walletModalTitle.textContent = 'Connected';
+      walletOptions.style.display = 'none';
+      walletConnected.style.display = 'block';
+
+      // Show truncated address
+      const addr = connectedAddress;
+      document.getElementById('walletAddress').textContent =
+        addr.slice(0, 4) + '...' + addr.slice(-4);
+
+      // Update connect button text
+      if (walletBtn) {
+        walletBtn.innerHTML = '🟢 ' + addr.slice(0, 4) + '...' + addr.slice(-4);
+      }
+
+      // Fetch user stats from API
+      try {
+        const res = await fetch('/v1/stats/wallet/' + connectedAddress);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('userAsdfBalance').textContent =
+            data.asdfBalance ? data.asdfBalance.toLocaleString() : '0';
+          document.getElementById('userHolderTier').textContent =
+            data.tier?.emoji + ' ' + data.tier?.name || 'Bronze';
+          document.getElementById('userDiscount').textContent =
+            '-' + (data.discountPercent || 0) + '%';
+        }
+      } catch (e) {
+        console.error('Failed to fetch wallet stats:', e);
+      }
+
+      // Save to localStorage
+      localStorage.setItem('connectedWallet', connectedWallet);
+      localStorage.setItem('connectedAddress', connectedAddress);
+    }
+
+    // Disconnect wallet
+    function disconnectWallet() {
+      try {
+        if (connectedWallet === 'phantom') {
+          const provider = window.phantom?.solana || window.solana;
+          provider?.disconnect();
+        } else if (connectedWallet === 'solflare') {
+          window.solflare?.disconnect();
+        }
+      } catch (e) {}
+
+      connectedWallet = null;
+      connectedAddress = null;
+      localStorage.removeItem('connectedWallet');
+      localStorage.removeItem('connectedAddress');
+
+      // Reset UI
+      walletModalTitle.textContent = 'Connect Wallet';
+      walletOptions.style.display = 'block';
+      walletConnected.style.display = 'none';
+      if (walletBtn) walletBtn.innerHTML = '👛 Connect';
+      detectWallets();
+
+      walletModal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Auto-reconnect on page load
+    async function autoReconnect() {
+      const savedWallet = localStorage.getItem('connectedWallet');
+      const savedAddress = localStorage.getItem('connectedAddress');
+
+      if (savedWallet && savedAddress) {
+        try {
+          if (savedWallet === 'phantom') {
+            const provider = window.phantom?.solana || window.solana;
+            if (provider?.isPhantom && provider.isConnected) {
+              connectedWallet = 'phantom';
+              connectedAddress = provider.publicKey?.toString() || savedAddress;
+              await onWalletConnected();
+            }
+          } else if (savedWallet === 'solflare') {
+            const provider = window.solflare;
+            if (provider?.isSolflare && provider.isConnected) {
+              connectedWallet = 'solflare';
+              connectedAddress = provider.publicKey?.toString() || savedAddress;
+              await onWalletConnected();
+            }
+          }
+        } catch (e) {
+          localStorage.removeItem('connectedWallet');
+          localStorage.removeItem('connectedAddress');
+        }
+      }
+    }
+
+    // Event listeners
     if (walletBtn) {
       walletBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        detectWallets();
         walletModal.classList.add('active');
         document.body.style.overflow = 'hidden';
       });
     }
 
-    // Close wallet modal
+    if (phantomBtn) {
+      phantomBtn.addEventListener('click', connectPhantom);
+    }
+
+    if (solflareBtn) {
+      solflareBtn.addEventListener('click', connectSolflare);
+    }
+
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener('click', disconnectWallet);
+    }
+
     if (walletModalClose) {
       walletModalClose.addEventListener('click', () => {
         walletModal.classList.remove('active');
@@ -3550,7 +3837,6 @@
       });
     }
 
-    // Close on backdrop tap
     if (walletModal) {
       walletModal.addEventListener('click', (e) => {
         if (e.target === walletModal) {
@@ -3560,28 +3846,9 @@
       });
     }
 
-    // Handle deep link for mobile wallets
-    const phantomLink = document.getElementById('phantomLink');
-    const solflareLink = document.getElementById('solflareLink');
-
-    // Detect if wallet app is installed
-    function detectWalletApp(walletName) {
-      // On mobile, we just open the deep link - the OS handles it
-      return isMobileDevice;
-    }
-
-    // Close modal after clicking wallet option
-    [phantomLink, solflareLink].forEach(link => {
-      if (link) {
-        link.addEventListener('click', () => {
-          // Small delay to allow deep link to trigger
-          setTimeout(() => {
-            walletModal.classList.remove('active');
-            document.body.style.overflow = '';
-          }, 300);
-        });
-      }
-    });
+    // Initialize
+    detectWallets();
+    setTimeout(autoReconnect, 500); // Wait for wallet extensions to inject
 
     // ========================================================================
     // KEYBOARD: ESC closes modals
