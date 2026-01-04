@@ -12,8 +12,14 @@ const redis = require('../utils/redis');
 // Minimum balance to consider a payer healthy (0.01 SOL in prod, 0 in dev)
 const MIN_HEALTHY_BALANCE = process.env.NODE_ENV === 'development' ? 0 : 10_000_000;
 
-// Warning balance threshold (0.05 SOL)
-const WARNING_BALANCE = 50_000_000;
+// Critical balance threshold (0.05 SOL) - triggers CRITICAL alert
+const CRITICAL_BALANCE = 50_000_000;
+
+// Warning balance threshold (0.2 SOL) - triggers WARNING alert
+const WARNING_BALANCE = 200_000_000;
+
+// Maximum age of balance data before considered stale (2 minutes)
+const BALANCE_MAX_AGE_MS = 120_000;
 
 // How often to refresh balances (30 seconds - balances RPC efficiency vs responsiveness)
 // 10s was too aggressive, causing unnecessary RPC calls (~360/hour vs ~120/hour)
@@ -48,6 +54,8 @@ class FeePayerPool {
     this.balances = new Map(); // pubkey -> balance in lamports
     this.unhealthyUntil = new Map(); // pubkey -> timestamp
     this.lastBalanceRefresh = 0;
+    this.lastBalanceRefreshSuccess = false; // Track if last refresh succeeded
+    this.balanceRefreshError = null; // Track last error
     this.initialized = false;
 
     // Instance-specific jitter to prevent thundering herd across replicas
@@ -248,11 +256,18 @@ class FeePayerPool {
         }
       }
 
+      // Mark refresh as successful
+      this.lastBalanceRefreshSuccess = true;
+      this.balanceRefreshError = null;
+
       logger.debug('FEE_PAYER_POOL', 'Batch balance refresh completed', {
         payers: this.payers.length,
         rpcCalls: 1, // Single batch call
       });
     } catch (error) {
+      // Track failure - don't update balances to 0 on RPC error
+      this.lastBalanceRefreshSuccess = false;
+      this.balanceRefreshError = error.message;
       logger.warn('FEE_PAYER_POOL', 'Batch balance refresh failed', { error: error.message });
     }
   }
@@ -348,22 +363,40 @@ class FeePayerPool {
 
   /**
    * Get balances for all payers
+   * Returns balance info with staleness indicator for alerting
    */
   async getBalances() {
     this.initialize();
     await this.refreshBalances();
 
+    const now = Date.now();
+    const isStale =
+      !this.lastBalanceRefreshSuccess || now - this.lastBalanceRefresh > BALANCE_MAX_AGE_MS;
+
     const result = [];
     for (const payer of this.payers) {
       const pubkey = payer.publicKey.toBase58();
       const balance = this.balances.get(pubkey) || 0;
+
+      // Determine status: critical < 0.05 SOL, warning < 0.2 SOL, ok >= 0.2 SOL
+      let status;
+      if (balance < CRITICAL_BALANCE) {
+        status = 'critical';
+      } else if (balance < WARNING_BALANCE) {
+        status = 'warning';
+      } else {
+        status = 'ok';
+      }
+
       result.push({
         pubkey,
         balance,
         balanceSol: balance / 1e9,
         isHealthy: this.isPayerHealthy(pubkey),
-        status:
-          balance < MIN_HEALTHY_BALANCE ? 'critical' : balance < WARNING_BALANCE ? 'warning' : 'ok',
+        status,
+        isStale, // True if balance data may be outdated (RPC failed)
+        lastRefresh: this.lastBalanceRefresh,
+        refreshError: this.balanceRefreshError,
       });
     }
     return result;
@@ -384,7 +417,9 @@ class FeePayerPool {
       const balance = this.balances.get(pubkey) || 0;
 
       if (this.isPayerHealthy(pubkey)) {
-        if (balance < WARNING_BALANCE) {
+        if (balance < CRITICAL_BALANCE) {
+          critical++;
+        } else if (balance < WARNING_BALANCE) {
           warning++;
         } else {
           healthy++;
@@ -394,7 +429,14 @@ class FeePayerPool {
       }
     }
 
-    return { total, healthy, warning, critical };
+    return {
+      total,
+      healthy,
+      warning,
+      critical,
+      isStale: !this.lastBalanceRefreshSuccess,
+      lastRefresh: this.lastBalanceRefresh,
+    };
   }
 
   // ===========================================================================
@@ -1113,7 +1155,9 @@ module.exports = {
 
   // Constants
   MIN_HEALTHY_BALANCE,
+  CRITICAL_BALANCE,
   WARNING_BALANCE,
+  BALANCE_MAX_AGE_MS,
   MAX_RESERVATIONS_PER_PAYER,
   KEY_STATUS,
 };

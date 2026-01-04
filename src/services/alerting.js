@@ -402,6 +402,7 @@ const alertingService = new AlertingService();
 
 /**
  * Check fee payer balances and send alerts
+ * Skips alerting if balance data is stale (RPC failures)
  */
 async function checkFeePayerAlerts() {
   try {
@@ -409,7 +410,17 @@ async function checkFeePayerAlerts() {
     const balances = await getPayerBalances();
     const summary = getHealthSummary();
 
-    // Check for all payers down
+    // Skip alerting if balance data is stale (RPC failed)
+    // This prevents false "0 SOL" alerts when Helius returns 429
+    if (summary.isStale) {
+      logger.debug('ALERTING', 'Skipping fee payer alerts - balance data is stale', {
+        lastRefresh: summary.lastRefresh,
+        ageMs: Date.now() - summary.lastRefresh,
+      });
+      return;
+    }
+
+    // Check for all payers down (only if we have fresh data)
     if (summary.healthy === 0 && summary.total > 0) {
       await alertingService.alert('ALL_PAYERS_DOWN', { total: summary.total });
     } else if (summary.healthy > 0) {
@@ -418,6 +429,15 @@ async function checkFeePayerAlerts() {
 
     // Check individual payers
     for (const payer of balances) {
+      // Skip if this payer's data is stale
+      if (payer.isStale) {
+        logger.debug('ALERTING', 'Skipping payer alert - stale data', {
+          pubkey: payer.pubkey.slice(0, 8),
+          error: payer.refreshError,
+        });
+        continue;
+      }
+
       if (payer.status === 'critical') {
         await alertingService.alert('FEE_PAYER_CRITICAL', {
           pubkey: payer.pubkey.slice(0, 8) + '...',

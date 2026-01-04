@@ -43,6 +43,7 @@ jest.mock('../../../src/utils/redis', () => ({
 
 const {
   MIN_HEALTHY_BALANCE,
+  CRITICAL_BALANCE,
   WARNING_BALANCE,
   MAX_RESERVATIONS_PER_PAYER,
   KEY_STATUS,
@@ -80,8 +81,12 @@ describe('Fee Payer Pool', () => {
       expect(typeof MIN_HEALTHY_BALANCE).toBe('number');
     });
 
-    it('should export WARNING_BALANCE as 0.05 SOL', () => {
-      expect(WARNING_BALANCE).toBe(50_000_000); // 0.05 SOL in lamports
+    it('should export CRITICAL_BALANCE as 0.05 SOL', () => {
+      expect(CRITICAL_BALANCE).toBe(50_000_000); // 0.05 SOL in lamports
+    });
+
+    it('should export WARNING_BALANCE as 0.2 SOL', () => {
+      expect(WARNING_BALANCE).toBe(200_000_000); // 0.2 SOL in lamports
     });
 
     it('should export MAX_RESERVATIONS_PER_PAYER', () => {

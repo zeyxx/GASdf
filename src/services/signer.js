@@ -22,5 +22,7 @@ module.exports = {
 
   // Constants
   MIN_HEALTHY_BALANCE: feePayerPool.MIN_HEALTHY_BALANCE,
+  CRITICAL_BALANCE: feePayerPool.CRITICAL_BALANCE,
   WARNING_BALANCE: feePayerPool.WARNING_BALANCE,
+  BALANCE_MAX_AGE_MS: feePayerPool.BALANCE_MAX_AGE_MS,
 };
