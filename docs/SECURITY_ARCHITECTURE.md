@@ -192,23 +192,23 @@ await sendAndConfirmTransaction(burnTx);
 
 ### Phase 1: Wallet Separation (Critical)
 
-- [ ] Create dedicated TREASURY_ADDRESS (new keypair or multisig)
-- [ ] Update quote.js: fee payment goes to TREASURY, not FEE_PAYER
-- [ ] Update fee-payer-pool.js: fee payer only tracks SOL
-- [ ] Close any token accounts on fee payer wallet
-- [ ] Update burn.js: operates on TREASURY, not FEE_PAYER
+- [x] Create dedicated TREASURY_ADDRESS (new keypair or multisig) — *`config.TREASURY_ADDRESS` supported*
+- [x] Update quote.js: fee payment goes to TREASURY, not FEE_PAYER — *`validator.js:511`*
+- [x] Update fee-payer-pool.js: fee payer only tracks SOL — *Implemented*
+- [ ] Close any token accounts on fee payer wallet — *Manual operation*
+- [x] Update burn.js: operates on TREASURY, not FEE_PAYER — *`treasury-ata.js`*
 
 ### Phase 2: Validation Hardening
 
-- [ ] Add program whitelist (reject unknown programs)
-- [ ] Enhanced simulation: check ALL fee payer accounts (should be just SOL)
-- [ ] Add explicit check: fee payer must have 0 token accounts
+- [ ] Add program whitelist (reject unknown programs) — *Not implemented (permissionless design)*
+- [x] Enhanced simulation: check ALL fee payer accounts — *`validator.js` simulation*
+- [ ] Add explicit check: fee payer must have 0 token accounts — *Optional hardening*
 
 ### Phase 3: Burn Atomicity
 
-- [ ] Refactor batch burn to single atomic transaction
-- [ ] Add burn verification routine (periodic check treasury = 0)
-- [ ] On-chain burn proof (memo with burn details)
+- [x] Refactor batch burn to single atomic transaction — *`batchBurnFromTreasury()` in burn.js:961*
+- [x] Add burn verification routine — *Redis burn proof recording*
+- [ ] On-chain burn proof (memo with burn details) — *Not implemented (uses Redis)*
 
 ## Configuration
 

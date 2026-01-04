@@ -52,8 +52,8 @@ Create a new GASdf client.
 
 ```typescript
 const gasdf = new GASdf({
-  endpoint: 'https://gasdf-43r8.onrender.com', // optional, production endpoint
-  timeout: 30000,                               // optional, request timeout in ms
+  endpoint: 'https://asdfasdfa.tech', // optional, production endpoint
+  timeout: 30000,                      // optional, request timeout in ms
 });
 ```
 
@@ -236,14 +236,16 @@ function TokenSelect({ onChange }) {
 
 All tokens verified by [HolDex](https://holdex-api.onrender.com) with K-score >= 50 (Bronze+) are accepted.
 
-| Tier | K-Score | Fee Multiplier |
-|------|---------|----------------|
-| Diamond | 90-100 | 1.0x (hardcoded: SOL, USDC, USDT, $asdfasdfa) |
-| Platinum | 80-89 | 1.0x |
-| Gold | 70-79 | 1.0x |
-| Silver | 60-69 | 1.1x |
-| Bronze | 50-59 | 1.2x |
-| Copper | < 50 | **Rejected** |
+| Tier | K-Score | Fee Multiplier | Status |
+|------|---------|----------------|--------|
+| 💎 Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
+| 💠 Platinum | 80-89 | 1.0x | Accepted |
+| 🥇 Gold | 70-79 | 1.0x | Accepted |
+| 🥈 Silver | 60-69 | 1.1x | Accepted |
+| 🥉 Bronze | 50-59 | 1.2x | Accepted (minimum for gas) |
+| 🟤 Copper | 40-49 | — | **Rejected** |
+| ⚫ Iron | 20-39 | — | **Rejected** |
+| 🔩 Rust | 0-19 | — | **Rejected** |
 
 ## Golden Ratio Economics (φ)
 

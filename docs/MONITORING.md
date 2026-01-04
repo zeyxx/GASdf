@@ -29,7 +29,7 @@ The `/metrics` endpoint requires authentication:
 
 ```bash
 curl -H "x-metrics-key: YOUR_METRICS_API_KEY" \
-  https://gasdf-43r8.onrender.com/metrics
+  https://asdfasdfa.tech/metrics
 ```
 
 ### Available Metrics
@@ -61,7 +61,7 @@ scrape_configs:
   - job_name: 'gasdf'
     scheme: https
     static_configs:
-      - targets: ['gasdf-43r8.onrender.com']
+      - targets: ['asdfasdfa.tech']
     metrics_path: /metrics
     authorization:
       type: Bearer
@@ -206,8 +206,8 @@ Target thresholds:
 ## Uptime Monitoring
 
 External uptime monitors should hit:
-- Primary: `https://gasdf-43r8.onrender.com/health`
-- Simple: `https://gasdf-43r8.onrender.com/status`
+- Primary: `https://asdfasdfa.tech/health`
+- Simple: `https://asdfasdfa.tech/status`
 
 Recommended services:
 - [UptimeRobot](https://uptimerobot.com) (free tier)

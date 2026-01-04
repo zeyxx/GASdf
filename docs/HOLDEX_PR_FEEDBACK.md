@@ -70,9 +70,9 @@ if (isPumpFun && !isMayhemMode) {
 
 ## Verification Test
 
-### With Current HolDex (Codespace):
+### With Current HolDex:
 ```bash
-curl "https://fluffy-meme-4jjw7v67gxw9c7pvx-3000.app.github.dev/api/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump"
+curl "https://holdex-api.onrender.com/api/token/9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump"
 ```
 
 Expected fields for GASdf:

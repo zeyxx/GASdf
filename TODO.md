@@ -38,13 +38,13 @@
 
 ## Infrastructure
 
-- **API:** https://gasdf-43r8.onrender.com
+- **API:** https://asdfasdfa.tech
 - **Status:** https://status.asdfasdfa.tech
 - **Discord Alerts:** Configured via GitHub Actions secret
 - **Monitoring:** `monitoring/` (Grafana Agent + Docker Compose)
 
 ## Notes
 
-- Fee payer: `9F5NUrZYjP5MRmqLBc8vd3rsmXiYQdqAMNF7VdKqM68w`
+- Fee payer: `2BoUm4xwqsF6KguCu3hhdSx9PNgem98e3tk8Ax3qNdXb`
 - Redis + Postgres on Render
 - Helius RPC for mainnet
