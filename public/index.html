@@ -1555,7 +1555,8 @@
       setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
-        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.35, 0.5, 0.65);
+        // Bloom: strength, radius, threshold (lower = less blur)
+        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.3, 0.75);
         this.composer.addPass(this.bloomPass);
       }
 
