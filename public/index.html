@@ -4546,11 +4546,17 @@
         // Update gas fee display
         swapGasdfFee.textContent = `${currentGasdfQuote.feeFormatted} ${gasToken.symbol}`;
 
-        // Show burn info based on payment token
+        // Show burn info based on payment token and dual-burn flywheel
+        const dualBurn = currentGasdfQuote.paymentToken?.dualBurn;
         if (isAsdf) {
-          swapBurnInfo.textContent = '100% direct burn';
+          swapBurnInfo.textContent = '100% direct burn (purist)';
+        } else if (dualBurn && dualBurn.ecosystemBurnPct > 0) {
+          // Token has ecosystem burn bonus
+          const ecoBurn = (dualBurn.ecosystemBurnPct * 100).toFixed(1);
+          const asdfBurn = (dualBurn.asdfBurnPct * 100).toFixed(1);
+          swapBurnInfo.textContent = `${ecoBurn}% direct + ${asdfBurn}% via $ASDF`;
         } else {
-          swapBurnInfo.textContent = 'Fee → $ASDF → 76.4% burn';
+          swapBurnInfo.textContent = '76.4% burn via $ASDF';
         }
 
         // Show holder discount if applicable
