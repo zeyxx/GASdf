@@ -15,6 +15,47 @@ jest.mock('../../../src/utils/logger', () => ({
 
 jest.mock('../../../src/middleware/security', () => ({
   scoreLimiter: (req, res, next) => next(),
+  globalLimiter: (req, res, next) => next(),
+}));
+
+jest.mock('../../../src/utils/rpc', () => ({
+  getConnection: jest.fn().mockReturnValue({
+    getParsedTokenAccountsByOwner: jest.fn().mockResolvedValue({ value: [] }),
+  }),
+  getBalance: jest.fn().mockResolvedValue(0),
+}));
+
+jest.mock('../../../src/utils/config', () => ({
+  BASE_FEE_LAMPORTS: 50000,
+  NETWORK_FEE_LAMPORTS: 5000,
+}));
+
+jest.mock('../../../src/services/helius', () => ({
+  calculatePriorityFee: jest.fn().mockResolvedValue({
+    priorityFeeLamports: 1000,
+    microLamportsPerCU: 5,
+  }),
+}));
+
+jest.mock('../../../src/services/jupiter', () => ({
+  getFeeInToken: jest.fn().mockResolvedValue({
+    inputAmount: 1000,
+    symbol: 'TEST',
+    decimals: 6,
+  }),
+}));
+
+jest.mock('../../../src/services/holdex', () => ({
+  getToken: jest.fn().mockResolvedValue({
+    kScore: 75,
+    tier: 'Gold',
+    kRank: { tier: 'Gold', icon: '🥇', level: 6 },
+    creditRating: { grade: 'A3', risk: 'low' },
+  }),
+  getAllTokens: jest.fn().mockResolvedValue({ success: true, tokens: [] }),
+  getKRank: jest.fn().mockReturnValue({ tier: 'Gold', icon: '🥇', level: 6 }),
+  getCreditRating: jest.fn().mockReturnValue({ grade: 'A3', risk: 'low' }),
+  ACCEPTED_TIERS: new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze']),
 }));
 
 jest.mock('../../../src/services/holder-tiers', () => ({
@@ -24,7 +65,16 @@ jest.mock('../../../src/services/holder-tiers', () => ({
     { name: 'WHALE', emoji: '🐋', minHolding: 100000, discountPercent: 25 },
     { name: 'OG', emoji: '🏆', minHolding: 1000000, discountPercent: 50 },
   ]),
-  getHolderTier: jest.fn(),
+  getHolderTier: jest.fn().mockResolvedValue({
+    tier: 'BRONZE',
+    emoji: '🥉',
+    balance: 0,
+    discountPercent: 0,
+  }),
+  calculateDiscountedFee: jest.fn().mockResolvedValue({
+    discountedFee: 50000,
+    savingsPercent: 0,
+  }),
 }));
 
 jest.mock('../../../src/services/token-gate', () => ({
@@ -43,6 +93,7 @@ jest.mock('../../../src/services/token-gate', () => ({
     },
   ]),
   isTokenAccepted: jest.fn(),
+  isDiamondToken: jest.fn().mockReturnValue(false),
 }));
 
 const tokensRouter = require('../../../src/routes/tokens');
