@@ -24,13 +24,36 @@ GASdf is a gasless transaction layer for Solana, allowing users to pay network f
 - Combined discount: `max(holderDiscount, eScoreDiscount)` — cap 95%
 
 ### 3. Sustainable Deflation (Tokenomics)
-- **Dual Burn Channel:**
-  - **$asdfasdfa payments** → 100% burned (zero treasury cut)
-  - **Other tokens** → Swapped to $asdfasdfa → 76.4% burned / 23.6% treasury
-- Every fee becomes $asdfasdfa and burns (not accumulated in treasury)
-- Velocity-based refill: treasury only swaps to SOL when fee payer runs low
 
-**Flywheel Effect**: Hold $ASDF → fees burn → supply shrinks → your % grows → better discount → more holding
+**Dual Burn Channel:**
+
+```
+$ASDF Payment:
+  └─→ 100% BURN (purist model, zero treasury cut)
+
+Other Token Payment (K-score ≥50):
+  │
+  ├─→ Ecosystem Burn: X% burned DIRECTLY
+  │     Formula: X = (1/φ²) × (1 - φ^(-burnPct/30))
+  │     Max: 38.2% (1/φ²) — rewards tokens that burn their supply
+  │
+  └─→ Remaining: Swap → $ASDF
+        ├─→ 76.4% BURN (1-1/φ³)
+        └─→ 23.6% Treasury (1/φ³) — refills fee payer when needed
+```
+
+**Ecosystem Burn Bonus (verified formula):**
+| Token Burned % | Ecosystem Burn |
+|----------------|----------------|
+| 0% | 0% |
+| 10% | ~7.9% |
+| 30% | ~14.6% |
+| 50% | ~23% |
+| 90%+ | →38.2% |
+
+**Flywheels:**
+1. **Holder**: Hold → fees burn → supply shrinks → % grows → better discount
+2. **Ecosystem**: Token burns supply → higher bonus → more direct burns → incentive to burn
 
 ## Commands
 
