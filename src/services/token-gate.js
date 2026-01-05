@@ -24,7 +24,6 @@
  * A token is either safe enough (Diamond/Platinum/Gold/Silver/Bronze), or it's not.
  */
 
-const config = require('../utils/config');
 const logger = require('../utils/logger');
 const holdex = require('./holdex');
 
@@ -43,13 +42,10 @@ const DIAMOND_TOKENS = new Set([
   'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', // jitoSOL
 ]);
 
-// Add $ASDF mint if configured (we always want to accept our own token)
+// Get diamond tokens (no longer includes $ASDF - uses real K-score)
+// $ASDF benefits from the Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
 function getDiamondTokens() {
-  const tokens = new Set(DIAMOND_TOKENS);
-  if (config.ASDF_MINT && !config.ASDF_MINT.includes('Devnet')) {
-    tokens.add(config.ASDF_MINT);
-  }
-  return tokens;
+  return DIAMOND_TOKENS;
 }
 
 /**
@@ -60,24 +56,11 @@ function getDiamondTokens() {
  */
 async function isTokenAccepted(mint) {
   // 1. Check DIAMOND_TOKENS locally (instant, no network call)
-  const diamondTokens = getDiamondTokens();
-  if (diamondTokens.has(mint)) {
-    // Diamond tokens get perfect scores
+  // Note: $ASDF is NOT in this list - it uses real K-score from HolDex
+  if (DIAMOND_TOKENS.has(mint)) {
+    // Diamond tokens (SOL, USDC, USDT, mSOL, jitoSOL) get perfect scores
     const kRank = holdex.getKRank(100);
     const creditRating = holdex.getCreditRating(100);
-
-    // For $ASDF specifically, still fetch burn data for dual-burn flywheel
-    let supply = null;
-    let ecosystemBurn = null;
-    if (mint === config.ASDF_MINT) {
-      try {
-        const tokenData = await holdex.getToken(mint);
-        supply = tokenData.supply;
-        ecosystemBurn = tokenData.ecosystemBurn;
-      } catch {
-        // Ignore errors, burn data is optional for display
-      }
-    }
 
     return {
       accepted: true,
@@ -86,8 +69,6 @@ async function isTokenAccepted(mint) {
       kScore: 100,
       kRank,
       creditRating,
-      supply,
-      ecosystemBurn,
     };
   }
 
@@ -174,18 +155,8 @@ function getDiamondTokensList() {
       decimals: 9,
       tier: 'Diamond',
     },
-    // $ASDF added dynamically if configured
-    ...(config.ASDF_MINT && !config.ASDF_MINT.includes('Devnet')
-      ? [
-          {
-            mint: config.ASDF_MINT,
-            symbol: 'asdfasdfa',
-            name: 'asdfasdf',
-            decimals: 6,
-            tier: 'Diamond',
-          },
-        ]
-      : []),
+    // Note: $ASDF is NOT in Diamond list - uses real K-score from HolDex
+    // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded tier
   ];
 }
 

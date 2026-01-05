@@ -161,15 +161,9 @@ describe('Token Gate Service', () => {
         expect(result.tier).toBe('Diamond');
       });
 
-      it('should accept $ASDF with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump'
-        );
-
-        expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
-        expect(result.tier).toBe('Diamond');
-      });
+      // NOTE: $ASDF is no longer in DIAMOND_TOKENS
+      // It uses real K-score from HolDex (benefits from Dual-Burn Flywheel instead)
+      // See HolDex tier-based acceptance tests for $ASDF handling
     });
 
     describe('HolDex tier-based acceptance', () => {
@@ -325,8 +319,9 @@ describe('Token Gate Service', () => {
       expect(tokenGate.isDiamondToken('RandomMint111111111111111111111111111111111')).toBe(false);
     });
 
-    it('should include $ASDF in Diamond tokens', () => {
-      expect(tokenGate.isDiamondToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(true);
+    it('should NOT include $ASDF in Diamond tokens (uses real K-score)', () => {
+      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
+      expect(tokenGate.isDiamondToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(false);
     });
   });
 
@@ -340,8 +335,9 @@ describe('Token Gate Service', () => {
       expect(tokenGate.isTrustedToken('RandomMint111111111111111111111111111111111')).toBe(false);
     });
 
-    it('should include $ASDF in trusted tokens', () => {
-      expect(tokenGate.isTrustedToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(true);
+    it('should NOT include $ASDF in trusted tokens (uses real K-score)', () => {
+      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded tier
+      expect(tokenGate.isTrustedToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(false);
     });
   });
 
@@ -350,7 +346,8 @@ describe('Token Gate Service', () => {
       const tokens = tokenGate.getDiamondTokensList();
 
       expect(tokens).toBeInstanceOf(Array);
-      expect(tokens.length).toBeGreaterThanOrEqual(5);
+      // 5 tokens: SOL, USDC, USDT, mSOL, jitoSOL (no longer includes $ASDF)
+      expect(tokens.length).toBe(5);
 
       // Check structure - now uses tier instead of trusted
       const sol = tokens.find((t) => t.symbol === 'SOL');
@@ -360,13 +357,12 @@ describe('Token Gate Service', () => {
       expect(sol.tier).toBe('Diamond');
     });
 
-    it('should include $asdfasdfa when configured', () => {
+    it('should NOT include $asdfasdfa (uses real K-score from HolDex)', () => {
+      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
       const tokens = tokenGate.getDiamondTokensList();
 
       const asdf = tokens.find((t) => t.symbol === 'asdfasdfa');
-      expect(asdf).toBeDefined();
-      expect(asdf.mint).toBe('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump');
-      expect(asdf.tier).toBe('Diamond');
+      expect(asdf).toBeUndefined();
     });
 
     it('should include all major stablecoins', () => {

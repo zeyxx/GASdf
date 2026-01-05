@@ -4247,15 +4247,19 @@
     let walletTokensCache = null; // Cached response from /v1/tokens/wallet/:pubkey
 
     // Popular tokens (always shown at top when no wallet connected)
+    // Diamond tokens: SOL, USDC, USDT (hardcoded, no HolDex call needed)
+    // Other tokens: K-scores fetched from HolDex API (not hardcoded)
     const POPULAR_TOKENS = [
-      { address: 'So11111111111111111111111111111111111111112', symbol: 'SOL', name: 'Solana', decimals: 9, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png', tier: 'Diamond', kScore: 100 },
-      { address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', name: 'USD Coin', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png', tier: 'Diamond', kScore: 100 },
-      { address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg', tier: 'Diamond', kScore: 100 },
-      { address: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', symbol: '$ASDF', name: 'asdfasdfa', decimals: 6, logoURI: '/favicon.ico', tier: 'Diamond', kScore: 100 },
-      { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', symbol: 'JUP', name: 'Jupiter', decimals: 6, logoURI: 'https://static.jup.ag/jup/icon.png', tier: 'Gold', kScore: 75 },
-      { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', symbol: 'BONK', name: 'Bonk', decimals: 5, logoURI: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I', tier: 'Silver', kScore: 65 },
-      { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', symbol: 'WIF', name: 'dogwifhat', decimals: 6, logoURI: 'https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link', tier: 'Gold', kScore: 72 },
-      { address: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', symbol: 'PYTH', name: 'Pyth Network', decimals: 6, logoURI: 'https://pyth.network/token.svg', tier: 'Platinum', kScore: 85 },
+      { address: 'So11111111111111111111111111111111111111112', symbol: 'SOL', name: 'Solana', decimals: 9, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png', tier: 'Diamond', kScore: 100, tierIcon: '💎' },
+      { address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', name: 'USD Coin', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png', tier: 'Diamond', kScore: 100, tierIcon: '💎' },
+      { address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg', tier: 'Diamond', kScore: 100, tierIcon: '💎' },
+      // $ASDF uses real K-score from HolDex (benefits from Dual-Burn Flywheel instead)
+      { address: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', symbol: '$ASDF', name: 'asdfasdfa', decimals: 6, logoURI: '/favicon.ico' },
+      // Other popular tokens - K-scores will be fetched from HolDex
+      { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', symbol: 'JUP', name: 'Jupiter', decimals: 6, logoURI: 'https://static.jup.ag/jup/icon.png' },
+      { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', symbol: 'BONK', name: 'Bonk', decimals: 5, logoURI: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I' },
+      { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', symbol: 'WIF', name: 'dogwifhat', decimals: 6, logoURI: 'https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link' },
+      { address: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', symbol: 'PYTH', name: 'Pyth Network', decimals: 6, logoURI: 'https://pyth.network/token.svg' },
     ];
 
     // Fetch wallet tokens from GASdf backend
@@ -4475,31 +4479,50 @@
     }
 
     // Render token list with categories
+    // Behavior differs based on selector type:
+    // - input/output: Open bar (like Jupiter) - ALL tokens selectable
+    // - gas: K-score restrictions - only K>=50 selectable
     function renderTokenList(searchQuery) {
       const query = searchQuery.toLowerCase().trim();
+      const isGasSelector = currentTokenSelector === 'gas';
 
-      // If wallet connected and we have cached data, show categorized tokens
+      // If wallet connected and we have cached data
       if (connectedAddress && walletTokensCache && !query) {
         const { diamond, accepted, notEligible } = walletTokensCache.categories;
 
         let html = '';
 
-        // Diamond tier (your tokens)
-        if (diamond.tokens.length > 0) {
-          html += `<div class="token-category token-category-diamond">${diamond.label} (${diamond.tokens.length})</div>`;
-          html += diamond.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
-        }
+        if (isGasSelector) {
+          // GAS SELECTOR: Show categorized with restrictions
+          // Diamond tier
+          if (diamond.tokens.length > 0) {
+            html += `<div class="token-category token-category-diamond">${diamond.label} (${diamond.tokens.length})</div>`;
+            html += diamond.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
+          }
 
-        // Accepted tokens (K-score >= 50)
-        if (accepted.tokens.length > 0) {
-          html += `<div class="token-category token-category-accepted">${accepted.label} (${accepted.tokens.length})</div>`;
-          html += accepted.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
-        }
+          // Accepted tokens (K-score >= 50)
+          if (accepted.tokens.length > 0) {
+            html += `<div class="token-category token-category-accepted">${accepted.label} (${accepted.tokens.length})</div>`;
+            html += accepted.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
+          }
 
-        // Not eligible tokens (K-score < 50)
-        if (notEligible.tokens.length > 0) {
-          html += `<div class="token-category token-category-not-eligible">${notEligible.label} (${notEligible.tokens.length})</div>`;
-          html += notEligible.tokens.map(t => renderTokenItem({...t, address: t.mint}, true)).join('');
+          // Not eligible tokens (K-score < 50) - greyed out
+          if (notEligible.tokens.length > 0) {
+            html += `<div class="token-category token-category-not-eligible">${notEligible.label} (${notEligible.tokens.length})</div>`;
+            html += notEligible.tokens.map(t => renderTokenItem({...t, address: t.mint}, true)).join('');
+          }
+        } else {
+          // SWAP SELECTOR: Open bar like Jupiter - show ALL tokens without restrictions
+          // Just display HolDex info but don't restrict selection
+          const allTokens = [
+            ...diamond.tokens,
+            ...accepted.tokens,
+            ...notEligible.tokens
+          ].sort((a, b) => (b.balance || 0) - (a.balance || 0)); // Sort by balance
+
+          html += `<div class="token-category">Your Tokens (${allTokens.length})</div>`;
+          // Show all tokens without not-eligible styling for swap selectors
+          html += allTokens.map(t => renderTokenItem({...t, address: t.mint}, false)).join('');
         }
 
         // If no tokens at all, show popular
