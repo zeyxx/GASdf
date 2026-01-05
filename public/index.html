@@ -1904,10 +1904,33 @@
 
     .swap-token-select {
       width: auto;
-      min-width: 100px;
+      min-width: 110px;
       font-weight: 600;
+      font-size: 1rem;
+      padding: 10px 12px;
       background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .swap-token-select:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    .swap-token-select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+    }
+
+    .swap-token-select option {
+      background: var(--bg-card);
+      color: var(--text);
+      padding: 10px;
     }
 
     .swap-balance {
@@ -3872,7 +3895,9 @@
     // Update swap button based on connection state
     function updateSwapButton() {
       if (!swapBtn) return;
-      if (!connectedAddress) {
+      // Check if connectedAddress exists (declared later in script)
+      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
+      if (!isConnected) {
         swapBtn.disabled = true;
         swapBtn.textContent = 'Connect Wallet';
       } else if (!currentJupiterQuote) {
@@ -3932,7 +3957,8 @@
         swapImpact.style.color = impact > 1 ? '#ff6b6b' : impact > 0.5 ? '#ffd93d' : 'inherit';
 
         // Fetch GASdf quote if gasless is enabled
-        if (swapGaslessToggle?.checked && connectedAddress) {
+        const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
+        if (swapGaslessToggle?.checked && isConnected) {
           await fetchGasdfQuote();
         } else {
           swapGasFee.textContent = '~0.00001 SOL';
@@ -3953,7 +3979,8 @@
 
     // Fetch GASdf quote for gas fee
     async function fetchGasdfQuote() {
-      if (!connectedAddress) return;
+      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
+      if (!isConnected) return;
 
       // Determine gas payment token
       let gasTokenMint = swapGasToken?.value;
@@ -3993,7 +4020,8 @@
 
     // Execute the gasless swap
     async function executeGaslessSwap() {
-      if (!connectedAddress || !currentJupiterQuote) {
+      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
+      if (!isConnected || !currentJupiterQuote) {
         swapStatus.textContent = 'Please connect wallet and get quote first';
         return;
       }
