@@ -2329,6 +2329,86 @@
       color: var(--white-70);
     }
 
+    /* Token category headers */
+    .token-category {
+      padding: 8px 12px;
+      margin: 8px 0 4px 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--white-50);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .token-category-diamond { color: #B9F2FF; }
+    .token-category-accepted { color: #90EE90; }
+    .token-category-not-eligible { color: #FF6B6B; }
+
+    /* Token item enhancements */
+    .token-item-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .token-item-kscore {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .token-item-kscore.diamond { background: rgba(185, 242, 255, 0.2); color: #B9F2FF; }
+    .token-item-kscore.platinum { background: rgba(229, 228, 226, 0.2); color: #E5E4E2; }
+    .token-item-kscore.gold { background: rgba(255, 215, 0, 0.2); color: #FFD700; }
+    .token-item-kscore.silver { background: rgba(192, 192, 192, 0.2); color: #C0C0C0; }
+    .token-item-kscore.bronze { background: rgba(205, 127, 50, 0.2); color: #CD7F32; }
+
+    .token-item-fee {
+      font-size: 10px;
+      color: var(--white-50);
+    }
+
+    /* Not eligible tokens */
+    .token-item.not-eligible {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .token-item.not-eligible:hover {
+      background: transparent;
+    }
+
+    .token-item-rejection {
+      font-size: 9px;
+      color: #FF6B6B;
+      max-width: 100px;
+      text-align: right;
+    }
+
+    /* Loading state */
+    .token-list-loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--white-50);
+    }
+
+    .token-list-loading .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     .form-group {
       display: flex;
       flex-direction: column;
@@ -4161,21 +4241,63 @@
       return null;
     }
 
-    // Token cache - populated from Jupiter API
+    // Token cache - populated from Jupiter API and wallet endpoint
     let tokenCache = [];
     let tokenMap = {}; // mint -> token data
+    let walletTokensCache = null; // Cached response from /v1/tokens/wallet/:pubkey
 
-    // Popular tokens (always shown at top)
+    // Popular tokens (always shown at top when no wallet connected)
     const POPULAR_TOKENS = [
-      { address: 'So11111111111111111111111111111111111111112', symbol: 'SOL', name: 'Solana', decimals: 9, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png' },
-      { address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', name: 'USD Coin', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png' },
-      { address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg' },
-      { address: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', symbol: '$ASDF', name: 'asdfasdfa', decimals: 6, logoURI: '/favicon.ico' },
-      { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', symbol: 'JUP', name: 'Jupiter', decimals: 6, logoURI: 'https://static.jup.ag/jup/icon.png' },
-      { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', symbol: 'BONK', name: 'Bonk', decimals: 5, logoURI: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I' },
-      { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', symbol: 'WIF', name: 'dogwifhat', decimals: 6, logoURI: 'https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link' },
-      { address: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', symbol: 'PYTH', name: 'Pyth Network', decimals: 6, logoURI: 'https://pyth.network/token.svg' },
+      { address: 'So11111111111111111111111111111111111111112', symbol: 'SOL', name: 'Solana', decimals: 9, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png', tier: 'Diamond', kScore: 100 },
+      { address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', symbol: 'USDC', name: 'USD Coin', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png', tier: 'Diamond', kScore: 100 },
+      { address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg', tier: 'Diamond', kScore: 100 },
+      { address: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump', symbol: '$ASDF', name: 'asdfasdfa', decimals: 6, logoURI: '/favicon.ico', tier: 'Diamond', kScore: 100 },
+      { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', symbol: 'JUP', name: 'Jupiter', decimals: 6, logoURI: 'https://static.jup.ag/jup/icon.png', tier: 'Gold', kScore: 75 },
+      { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', symbol: 'BONK', name: 'Bonk', decimals: 5, logoURI: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I', tier: 'Silver', kScore: 65 },
+      { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', symbol: 'WIF', name: 'dogwifhat', decimals: 6, logoURI: 'https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link', tier: 'Gold', kScore: 72 },
+      { address: 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', symbol: 'PYTH', name: 'Pyth Network', decimals: 6, logoURI: 'https://pyth.network/token.svg', tier: 'Platinum', kScore: 85 },
     ];
+
+    // Fetch wallet tokens from GASdf backend
+    async function fetchWalletTokens(pubkey) {
+      if (!pubkey) return null;
+      try {
+        const res = await fetch(`${API_URL}/v1/tokens/wallet/${pubkey}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        walletTokensCache = data;
+
+        // Update tokenMap with wallet tokens
+        const allCategories = [
+          ...(data.categories?.diamond?.tokens || []),
+          ...(data.categories?.accepted?.tokens || []),
+          ...(data.categories?.notEligible?.tokens || [])
+        ];
+        allCategories.forEach(t => {
+          tokenMap[t.mint] = {
+            address: t.mint,
+            symbol: t.symbol,
+            name: t.name,
+            decimals: t.decimals,
+            logoURI: t.logoURI,
+            balance: t.balance,
+            balanceFormatted: t.balanceFormatted,
+            kScore: t.kScore,
+            tier: t.tier,
+            tierIcon: t.tierIcon,
+            feeFormatted: t.feeFormatted,
+            accepted: t.accepted,
+            rejectionReason: t.rejectionReason
+          };
+        });
+
+        console.log('[Swap] Loaded wallet tokens:', data.summary);
+        return data;
+      } catch (err) {
+        console.error('[Swap] Failed to fetch wallet tokens:', err);
+        return null;
+      }
+    }
 
     // Swap state
     let currentJupiterQuote = null;
@@ -4297,7 +4419,30 @@
       tokenModal.style.display = 'flex';
       tokenSearch.value = '';
       tokenSearch.focus();
-      renderTokenList('');
+
+      // Update modal title based on selector type
+      const titleEl = tokenModal.querySelector('h4');
+      if (titleEl) {
+        if (type === 'gas') {
+          titleEl.textContent = 'Select Gas Token';
+        } else if (type === 'input') {
+          titleEl.textContent = 'Select Input Token';
+        } else if (type === 'output') {
+          titleEl.textContent = 'Select Output Token';
+        } else {
+          titleEl.textContent = 'Select Token';
+        }
+      }
+
+      // Show loading if wallet connected but no cached tokens yet
+      if (connectedAddress && !walletTokensCache) {
+        tokenList.innerHTML = `<div class="token-list-loading"><div class="spinner"></div>Loading your tokens...</div>`;
+        fetchWalletTokens(connectedAddress).then(() => {
+          renderTokenList('');
+        });
+      } else {
+        renderTokenList('');
+      }
     }
 
     // Close token modal
@@ -4306,39 +4451,110 @@
       currentTokenSelector = null;
     }
 
-    // Render token list
-    function renderTokenList(searchQuery) {
-      const query = searchQuery.toLowerCase().trim();
-
-      // Filter tokens
-      let filtered = [...POPULAR_TOKENS];
-      if (query) {
-        filtered = Object.values(tokenMap).filter(t =>
-          t.symbol.toLowerCase().includes(query) ||
-          t.name.toLowerCase().includes(query) ||
-          t.address.toLowerCase() === query
-        ).slice(0, 50);
-      }
-
-      // Render HTML
-      tokenList.innerHTML = filtered.map(token => `
-        <div class="token-item" data-mint="${token.address}">
+    // Render a single token item HTML
+    function renderTokenItem(token, isNotEligible = false) {
+      const tierClass = token.tier?.toLowerCase() || '';
+      return `
+        <div class="token-item ${isNotEligible ? 'not-eligible' : ''}" data-mint="${token.address || token.mint}" data-accepted="${token.accepted !== false}">
           <div class="token-item-icon">
             ${token.logoURI
               ? `<img src="${token.logoURI}" alt="${token.symbol}" onerror="this.parentElement.textContent='🪙'">`
               : '🪙'}
           </div>
           <div class="token-item-info">
-            <span class="token-item-symbol">${token.symbol}</span>
-            <span class="token-item-name">${token.name}</span>
+            <span class="token-item-symbol">${token.tierIcon || ''} ${token.symbol}</span>
+            <span class="token-item-name">${token.name}${token.balanceFormatted ? ` • ${token.balanceFormatted}` : ''}</span>
+          </div>
+          <div class="token-item-right">
+            ${token.kScore !== undefined ? `<span class="token-item-kscore ${tierClass}">K:${token.kScore}</span>` : ''}
+            ${token.feeFormatted ? `<span class="token-item-fee">Fee: ${token.feeFormatted}</span>` : ''}
+            ${isNotEligible && token.rejectionReason ? `<span class="token-item-rejection">${token.rejectionReason}</span>` : ''}
           </div>
         </div>
-      `).join('');
+      `;
+    }
 
-      // Add click handlers
+    // Render token list with categories
+    function renderTokenList(searchQuery) {
+      const query = searchQuery.toLowerCase().trim();
+
+      // If wallet connected and we have cached data, show categorized tokens
+      if (connectedAddress && walletTokensCache && !query) {
+        const { diamond, accepted, notEligible } = walletTokensCache.categories;
+
+        let html = '';
+
+        // Diamond tier (your tokens)
+        if (diamond.tokens.length > 0) {
+          html += `<div class="token-category token-category-diamond">${diamond.label} (${diamond.tokens.length})</div>`;
+          html += diamond.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
+        }
+
+        // Accepted tokens (K-score >= 50)
+        if (accepted.tokens.length > 0) {
+          html += `<div class="token-category token-category-accepted">${accepted.label} (${accepted.tokens.length})</div>`;
+          html += accepted.tokens.map(t => renderTokenItem({...t, address: t.mint})).join('');
+        }
+
+        // Not eligible tokens (K-score < 50)
+        if (notEligible.tokens.length > 0) {
+          html += `<div class="token-category token-category-not-eligible">${notEligible.label} (${notEligible.tokens.length})</div>`;
+          html += notEligible.tokens.map(t => renderTokenItem({...t, address: t.mint}, true)).join('');
+        }
+
+        // If no tokens at all, show popular
+        if (!html) {
+          html = `<div class="token-category">Popular Tokens</div>`;
+          html += POPULAR_TOKENS.map(t => renderTokenItem(t)).join('');
+        }
+
+        tokenList.innerHTML = html;
+      } else {
+        // No wallet or searching - filter from tokenMap/POPULAR_TOKENS
+        let filtered = [...POPULAR_TOKENS];
+        if (query) {
+          filtered = Object.values(tokenMap).filter(t =>
+            (t.symbol?.toLowerCase().includes(query) ||
+            t.name?.toLowerCase().includes(query) ||
+            (t.address || t.mint)?.toLowerCase() === query)
+          ).slice(0, 50);
+
+          // If searching for mint address and not found, try to fetch it
+          if (filtered.length === 0 && query.length >= 32 && query.length <= 44) {
+            tokenList.innerHTML = `<div class="token-list-loading"><div class="spinner"></div>Looking up token...</div>`;
+            fetchTokenInfo(query).then(token => {
+              if (token) {
+                tokenList.innerHTML = renderTokenItem({...token, address: token.address});
+                attachTokenClickHandlers();
+              } else {
+                tokenList.innerHTML = `<div class="token-list-loading">Token not found</div>`;
+              }
+            });
+            return;
+          }
+        }
+
+        // Show with optional category header
+        let html = query ? '' : `<div class="token-category">Popular Tokens</div>`;
+        html += filtered.map(t => renderTokenItem(t)).join('');
+        tokenList.innerHTML = html;
+      }
+
+      attachTokenClickHandlers();
+    }
+
+    // Attach click handlers to token items
+    function attachTokenClickHandlers() {
       tokenList.querySelectorAll('.token-item').forEach(item => {
         item.addEventListener('click', () => {
           const mint = item.dataset.mint;
+          const accepted = item.dataset.accepted !== 'false';
+
+          // Don't allow selecting not-eligible tokens for gas payment
+          if (!accepted && currentTokenSelector === 'gas') {
+            return;
+          }
+
           selectToken(mint);
         });
       });
@@ -4971,6 +5187,11 @@
       localStorage.setItem('connectedWallet', connectedWallet);
       localStorage.setItem('connectedAddress', connectedAddress);
 
+      // Fetch wallet tokens for token selector (with HolDex enrichment)
+      fetchWalletTokens(connectedAddress).catch(e =>
+        console.error('[WALLET] Failed to fetch wallet tokens:', e)
+      );
+
       // Sync wallet state with Jupiter Plugin
       syncJupiterWallet();
     }
@@ -4988,6 +5209,7 @@
 
       connectedWallet = null;
       connectedAddress = null;
+      walletTokensCache = null; // Clear wallet tokens cache
       localStorage.removeItem('connectedWallet');
       localStorage.removeItem('connectedAddress');
 
