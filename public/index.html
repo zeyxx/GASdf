@@ -2704,8 +2704,12 @@
                   <span class="detail-value" id="swap-gasdf-fee">--</span>
                 </div>
                 <div class="detail-row savings-row">
-                  <span class="detail-label">💰 You Save</span>
-                  <span class="detail-value savings-value" id="swap-savings">No SOL needed!</span>
+                  <span class="detail-label">🔥 Burn</span>
+                  <span class="detail-value savings-value" id="swap-burn-info">Fee → $ASDF → Burn</span>
+                </div>
+                <div class="detail-row holder-row" id="swap-holder-row" style="display: none;">
+                  <span class="detail-label">💎 Discount</span>
+                  <span class="detail-value" id="swap-holder-discount">--</span>
                 </div>
               </div>
 
@@ -4198,7 +4202,9 @@
     const swapImpact = document.getElementById('swap-impact');
     const swapNetworkFee = document.getElementById('swap-network-fee');
     const swapGasdfFee = document.getElementById('swap-gasdf-fee');
-    const swapSavings = document.getElementById('swap-savings');
+    const swapBurnInfo = document.getElementById('swap-burn-info');
+    const swapHolderRow = document.getElementById('swap-holder-row');
+    const swapHolderDiscount = document.getElementById('swap-holder-discount');
     const swapBtn = document.getElementById('swap-btn');
     const swapStatus = document.getElementById('swap-status');
     const tokenModal = document.getElementById('token-modal');
@@ -4509,12 +4515,15 @@
     async function fetchGasdfQuote() {
       if (!connectedAddress) {
         swapGasdfFee.textContent = 'Connect wallet';
-        swapSavings.textContent = '--';
+        swapBurnInfo.textContent = '--';
+        swapHolderRow.style.display = 'none';
         return;
       }
 
       // Determine gas payment token
       const paymentMint = gasTokenMint === 'same' ? inputTokenMint : gasTokenMint;
+      const gasToken = getToken(paymentMint);
+      const isAsdf = paymentMint === '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
 
       try {
         const gasdfRes = await fetch('/v1/quote', {
@@ -4535,19 +4544,30 @@
         console.log('[Swap] GASdf quote:', currentGasdfQuote);
 
         // Update gas fee display
-        const gasToken = getToken(paymentMint);
         swapGasdfFee.textContent = `${currentGasdfQuote.feeFormatted} ${gasToken.symbol}`;
 
-        // Calculate savings
-        // Normal SOL gas cost = ~0.000005 SOL = ~$0.0005 at $100/SOL
-        const solGasCostUsd = 0.000005 * solPriceUsd;
-        swapSavings.textContent = `No SOL needed! (~$${solGasCostUsd.toFixed(4)} saved)`;
+        // Show burn info based on payment token
+        if (isAsdf) {
+          swapBurnInfo.textContent = '100% direct burn';
+        } else {
+          swapBurnInfo.textContent = 'Fee → $ASDF → 76.4% burn';
+        }
+
+        // Show holder discount if applicable
+        const holderTier = currentGasdfQuote.holderTier;
+        if (holderTier && holderTier.discount > 0) {
+          swapHolderRow.style.display = 'flex';
+          swapHolderDiscount.textContent = `${holderTier.tier} ${holderTier.emoji || ''} -${Math.round(holderTier.discount * 100)}%`;
+        } else {
+          swapHolderRow.style.display = 'none';
+        }
 
       } catch (err) {
         console.error('[Swap] GASdf quote error:', err);
         currentGasdfQuote = null;
         swapGasdfFee.textContent = 'Quote failed';
-        swapSavings.textContent = '--';
+        swapBurnInfo.textContent = '--';
+        swapHolderRow.style.display = 'none';
       }
     }
 

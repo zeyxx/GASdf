@@ -6,11 +6,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GASdf is a gasless transaction layer for Solana, allowing users to pay network fees with any token instead of SOL.
 
-**Dual Burn Channel:**
-- **$asdfasdfa payments** → 100% burned (zero treasury cut)
-- **Other tokens** → Swapped to $asdfasdfa → 76.4% burned / 23.6% treasury
-
 **Live:** https://asdfasdfa.tech
+
+## Value Proposition (The 3 Pillars)
+
+**NOT "gas efficiency"** - GASdf provides three distinct values:
+
+### 1. Convenience (Primary UX)
+- Users don't need SOL for gas - pay with USDC, USDT, or verified tokens
+- Seamless dApp integration via SDK
+- Token gating via HolDex K-score (only trusted tokens accepted)
+
+### 2. Holder Rewards (Economic Incentive)
+- $asdfasdfa holders get **up to 95% fee discounts**
+- Logarithmic discount formula prevents whale dominance
+- E-Score engagement rewards add additional discounts
+- Combined discount: `max(holderDiscount, eScoreDiscount)` — cap 95%
+
+### 3. Sustainable Deflation (Tokenomics)
+- **Dual Burn Channel:**
+  - **$asdfasdfa payments** → 100% burned (zero treasury cut)
+  - **Other tokens** → Swapped to $asdfasdfa → 76.4% burned / 23.6% treasury
+- Every fee becomes $asdfasdfa and burns (not accumulated in treasury)
+- Velocity-based refill: treasury only swaps to SOL when fee payer runs low
+
+**Flywheel Effect**: Hold $ASDF → fees burn → supply shrinks → your % grows → better discount → more holding
 
 ## Commands
 
