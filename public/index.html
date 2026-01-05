@@ -3804,6 +3804,12 @@
     });
 
     // ========================================================================
+    // WALLET STATE (declared early for swap code to access)
+    // ========================================================================
+    let connectedWallet = null;
+    let connectedAddress = null;
+
+    // ========================================================================
     // GASLESS SWAP (Jupiter API + GASdf)
     // ========================================================================
 
@@ -3895,9 +3901,7 @@
     // Update swap button based on connection state
     function updateSwapButton() {
       if (!swapBtn) return;
-      // Check if connectedAddress exists (declared later in script)
-      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
-      if (!isConnected) {
+      if (!connectedAddress) {
         swapBtn.disabled = true;
         swapBtn.textContent = 'Connect Wallet';
       } else if (!currentJupiterQuote) {
@@ -3957,8 +3961,7 @@
         swapImpact.style.color = impact > 1 ? '#ff6b6b' : impact > 0.5 ? '#ffd93d' : 'inherit';
 
         // Fetch GASdf quote if gasless is enabled
-        const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
-        if (swapGaslessToggle?.checked && isConnected) {
+        if (swapGaslessToggle?.checked && connectedAddress) {
           await fetchGasdfQuote();
         } else {
           swapGasFee.textContent = '~0.00001 SOL';
@@ -3979,8 +3982,7 @@
 
     // Fetch GASdf quote for gas fee
     async function fetchGasdfQuote() {
-      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
-      if (!isConnected) return;
+      if (!connectedAddress) return;
 
       // Determine gas payment token
       let gasTokenMint = swapGasToken?.value;
@@ -4020,8 +4022,7 @@
 
     // Execute the gasless swap
     async function executeGaslessSwap() {
-      const isConnected = typeof connectedAddress !== 'undefined' && connectedAddress;
-      if (!isConnected || !currentJupiterQuote) {
+      if (!connectedAddress || !currentJupiterQuote) {
         swapStatus.textContent = 'Please connect wallet and get quote first';
         return;
       }
@@ -4287,10 +4288,6 @@
     const phantomStatus = document.getElementById('phantomStatus');
     const solflareStatus = document.getElementById('solflareStatus');
     const disconnectBtn = document.getElementById('disconnectBtn');
-
-    // Wallet state
-    let connectedWallet = null;
-    let connectedAddress = null;
 
     // Detect installed wallets
     function detectWallets() {
