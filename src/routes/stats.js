@@ -115,7 +115,9 @@ router.get('/wallet/:address', async (req, res) => {
       // ON-CHAIN DATA (source of truth)
       onChain: {
         asdfBalance: tierInfo.balance,
-        asdfBalanceFormatted: tierInfo.balance.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+        asdfBalanceFormatted: tierInfo.balance.toLocaleString('en-US', {
+          maximumFractionDigits: 2,
+        }),
         circulatingSupply: tierInfo.circulating,
         sharePercent: tierInfo.sharePercent,
       },
