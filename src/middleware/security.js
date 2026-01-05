@@ -11,7 +11,12 @@ const securityHeaders = helmet({
     : {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'], // Three.js CDN
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdn.jsdelivr.net', // Three.js CDN
+            'https://terminal.jup.ag', // Jupiter Terminal
+          ],
           scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
@@ -21,9 +26,13 @@ const securityHeaders = helmet({
             "'self'",
             'https://asdev-backend.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
-            'https://price.jup.ag', // Jupiter fallback
+            'https://price.jup.ag', // Jupiter price API
+            'https://quote-api.jup.ag', // Jupiter quotes
+            'https://api.jup.ag', // Jupiter API
+            'https://*.helius-rpc.com', // Helius RPC
+            'wss://*.helius-rpc.com', // Helius WebSocket
           ],
-          frameSrc: ["'none'"],
+          frameSrc: ['https://terminal.jup.ag'], // Jupiter Terminal iframe
           objectSrc: ["'none'"],
         },
       },
