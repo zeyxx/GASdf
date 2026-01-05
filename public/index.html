@@ -2744,8 +2744,8 @@
     </div>
   </div>
 
-  <!-- Jupiter Terminal -->
-  <script src="https://terminal.jup.ag/main-v3.js" data-preload></script>
+  <!-- Jupiter Plugin (RPC-less swap widget) -->
+  <script src="https://plugin.jup.ag/plugin-v1.js" data-preload defer></script>
 
   <!-- Three.js Import Map -->
   <script type="importmap">
@@ -3558,11 +3558,11 @@
     });
 
     // ========================================================================
-    // JUPITER TERMINAL INTEGRATION
+    // JUPITER PLUGIN INTEGRATION (RPC-less swap widget)
     // ========================================================================
     let jupiterInitialized = false;
 
-    function initJupiterTerminal() {
+    function initJupiterPlugin() {
       if (jupiterInitialized || !window.Jupiter) return;
 
       try {
@@ -3574,38 +3574,54 @@
           walletProvider = window.solflare;
         }
 
+        // Jupiter Plugin config (RPC-less - Jupiter handles everything)
         const config = {
           displayMode: 'integrated',
           integratedTargetId: 'jupiter-terminal',
-          // SECURITY: Use our RPC proxy - Helius API key stays server-side
-          endpoint: window.location.origin + '/v1/rpc',
-          strictTokenList: false,
-          defaultExplorer: 'Solscan',
+          // Wallet passthrough for connected wallets
+          enableWalletPassthrough: !!walletProvider,
           formProps: {
-            fixedOutputMint: false,
             swapMode: 'ExactIn',
             initialAmount: '1000000', // 1 USDC (6 decimals)
             initialInputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
             initialOutputMint: 'So11111111111111111111111111111111111111112', // SOL
           },
+          // Event handlers
+          onSuccess: ({ txid }) => {
+            console.log('[Jupiter] Swap success:', txid);
+          },
+          onSwapError: ({ error }) => {
+            console.error('[Jupiter] Swap error:', error);
+          },
         };
 
-        // Pass wallet if connected (passthrough mode)
+        // Pass wallet state if connected
         if (walletProvider && connectedAddress) {
-          config.passThroughWallet = walletProvider;
+          config.passthroughWalletContextState = {
+            wallet: {
+              adapter: walletProvider,
+            },
+            publicKey: walletProvider.publicKey,
+            connected: true,
+            connecting: false,
+            disconnecting: false,
+          };
         }
 
         window.Jupiter.init(config);
         jupiterInitialized = true;
-        console.log('Jupiter Terminal initialized', connectedAddress ? 'with wallet' : 'without wallet');
+        console.log('[Jupiter] Plugin initialized', connectedAddress ? 'with wallet' : 'without wallet');
       } catch (e) {
-        console.error('Jupiter init error:', e);
+        console.error('[Jupiter] Plugin init error:', e);
       }
     }
 
+    // Alias for backwards compatibility
+    const initJupiterTerminal = initJupiterPlugin;
+
     // Also init if swap tab is already active on load
     if (document.querySelector('.app-tab[data-app="swap"].active')) {
-      setTimeout(initJupiterTerminal, 1000);
+      setTimeout(initJupiterPlugin, 1000);
     }
 
     // ========================================================================

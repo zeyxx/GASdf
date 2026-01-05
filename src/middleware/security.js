@@ -15,28 +15,27 @@ const securityHeaders = helmet({
             "'self'",
             "'unsafe-inline'",
             'https://cdn.jsdelivr.net', // Three.js CDN
-            'https://terminal.jup.ag', // Jupiter Terminal
+            'https://plugin.jup.ag', // Jupiter Plugin (RPC-less swap widget)
           ],
           scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
           styleSrc: [
             "'self'",
             "'unsafe-inline'",
             'https://fonts.googleapis.com',
-            'https://terminal.jup.ag', // Jupiter Terminal CSS
+            'https://plugin.jup.ag', // Jupiter Plugin CSS
           ],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           imgSrc: ["'self'", 'data:', 'https:'],
-          // Allow Jupiter Terminal and APIs
+          // Allow Jupiter Plugin and APIs
           connectSrc: [
             "'self'",
             'https://asdev-backend.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
-            'https://*.jup.ag', // All Jupiter APIs (terminal, api, quote-api, price, tokens, worker, cache)
-            'https://*.helius-rpc.com', // Helius RPC
+            'https://*.jup.ag', // All Jupiter APIs (plugin, api, ultra, etc.)
+            'https://*.helius-rpc.com', // Helius RPC (for our proxy)
             'wss://*.helius-rpc.com', // Helius WebSocket
-            'https://api.mainnet-beta.solana.com', // Official Solana RPC
           ],
-          frameSrc: ['https://terminal.jup.ag'], // Jupiter Terminal iframe
+          frameSrc: ['https://plugin.jup.ag'], // Jupiter Plugin iframe
           objectSrc: ["'none'"],
         },
       },
