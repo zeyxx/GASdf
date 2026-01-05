@@ -294,6 +294,9 @@
     .nav-pill.active { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
 
     .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
       background: transparent;
       border: 1px solid var(--white-30);
       padding: var(--space-sm) var(--space-lg);
@@ -303,8 +306,26 @@
       letter-spacing: 0.1em;
       cursor: pointer;
       transition: all 0.3s;
+      border-radius: 8px;
     }
-    .nav-cta:hover { background: var(--white); color: #000; }
+    .nav-cta:hover {
+      background: var(--white-05);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .nav-cta.connected {
+      background: var(--gold-soft);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+    .nav-cta .wallet-icon {
+      font-size: 14px;
+    }
+    .nav-cta .wallet-addr {
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 0;
+    }
 
     /* ================================================================
        HERO SECTION
@@ -1368,63 +1389,18 @@
     }
 
     /* ================================================================
-       WALLET CONNECT BUTTON (Desktop + Mobile)
+       WALLET MODAL - Desktop-first design
        ================================================================ */
-    .wallet-connect-btn {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      position: fixed;
-      top: var(--space-lg);
-      right: var(--space-lg);
-      z-index: 1000;
-      padding: var(--space-sm) var(--space-lg);
-      background: var(--gold);
-      color: #000;
-      border: none;
-      border-radius: 100px;
-      font-size: var(--text-sm);
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 20px rgba(201,162,39,0.4);
-      transition: all 0.3s;
-    }
-
-    .wallet-connect-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 25px rgba(201,162,39,0.5);
-    }
-
-    .wallet-connect-btn:active {
-      transform: scale(0.95);
-    }
-
-    @media (max-width: 768px) {
-      .wallet-connect-btn {
-        top: auto;
-        bottom: var(--space-lg);
-        right: auto;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: var(--space-md) var(--space-xl);
-      }
-
-      .wallet-connect-btn:active {
-        transform: translateX(-50%) scale(0.95);
-      }
-    }
-
-    /* Wallet modal */
     .wallet-modal {
       display: none;
       position: fixed;
       inset: 0;
       z-index: 10001;
-      background: rgba(0,0,0,0.95);
-      backdrop-filter: blur(20px);
-      padding: var(--space-lg);
-      flex-direction: column;
-      justify-content: flex-end;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      justify-content: center;
+      align-items: center;
+      padding: var(--space-xl);
     }
 
     .wallet-modal.active {
@@ -1432,11 +1408,19 @@
     }
 
     .wallet-modal-content {
-      background: #111;
+      background: linear-gradient(180deg, rgba(20,20,20,0.98) 0%, rgba(10,10,10,0.98) 100%);
       border: 1px solid var(--white-10);
-      border-radius: 20px 20px 0 0;
+      border-radius: 16px;
       padding: var(--space-xl);
-      padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      animation: modalSlideIn 0.2s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
     .wallet-modal-header {
@@ -1444,20 +1428,41 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--white-10);
     }
 
     .wallet-modal-title {
       font-size: var(--text-md);
       font-weight: 500;
+      color: var(--white);
     }
 
     .wallet-modal-close {
-      background: none;
-      border: none;
+      background: var(--white-05);
+      border: 1px solid var(--white-10);
+      border-radius: 8px;
       color: var(--white-50);
-      font-size: 20px;
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
       cursor: pointer;
-      padding: var(--space-xs);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .wallet-modal-close:hover {
+      background: var(--white-10);
+      border-color: var(--white-20);
+      color: var(--white);
+    }
+
+    .wallet-options-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
     }
 
     .wallet-option {
@@ -1468,27 +1473,27 @@
       background: var(--white-05);
       border: 1px solid var(--white-10);
       border-radius: 12px;
-      margin-bottom: var(--space-sm);
       cursor: pointer;
       transition: all 0.2s;
       text-decoration: none;
       color: inherit;
     }
 
-    .wallet-option:hover,
-    .wallet-option:active {
+    .wallet-option:hover {
       background: var(--white-10);
       border-color: var(--gold);
+      transform: translateX(4px);
     }
 
     .wallet-option-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 22px;
+      flex-shrink: 0;
     }
 
     .wallet-option-icon.phantom {
@@ -1499,83 +1504,116 @@
       background: linear-gradient(135deg, #fc8c03, #f5a623);
     }
 
-    .wallet-option-icon.walletconnect {
-      background: linear-gradient(135deg, #3b99fc, #2050f0);
-    }
-
     .wallet-option-info {
       flex: 1;
+      text-align: left;
     }
 
     .wallet-option-name {
       font-size: var(--text-sm);
       font-weight: 500;
+      color: var(--white);
     }
 
-    .wallet-option-desc {
+    .wallet-option-status {
       font-size: 11px;
       color: var(--white-50);
+      margin-top: 2px;
+    }
+
+    .wallet-option-status.detected {
+      color: var(--flame);
     }
 
     .wallet-option-arrow {
       color: var(--white-30);
+      font-size: 18px;
+      transition: transform 0.2s;
     }
 
-    .wallet-option:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .wallet-option:hover .wallet-option-arrow {
+      transform: translateX(4px);
+      color: var(--gold);
     }
 
     .wallet-option.not-installed {
       opacity: 0.6;
     }
 
-    .wallet-option.not-installed .wallet-option-desc {
-      color: var(--flame);
+    .wallet-option.not-installed .wallet-option-status {
+      color: var(--white-30);
     }
 
     /* Connected State */
-    .wallet-connected-info {
-      padding: var(--space-md);
+    .wallet-connected-view {
       text-align: center;
     }
 
-    .wallet-address {
+    .wallet-connected-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+    }
+
+    .wallet-connected-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--gold-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .wallet-address-display {
       font-family: monospace;
       font-size: var(--text-sm);
       color: var(--gold);
       background: var(--white-05);
       padding: var(--space-sm) var(--space-md);
       border-radius: 8px;
+      border: 1px solid var(--white-10);
+      display: inline-block;
       margin-bottom: var(--space-lg);
     }
 
-    .wallet-stats {
-      display: flex;
-      flex-direction: column;
+    .wallet-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: var(--space-sm);
       margin-bottom: var(--space-lg);
     }
 
-    .wallet-stat {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--space-sm);
+    .wallet-stat-card {
       background: var(--white-05);
-      border-radius: 8px;
+      border: 1px solid var(--white-10);
+      border-radius: 10px;
+      padding: var(--space-md);
+      text-align: center;
+    }
+
+    .wallet-stat-card.full-width {
+      grid-column: span 2;
     }
 
     .wallet-stat-label {
       color: var(--white-50);
-      font-size: var(--text-xs);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-xs);
     }
 
     .wallet-stat-value {
-      font-weight: 500;
-      font-size: var(--text-sm);
+      font-size: var(--text-md);
+      font-weight: 600;
+      color: var(--white);
     }
 
-    .wallet-stat-value.highlight {
+    .wallet-stat-value.gold {
       color: var(--gold);
     }
 
@@ -1585,7 +1623,7 @@
       background: transparent;
       border: 1px solid var(--white-20);
       border-radius: 8px;
-      color: var(--white-70);
+      color: var(--white-50);
       font-size: var(--text-xs);
       cursor: pointer;
       transition: all 0.2s;
@@ -1594,6 +1632,27 @@
     .wallet-disconnect-btn:hover {
       border-color: var(--flame);
       color: var(--flame);
+      background: rgba(255,90,50,0.1);
+    }
+
+    /* Mobile: Bottom sheet style */
+    @media (max-width: 768px) {
+      .wallet-modal {
+        align-items: flex-end;
+        padding: 0;
+      }
+
+      .wallet-modal-content {
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+        animation: modalSlideUp 0.3s ease-out;
+      }
+
+      @keyframes modalSlideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
     }
 
     /* ================================================================
@@ -1940,7 +1999,10 @@
       <a href="#ecosystem" class="nav-pill">How</a>
       <a href="#kscore" class="nav-pill">K-Score</a>
     </div>
-    <button class="nav-cta">Connect</button>
+    <button class="nav-cta" id="navWalletBtn">
+      <span class="wallet-icon">👛</span>
+      <span id="navWalletText">Connect</span>
+    </button>
   </nav>
 
   <div class="content">
@@ -2600,11 +2662,6 @@
     </footer>
   </div>
 
-  <!-- Wallet Connect Button (Desktop: top-right, Mobile: bottom-center) -->
-  <button class="wallet-connect-btn" id="walletConnectBtn">
-    👛 Connect
-  </button>
-
   <!-- Burn Stats Modal (Black Hole Tap) -->
   <div class="burn-modal" id="burnModal">
     <button class="burn-modal-close" id="burnModalClose">✕</button>
@@ -2641,13 +2698,14 @@
         <span class="wallet-modal-title" id="walletModalTitle">Connect Wallet</span>
         <button class="wallet-modal-close" id="walletModalClose">✕</button>
       </div>
+
       <!-- Wallet Options (shown when not connected) -->
-      <div id="walletOptions">
+      <div class="wallet-options-list" id="walletOptions">
         <button class="wallet-option" id="phantomBtn">
           <div class="wallet-option-icon phantom">👻</div>
           <div class="wallet-option-info">
             <div class="wallet-option-name">Phantom</div>
-            <div class="wallet-option-desc" id="phantomStatus">Detecting...</div>
+            <div class="wallet-option-status" id="phantomStatus">Checking...</div>
           </div>
           <span class="wallet-option-arrow">→</span>
         </button>
@@ -2655,31 +2713,33 @@
           <div class="wallet-option-icon solflare">☀️</div>
           <div class="wallet-option-info">
             <div class="wallet-option-name">Solflare</div>
-            <div class="wallet-option-desc" id="solflareStatus">Detecting...</div>
+            <div class="wallet-option-status" id="solflareStatus">Checking...</div>
           </div>
           <span class="wallet-option-arrow">→</span>
         </button>
       </div>
+
       <!-- Connected State (shown when connected) -->
-      <div id="walletConnected" style="display: none;">
-        <div class="wallet-connected-info">
-          <div class="wallet-address" id="walletAddress">Loading...</div>
-          <div class="wallet-stats">
-            <div class="wallet-stat">
-              <span class="wallet-stat-label">$ASDF Balance</span>
-              <span class="wallet-stat-value" id="userAsdfBalance">---</span>
-            </div>
-            <div class="wallet-stat">
-              <span class="wallet-stat-label">Holder Tier</span>
-              <span class="wallet-stat-value" id="userHolderTier">---</span>
-            </div>
-            <div class="wallet-stat">
-              <span class="wallet-stat-label">Your Discount</span>
-              <span class="wallet-stat-value highlight" id="userDiscount">---</span>
-            </div>
-          </div>
-          <button class="wallet-disconnect-btn" id="disconnectBtn">Disconnect</button>
+      <div class="wallet-connected-view" id="walletConnected" style="display: none;">
+        <div class="wallet-connected-header">
+          <div class="wallet-connected-icon">✓</div>
         </div>
+        <div class="wallet-address-display" id="walletAddress">Loading...</div>
+        <div class="wallet-stats-grid">
+          <div class="wallet-stat-card">
+            <div class="wallet-stat-label">$ASDF Balance</div>
+            <div class="wallet-stat-value" id="userAsdfBalance">---</div>
+          </div>
+          <div class="wallet-stat-card">
+            <div class="wallet-stat-label">Holder Tier</div>
+            <div class="wallet-stat-value gold" id="userHolderTier">---</div>
+          </div>
+          <div class="wallet-stat-card full-width">
+            <div class="wallet-stat-label">Your Fee Discount</div>
+            <div class="wallet-stat-value gold" id="userDiscount">---</div>
+          </div>
+        </div>
+        <button class="wallet-disconnect-btn" id="disconnectBtn">Disconnect Wallet</button>
       </div>
     </div>
   </div>
@@ -3682,7 +3742,8 @@
     // ========================================================================
     // WALLET CONNECTION (Phantom / Solflare)
     // ========================================================================
-    const walletBtn = document.getElementById('walletConnectBtn');
+    const navWalletBtn = document.getElementById('navWalletBtn');
+    const navWalletText = document.getElementById('navWalletText');
     const walletModal = document.getElementById('walletModal');
     const walletModalClose = document.getElementById('walletModalClose');
     const walletModalTitle = document.getElementById('walletModalTitle');
@@ -3703,20 +3764,28 @@
       const hasPhantom = window.phantom?.solana?.isPhantom || window.solana?.isPhantom;
       const hasSolflare = window.solflare?.isSolflare;
 
-      if (hasPhantom) {
-        phantomStatus.textContent = 'Click to connect';
-        phantomBtn.classList.remove('not-installed');
-      } else {
-        phantomStatus.textContent = 'Not installed → Get Phantom';
-        phantomBtn.classList.add('not-installed');
+      if (phantomStatus) {
+        if (hasPhantom) {
+          phantomStatus.textContent = 'Detected • Click to connect';
+          phantomStatus.classList.add('detected');
+          phantomBtn.classList.remove('not-installed');
+        } else {
+          phantomStatus.textContent = 'Not installed';
+          phantomStatus.classList.remove('detected');
+          phantomBtn.classList.add('not-installed');
+        }
       }
 
-      if (hasSolflare) {
-        solflareStatus.textContent = 'Click to connect';
-        solflareBtn.classList.remove('not-installed');
-      } else {
-        solflareStatus.textContent = 'Not installed → Get Solflare';
-        solflareBtn.classList.add('not-installed');
+      if (solflareStatus) {
+        if (hasSolflare) {
+          solflareStatus.textContent = 'Detected • Click to connect';
+          solflareStatus.classList.add('detected');
+          solflareBtn.classList.remove('not-installed');
+        } else {
+          solflareStatus.textContent = 'Not installed';
+          solflareStatus.classList.remove('detected');
+          solflareBtn.classList.add('not-installed');
+        }
       }
 
       return { hasPhantom, hasSolflare };
@@ -3764,19 +3833,21 @@
 
     // After wallet connected - fetch user stats
     async function onWalletConnected() {
-      // Update UI
-      walletModalTitle.textContent = 'Connected';
-      walletOptions.style.display = 'none';
-      walletConnected.style.display = 'block';
+      // Update modal UI
+      if (walletModalTitle) walletModalTitle.textContent = 'Wallet Connected';
+      if (walletOptions) walletOptions.style.display = 'none';
+      if (walletConnected) walletConnected.style.display = 'block';
 
       // Show truncated address
       const addr = connectedAddress;
-      document.getElementById('walletAddress').textContent =
-        addr.slice(0, 4) + '...' + addr.slice(-4);
+      const shortAddr = addr.slice(0, 4) + '...' + addr.slice(-4);
+      const walletAddrEl = document.getElementById('walletAddress');
+      if (walletAddrEl) walletAddrEl.textContent = shortAddr;
 
-      // Update connect button text
-      if (walletBtn) {
-        walletBtn.innerHTML = '🟢 ' + addr.slice(0, 4) + '...' + addr.slice(-4);
+      // Update nav button to show connected state
+      if (navWalletBtn) {
+        navWalletBtn.classList.add('connected');
+        navWalletBtn.innerHTML = `<span class="wallet-addr">${shortAddr}</span>`;
       }
 
       // Fetch user stats from API
@@ -3784,12 +3855,25 @@
         const res = await fetch('/v1/stats/wallet/' + connectedAddress);
         if (res.ok) {
           const data = await res.json();
-          document.getElementById('userAsdfBalance').textContent =
-            data.asdfBalance ? data.asdfBalance.toLocaleString() : '0';
-          document.getElementById('userHolderTier').textContent =
-            data.tier?.emoji + ' ' + data.tier?.name || 'Bronze';
-          document.getElementById('userDiscount').textContent =
-            '-' + (data.discountPercent || 0) + '%';
+          const balanceEl = document.getElementById('userAsdfBalance');
+          const tierEl = document.getElementById('userHolderTier');
+          const discountEl = document.getElementById('userDiscount');
+
+          if (balanceEl) {
+            balanceEl.textContent = data.asdfBalance
+              ? data.asdfBalance.toLocaleString()
+              : '0';
+          }
+          if (tierEl) {
+            tierEl.textContent = data.tier
+              ? data.tier.emoji + ' ' + data.tier.name
+              : '🥉 Bronze';
+          }
+          if (discountEl) {
+            discountEl.textContent = data.discountPercent
+              ? '-' + data.discountPercent + '%'
+              : '0%';
+          }
         }
       } catch (e) {
         console.error('Failed to fetch wallet stats:', e);
@@ -3816,14 +3900,20 @@
       localStorage.removeItem('connectedWallet');
       localStorage.removeItem('connectedAddress');
 
-      // Reset UI
-      walletModalTitle.textContent = 'Connect Wallet';
-      walletOptions.style.display = 'block';
-      walletConnected.style.display = 'none';
-      if (walletBtn) walletBtn.innerHTML = '👛 Connect';
+      // Reset modal UI
+      if (walletModalTitle) walletModalTitle.textContent = 'Connect Wallet';
+      if (walletOptions) walletOptions.style.display = 'flex';
+      if (walletConnected) walletConnected.style.display = 'none';
+
+      // Reset nav button
+      if (navWalletBtn) {
+        navWalletBtn.classList.remove('connected');
+        navWalletBtn.innerHTML = `<span class="wallet-icon">👛</span><span>Connect</span>`;
+      }
+
       detectWallets();
 
-      walletModal.classList.remove('active');
+      if (walletModal) walletModal.classList.remove('active');
       document.body.style.overflow = '';
     }
 
@@ -3857,11 +3947,11 @@
     }
 
     // Event listeners
-    if (walletBtn) {
-      walletBtn.addEventListener('click', (e) => {
+    if (navWalletBtn) {
+      navWalletBtn.addEventListener('click', (e) => {
         e.preventDefault();
         detectWallets();
-        walletModal.classList.add('active');
+        if (walletModal) walletModal.classList.add('active');
         document.body.style.overflow = 'hidden';
       });
     }
@@ -3880,7 +3970,7 @@
 
     if (walletModalClose) {
       walletModalClose.addEventListener('click', () => {
-        walletModal.classList.remove('active');
+        if (walletModal) walletModal.classList.remove('active');
         document.body.style.overflow = '';
       });
     }
