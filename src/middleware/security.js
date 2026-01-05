@@ -34,6 +34,7 @@ const securityHeaders = helmet({
             'https://*.jup.ag', // All Jupiter APIs (terminal, api, quote-api, price, tokens, worker, cache)
             'https://*.helius-rpc.com', // Helius RPC
             'wss://*.helius-rpc.com', // Helius WebSocket
+            'https://api.mainnet-beta.solana.com', // Official Solana RPC
           ],
           frameSrc: ['https://terminal.jup.ag'], // Jupiter Terminal iframe
           objectSrc: ["'none'"],
