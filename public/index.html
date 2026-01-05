@@ -1791,6 +1791,17 @@
       gap: var(--space-md);
     }
 
+    /* Jupiter Terminal Container */
+    .jupiter-container {
+      min-height: 400px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .jupiter-container iframe {
+      border: none !important;
+    }
+
     .form-group {
       display: flex;
       flex-direction: column;
@@ -2070,34 +2081,13 @@
             <div class="app-status" id="clean-status"></div>
           </div>
 
-          <!-- SWAP -->
+          <!-- SWAP - Jupiter Terminal -->
           <div class="app-panel" id="panel-swap">
             <div class="app-header">
               <h3>Swap via Jupiter</h3>
-              <p>Any amount. Gas paid with input token.</p>
+              <p>Real swaps. Best rates. Gasless with GASdf.</p>
             </div>
-            <div class="app-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>From</label>
-                  <select id="swap-from" class="form-select">
-                    <option value="">Select token</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>To</label>
-                  <select id="swap-to" class="form-select">
-                    <option value="">Select token</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Amount</label>
-                <input type="text" id="swap-amount" class="form-input" placeholder="0.00">
-              </div>
-              <button class="app-btn" id="swap-btn" disabled>Connect Wallet</button>
-            </div>
-            <div class="app-status" id="swap-status"></div>
+            <div id="jupiter-terminal" class="jupiter-container"></div>
           </div>
 
           <!-- MESSAGE -->
@@ -2693,6 +2683,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Jupiter Terminal -->
+  <script src="https://terminal.jup.ag/main-v3.js" data-preload></script>
 
   <!-- Three.js Import Map -->
   <script type="importmap">
@@ -3496,8 +3489,63 @@
         // Update panels
         appPanels.forEach(p => p.classList.remove('active'));
         document.getElementById('panel-' + app).classList.add('active');
+
+        // Initialize Jupiter when swap tab is clicked
+        if (app === 'swap') {
+          initJupiterTerminal();
+        }
       });
     });
+
+    // ========================================================================
+    // JUPITER TERMINAL INTEGRATION
+    // ========================================================================
+    let jupiterInitialized = false;
+
+    function initJupiterTerminal() {
+      if (jupiterInitialized || !window.Jupiter) return;
+
+      try {
+        // Get wallet provider if connected
+        let walletProvider = null;
+        if (connectedWallet === 'phantom') {
+          walletProvider = window.phantom?.solana || window.solana;
+        } else if (connectedWallet === 'solflare') {
+          walletProvider = window.solflare;
+        }
+
+        const config = {
+          displayMode: 'integrated',
+          integratedTargetId: 'jupiter-terminal',
+          endpoint: 'https://mainnet.helius-rpc.com/?api-key=15319bf4-5b40-4958-ac8d-6313aa55eb92',
+          strictTokenList: false,
+          defaultExplorer: 'Solscan',
+          formProps: {
+            fixedOutputMint: false,
+            swapMode: 'ExactIn',
+            initialAmount: '1000000', // 1 USDC (6 decimals)
+            initialInputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+            initialOutputMint: 'So11111111111111111111111111111111111111112', // SOL
+          },
+        };
+
+        // Pass wallet if connected (passthrough mode)
+        if (walletProvider && connectedAddress) {
+          config.passThroughWallet = walletProvider;
+        }
+
+        window.Jupiter.init(config);
+        jupiterInitialized = true;
+        console.log('Jupiter Terminal initialized', connectedAddress ? 'with wallet' : 'without wallet');
+      } catch (e) {
+        console.error('Jupiter init error:', e);
+      }
+    }
+
+    // Also init if swap tab is already active on load
+    if (document.querySelector('.app-tab[data-app="swap"].active')) {
+      setTimeout(initJupiterTerminal, 1000);
+    }
 
     // ========================================================================
     // LOAD LIVE DATA FROM APIs
