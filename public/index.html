@@ -4220,25 +4220,28 @@
       tokenMap[t.address] = t;
     });
 
-    // Fetch tokens from Jupiter API
-    async function fetchJupiterTokens() {
+    // Fetch single token info from Jupiter API
+    async function fetchTokenInfo(mint) {
       try {
-        // Fetch popular/strict tokens from Jupiter
-        const res = await fetch('https://tokens.jup.ag/tokens?tags=strict');
-        if (!res.ok) throw new Error('Failed to fetch tokens');
-        const tokens = await res.json();
-
-        // Add to cache and map
-        tokens.forEach(t => {
-          if (!tokenMap[t.address]) {
-            tokenMap[t.address] = t;
-          }
-        });
-        tokenCache = tokens;
-        console.log('[Swap] Loaded', tokens.length, 'tokens from Jupiter');
+        const res = await fetch(`https://lite-api.jup.ag/tokens/v1/token/${mint}`);
+        if (!res.ok) return null;
+        const token = await res.json();
+        if (token && token.address) {
+          tokenMap[token.address] = token;
+        }
+        return token;
       } catch (err) {
-        console.error('[Swap] Failed to fetch tokens:', err);
+        console.error('[Swap] Failed to fetch token info:', err);
+        return null;
       }
+    }
+
+    // Initialize tokens (use popular tokens, fetch on-demand for search)
+    async function fetchJupiterTokens() {
+      // Popular tokens are already in tokenMap from POPULAR_TOKENS
+      // For full list, Jupiter API is 300MB+ - too heavy for client
+      // Instead, we fetch individual tokens when user searches by mint
+      console.log('[Swap] Using', POPULAR_TOKENS.length, 'popular tokens');
     }
 
     // Fetch SOL price
