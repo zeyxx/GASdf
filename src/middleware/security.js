@@ -32,6 +32,7 @@ const securityHeaders = helmet({
             'https://asdev-backend.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
             'https://*.jup.ag', // All Jupiter APIs (plugin, api, ultra, etc.)
+            'https://tokens.jup.ag', // Jupiter token list API
             'https://*.helius-rpc.com', // Helius RPC (for our proxy)
             'wss://*.helius-rpc.com', // Helius WebSocket
             'https://fonts.googleapis.com', // Jupiter Plugin fetches fonts via Fetch API
