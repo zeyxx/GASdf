@@ -1850,7 +1850,7 @@
       gap: var(--space-md);
     }
 
-    /* Jupiter Terminal Container */
+    /* Jupiter Terminal Container (legacy) */
     .jupiter-container {
       min-height: 400px;
       border-radius: 12px;
@@ -1859,6 +1859,152 @@
 
     .jupiter-container iframe {
       border: none !important;
+    }
+
+    /* Gasless Swap UI */
+    .swap-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .swap-token-row {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: var(--space-md);
+    }
+
+    .swap-token-group {
+      margin: 0;
+    }
+
+    .swap-input-wrapper {
+      display: flex;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+
+    .swap-amount {
+      flex: 1;
+      font-size: 1.5rem;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      padding: var(--space-sm) 0;
+    }
+
+    .swap-amount:focus {
+      outline: none;
+    }
+
+    .swap-amount::placeholder {
+      color: var(--text-muted);
+    }
+
+    .swap-token-select {
+      width: auto;
+      min-width: 100px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .swap-balance {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    .swap-arrow-row {
+      display: flex;
+      justify-content: center;
+      margin: calc(-1 * var(--space-sm)) 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .swap-direction-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid var(--bg);
+      color: var(--bg);
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .swap-direction-btn:hover {
+      transform: rotate(180deg);
+      background: var(--accent-hover);
+    }
+
+    .swap-gasless-section {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: var(--space-md);
+      margin-top: var(--space-sm);
+    }
+
+    .gasless-toggle-row {
+      margin-bottom: var(--space-sm);
+    }
+
+    .gasless-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .gasless-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .gasless-text {
+      color: var(--accent);
+    }
+
+    .gasless-token-group {
+      margin: 0;
+      padding-top: var(--space-sm);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .swap-quote-info {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: var(--space-md);
+      margin-top: var(--space-sm);
+    }
+
+    .quote-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-xs) 0;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .quote-row.highlight {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .swap-btn {
+      margin-top: var(--space-md);
+      font-size: 1.1rem;
+      padding: var(--space-md);
+    }
+
+    .swap-btn.loading {
+      opacity: 0.7;
+      pointer-events: none;
     }
 
     .form-group {
@@ -2143,13 +2289,93 @@
             <div class="app-status" id="clean-status"></div>
           </div>
 
-          <!-- SWAP - Jupiter Terminal -->
+          <!-- SWAP - Custom Gasless Swap -->
           <div class="app-panel" id="panel-swap">
             <div class="app-header">
-              <h3>Swap via Jupiter</h3>
-              <p>Real swaps. Best rates. Gasless with GASdf.</p>
+              <h3>Gasless Swap</h3>
+              <p>Best rates via Jupiter. Pay gas with any token.</p>
             </div>
-            <div id="jupiter-terminal" class="jupiter-container"></div>
+            <div class="app-form swap-form">
+              <!-- Input Token -->
+              <div class="swap-token-row">
+                <div class="form-group swap-token-group">
+                  <label>You pay</label>
+                  <div class="swap-input-wrapper">
+                    <input type="text" id="swap-input-amount" class="form-input swap-amount" placeholder="0.00">
+                    <select id="swap-input-token" class="form-select swap-token-select">
+                      <option value="">Select</option>
+                      <option value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">USDC</option>
+                      <option value="So11111111111111111111111111111111111111112">SOL</option>
+                      <option value="9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump">$ASDF</option>
+                    </select>
+                  </div>
+                  <div class="swap-balance" id="swap-input-balance">Balance: --</div>
+                </div>
+              </div>
+
+              <!-- Swap Direction Arrow -->
+              <div class="swap-arrow-row">
+                <button class="swap-direction-btn" id="swap-direction-btn" title="Switch tokens">↓</button>
+              </div>
+
+              <!-- Output Token -->
+              <div class="swap-token-row">
+                <div class="form-group swap-token-group">
+                  <label>You receive</label>
+                  <div class="swap-input-wrapper">
+                    <input type="text" id="swap-output-amount" class="form-input swap-amount" placeholder="0.00" readonly>
+                    <select id="swap-output-token" class="form-select swap-token-select">
+                      <option value="">Select</option>
+                      <option value="So11111111111111111111111111111111111111112" selected>SOL</option>
+                      <option value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">USDC</option>
+                      <option value="9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump">$ASDF</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gasless Options -->
+              <div class="swap-gasless-section">
+                <div class="gasless-toggle-row">
+                  <label class="gasless-label">
+                    <input type="checkbox" id="swap-gasless-toggle" checked>
+                    <span class="gasless-text">⛽ Gasless (pay gas with token)</span>
+                  </label>
+                </div>
+                <div class="form-group gasless-token-group" id="swap-gas-token-group">
+                  <label>Pay gas with</label>
+                  <select id="swap-gas-token" class="form-select">
+                    <option value="same">Same as input token</option>
+                    <option value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">USDC</option>
+                    <option value="9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump">$ASDF (76.4% burned)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Quote Info -->
+              <div class="swap-quote-info" id="swap-quote-info" style="display: none;">
+                <div class="quote-row">
+                  <span>Rate</span>
+                  <span id="swap-rate">--</span>
+                </div>
+                <div class="quote-row">
+                  <span>Price Impact</span>
+                  <span id="swap-impact">--</span>
+                </div>
+                <div class="quote-row">
+                  <span>Gas Fee</span>
+                  <span id="swap-gas-fee">--</span>
+                </div>
+                <div class="quote-row highlight">
+                  <span>You save</span>
+                  <span id="swap-savings">No SOL needed</span>
+                </div>
+              </div>
+
+              <!-- Swap Button -->
+              <button class="app-btn swap-btn" id="swap-btn" disabled>Connect Wallet</button>
+            </div>
+            <div class="app-status" id="swap-status"></div>
           </div>
 
           <!-- MESSAGE -->
@@ -2743,9 +2969,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Jupiter Plugin (RPC-less swap widget) -->
-  <script src="https://plugin.jup.ag/plugin-v1.js" data-preload defer></script>
 
   <!-- Three.js Import Map -->
   <script type="importmap">
@@ -3558,9 +3781,8 @@
     });
 
     // ========================================================================
-    // JUPITER PLUGIN INTEGRATION (RPC-less swap widget)
+    // GASLESS SWAP (Jupiter API + GASdf)
     // ========================================================================
-    let jupiterInitialized = false;
 
     // Get current wallet provider
     function getWalletProvider() {
@@ -3572,101 +3794,322 @@
       return null;
     }
 
-    // Build wallet context state for Jupiter Plugin
-    function buildWalletContextState() {
-      const provider = getWalletProvider();
-      if (!provider || !connectedAddress) {
-        return {
-          wallet: null,
-          publicKey: null,
-          connected: false,
-          connecting: false,
-          disconnecting: false,
-          signTransaction: undefined,
-          signAllTransactions: undefined,
-          sendTransaction: undefined,
-        };
-      }
+    // Token decimals
+    const TOKEN_DECIMALS = {
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 6,  // USDC
+      'So11111111111111111111111111111111111111112': 9,   // SOL
+      '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump': 6, // $ASDF
+    };
 
-      // Create adapter with required signing functions
-      const adapter = {
-        publicKey: provider.publicKey,
-        connected: true,
-        signTransaction: (tx) => provider.signTransaction(tx),
-        signAllTransactions: (txs) => provider.signAllTransactions(txs),
-        sendTransaction: provider.sendTransaction ? (tx, conn, opts) => provider.sendTransaction(tx, opts) : undefined,
-      };
+    const TOKEN_SYMBOLS = {
+      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
+      'So11111111111111111111111111111111111111112': 'SOL',
+      '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump': '$ASDF',
+    };
 
-      return {
-        wallet: { adapter },
-        publicKey: provider.publicKey,
-        connected: true,
-        connecting: false,
-        disconnecting: false,
-        signTransaction: adapter.signTransaction,
-        signAllTransactions: adapter.signAllTransactions,
-        sendTransaction: adapter.sendTransaction,
-      };
+    // Swap state
+    let currentJupiterQuote = null;
+    let currentGasdfQuote = null;
+    let swapQuoteTimeout = null;
+
+    // DOM elements for swap
+    const swapInputAmount = document.getElementById('swap-input-amount');
+    const swapInputToken = document.getElementById('swap-input-token');
+    const swapOutputAmount = document.getElementById('swap-output-amount');
+    const swapOutputToken = document.getElementById('swap-output-token');
+    const swapInputBalance = document.getElementById('swap-input-balance');
+    const swapDirectionBtn = document.getElementById('swap-direction-btn');
+    const swapGaslessToggle = document.getElementById('swap-gasless-toggle');
+    const swapGasTokenGroup = document.getElementById('swap-gas-token-group');
+    const swapGasToken = document.getElementById('swap-gas-token');
+    const swapQuoteInfo = document.getElementById('swap-quote-info');
+    const swapRate = document.getElementById('swap-rate');
+    const swapImpact = document.getElementById('swap-impact');
+    const swapGasFee = document.getElementById('swap-gas-fee');
+    const swapSavings = document.getElementById('swap-savings');
+    const swapBtn = document.getElementById('swap-btn');
+    const swapStatus = document.getElementById('swap-status');
+
+    // Initialize swap UI
+    function initSwapUI() {
+      if (!swapInputAmount) return;
+
+      // Input amount change - debounced quote fetch
+      swapInputAmount.addEventListener('input', () => {
+        clearTimeout(swapQuoteTimeout);
+        swapQuoteTimeout = setTimeout(fetchSwapQuote, 500);
+      });
+
+      // Token selection change
+      swapInputToken.addEventListener('change', fetchSwapQuote);
+      swapOutputToken.addEventListener('change', fetchSwapQuote);
+
+      // Direction switch
+      swapDirectionBtn.addEventListener('click', () => {
+        const inputToken = swapInputToken.value;
+        const outputToken = swapOutputToken.value;
+        swapInputToken.value = outputToken;
+        swapOutputToken.value = inputToken;
+        fetchSwapQuote();
+      });
+
+      // Gasless toggle
+      swapGaslessToggle.addEventListener('change', () => {
+        swapGasTokenGroup.style.display = swapGaslessToggle.checked ? 'flex' : 'none';
+        fetchSwapQuote();
+      });
+
+      // Gas token change
+      swapGasToken.addEventListener('change', fetchSwapQuote);
+
+      // Swap button
+      swapBtn.addEventListener('click', executeGaslessSwap);
+
+      // Update button state based on wallet connection
+      updateSwapButton();
     }
 
-    // Sync wallet state with Jupiter Plugin
+    // Update swap button based on connection state
+    function updateSwapButton() {
+      if (!swapBtn) return;
+      if (!connectedAddress) {
+        swapBtn.disabled = true;
+        swapBtn.textContent = 'Connect Wallet';
+      } else if (!currentJupiterQuote) {
+        swapBtn.disabled = true;
+        swapBtn.textContent = 'Enter amount';
+      } else {
+        swapBtn.disabled = false;
+        swapBtn.textContent = swapGaslessToggle?.checked ? 'Swap (Gasless)' : 'Swap';
+      }
+    }
+
+    // Fetch Jupiter quote
+    async function fetchSwapQuote() {
+      const inputMint = swapInputToken?.value;
+      const outputMint = swapOutputToken?.value;
+      const amount = swapInputAmount?.value;
+
+      if (!inputMint || !outputMint || !amount || parseFloat(amount) <= 0) {
+        currentJupiterQuote = null;
+        currentGasdfQuote = null;
+        swapOutputAmount.value = '';
+        swapQuoteInfo.style.display = 'none';
+        updateSwapButton();
+        return;
+      }
+
+      // Convert to smallest units
+      const decimals = TOKEN_DECIMALS[inputMint] || 6;
+      const amountInSmallestUnits = Math.floor(parseFloat(amount) * Math.pow(10, decimals));
+
+      try {
+        // Fetch Jupiter quote
+        const jupiterUrl = `https://api.jup.ag/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountInSmallestUnits}&slippageBps=50`;
+        const jupiterRes = await fetch(jupiterUrl);
+
+        if (!jupiterRes.ok) {
+          throw new Error('Jupiter quote failed');
+        }
+
+        currentJupiterQuote = await jupiterRes.json();
+        console.log('[Swap] Jupiter quote:', currentJupiterQuote);
+
+        // Calculate output amount
+        const outputDecimals = TOKEN_DECIMALS[outputMint] || 6;
+        const outputAmount = parseInt(currentJupiterQuote.outAmount) / Math.pow(10, outputDecimals);
+        swapOutputAmount.value = outputAmount.toFixed(outputDecimals > 6 ? 6 : outputDecimals);
+
+        // Update rate display
+        const rate = outputAmount / parseFloat(amount);
+        const inputSymbol = TOKEN_SYMBOLS[inputMint] || 'Token';
+        const outputSymbol = TOKEN_SYMBOLS[outputMint] || 'Token';
+        swapRate.textContent = `1 ${inputSymbol} = ${rate.toFixed(6)} ${outputSymbol}`;
+
+        // Price impact
+        const impact = parseFloat(currentJupiterQuote.priceImpactPct || 0);
+        swapImpact.textContent = impact < 0.01 ? '<0.01%' : impact.toFixed(2) + '%';
+        swapImpact.style.color = impact > 1 ? '#ff6b6b' : impact > 0.5 ? '#ffd93d' : 'inherit';
+
+        // Fetch GASdf quote if gasless is enabled
+        if (swapGaslessToggle?.checked && connectedAddress) {
+          await fetchGasdfQuote();
+        } else {
+          swapGasFee.textContent = '~0.00001 SOL';
+          swapSavings.textContent = 'Enable gasless to save SOL';
+        }
+
+        swapQuoteInfo.style.display = 'block';
+        updateSwapButton();
+
+      } catch (err) {
+        console.error('[Swap] Quote error:', err);
+        currentJupiterQuote = null;
+        swapOutputAmount.value = '';
+        swapQuoteInfo.style.display = 'none';
+        updateSwapButton();
+      }
+    }
+
+    // Fetch GASdf quote for gas fee
+    async function fetchGasdfQuote() {
+      if (!connectedAddress) return;
+
+      // Determine gas payment token
+      let gasTokenMint = swapGasToken?.value;
+      if (gasTokenMint === 'same') {
+        gasTokenMint = swapInputToken?.value;
+      }
+
+      try {
+        const gasdfRes = await fetch('/v1/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userPubkey: connectedAddress,
+            paymentToken: gasTokenMint,
+            computeUnits: 300000, // Swap transactions need more CU
+          }),
+        });
+
+        if (!gasdfRes.ok) {
+          throw new Error('GASdf quote failed');
+        }
+
+        currentGasdfQuote = await gasdfRes.json();
+        console.log('[Swap] GASdf quote:', currentGasdfQuote);
+
+        // Update gas fee display
+        const gasSymbol = TOKEN_SYMBOLS[gasTokenMint] || 'Token';
+        swapGasFee.textContent = `${currentGasdfQuote.feeFormatted} ${gasSymbol}`;
+        swapSavings.textContent = 'No SOL needed for gas!';
+
+      } catch (err) {
+        console.error('[Swap] GASdf quote error:', err);
+        currentGasdfQuote = null;
+        swapGasFee.textContent = 'Quote failed';
+      }
+    }
+
+    // Execute the gasless swap
+    async function executeGaslessSwap() {
+      if (!connectedAddress || !currentJupiterQuote) {
+        swapStatus.textContent = 'Please connect wallet and get quote first';
+        return;
+      }
+
+      const provider = getWalletProvider();
+      if (!provider) {
+        swapStatus.textContent = 'Wallet not found';
+        return;
+      }
+
+      swapBtn.disabled = true;
+      swapBtn.classList.add('loading');
+      swapBtn.textContent = 'Building transaction...';
+      swapStatus.textContent = '';
+
+      try {
+        const isGasless = swapGaslessToggle?.checked && currentGasdfQuote;
+
+        // Get swap instructions from Jupiter
+        const swapRes = await fetch('https://api.jup.ag/swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteResponse: currentJupiterQuote,
+            userPublicKey: connectedAddress,
+            wrapAndUnwrapSol: true,
+            // Use GASdf fee payer if gasless
+            feeAccount: isGasless ? currentGasdfQuote.feePayer : undefined,
+          }),
+        });
+
+        if (!swapRes.ok) {
+          const err = await swapRes.json();
+          throw new Error(err.message || 'Failed to get swap transaction');
+        }
+
+        const swapData = await swapRes.json();
+        console.log('[Swap] Jupiter swap response:', swapData);
+
+        swapBtn.textContent = 'Signing transaction...';
+
+        if (isGasless) {
+          // Gasless flow: Submit to GASdf for co-signing
+          // First, sign the transaction
+          const txBuffer = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
+
+          // Deserialize, modify fee payer, and sign
+          // Note: This requires web3.js which may not be loaded in browser
+          // For now, we'll send the transaction to GASdf which will handle it
+
+          swapBtn.textContent = 'Submitting to GASdf...';
+
+          const submitRes = await fetch('/v1/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quoteId: currentGasdfQuote.quoteId,
+              transaction: swapData.swapTransaction,
+              userPubkey: connectedAddress,
+            }),
+          });
+
+          const result = await submitRes.json();
+
+          if (!submitRes.ok) {
+            throw new Error(result.error || 'GASdf submission failed');
+          }
+
+          console.log('[Swap] Gasless swap success:', result);
+          swapStatus.innerHTML = `✅ Swap successful! <a href="https://solscan.io/tx/${result.signature}" target="_blank">View on Solscan</a>`;
+
+        } else {
+          // Regular flow: User signs and sends directly
+          const txBuffer = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
+          const signedTx = await provider.signTransaction({ serialize: () => txBuffer });
+
+          swapBtn.textContent = 'Sending transaction...';
+
+          const signature = await provider.sendTransaction(signedTx);
+          console.log('[Swap] Regular swap success:', signature);
+          swapStatus.innerHTML = `✅ Swap successful! <a href="https://solscan.io/tx/${signature}" target="_blank">View on Solscan</a>`;
+        }
+
+        // Reset form
+        swapInputAmount.value = '';
+        swapOutputAmount.value = '';
+        currentJupiterQuote = null;
+        currentGasdfQuote = null;
+        swapQuoteInfo.style.display = 'none';
+
+      } catch (err) {
+        console.error('[Swap] Error:', err);
+        swapStatus.textContent = `❌ ${err.message}`;
+      } finally {
+        swapBtn.classList.remove('loading');
+        updateSwapButton();
+      }
+    }
+
+    // Legacy functions for compatibility - now updates swap button state
     function syncJupiterWallet() {
-      if (!window.Jupiter?.syncProps) return;
-      const state = buildWalletContextState();
-      window.Jupiter.syncProps({ passthroughWalletContextState: state });
-      console.log('[Jupiter] Wallet synced:', state.connected ? 'connected' : 'disconnected');
+      updateSwapButton();
     }
 
     function initJupiterPlugin() {
-      if (jupiterInitialized || !window.Jupiter) return;
-
-      try {
-        // Jupiter Plugin config (RPC-less - Jupiter handles everything)
-        const config = {
-          displayMode: 'integrated',
-          integratedTargetId: 'jupiter-terminal',
-          // Always enable passthrough - we sync state dynamically
-          enableWalletPassthrough: true,
-          // Callback when Jupiter needs wallet connection
-          onRequestConnectWallet: () => {
-            console.log('[Jupiter] Wallet connection requested');
-            if (walletModal) walletModal.style.display = 'flex';
-          },
-          formProps: {
-            swapMode: 'ExactIn',
-            initialAmount: '1000000', // 1 USDC (6 decimals)
-            initialInputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-            initialOutputMint: 'So11111111111111111111111111111111111111112', // SOL
-          },
-          // Event handlers
-          onSuccess: ({ txid }) => {
-            console.log('[Jupiter] Swap success:', txid);
-          },
-          onSwapError: ({ error }) => {
-            console.error('[Jupiter] Swap error:', error);
-          },
-        };
-
-        // Pass initial wallet state if connected
-        const walletState = buildWalletContextState();
-        if (walletState.connected) {
-          config.passthroughWalletContextState = walletState;
-        }
-
-        window.Jupiter.init(config);
-        jupiterInitialized = true;
-        console.log('[Jupiter] Plugin initialized', walletState.connected ? 'with wallet' : 'without wallet');
-      } catch (e) {
-        console.error('[Jupiter] Plugin init error:', e);
-      }
+      // Initialize custom swap UI instead
+      initSwapUI();
     }
 
-    // Alias for backwards compatibility
     const initJupiterTerminal = initJupiterPlugin;
 
-    // Also init if swap tab is already active on load
-    if (document.querySelector('.app-tab[data-app="swap"].active')) {
-      setTimeout(initJupiterPlugin, 1000);
+    // Initialize swap UI when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initSwapUI);
+    } else {
+      initSwapUI();
     }
 
     // ========================================================================
