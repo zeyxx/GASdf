@@ -4262,7 +4262,7 @@
     async function fetchWalletTokens(pubkey) {
       if (!pubkey) return null;
       try {
-        const res = await fetch(`${API_URL}/v1/tokens/wallet/${pubkey}`);
+        const res = await fetch(`/v1/tokens/wallet/${pubkey}`);
         if (!res.ok) return null;
         const data = await res.json();
         walletTokensCache = data;
