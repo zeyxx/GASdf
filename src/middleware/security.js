@@ -18,17 +18,20 @@ const securityHeaders = helmet({
             'https://terminal.jup.ag', // Jupiter Terminal
           ],
           scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
-          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://fonts.googleapis.com',
+            'https://terminal.jup.ag', // Jupiter Terminal CSS
+          ],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           imgSrc: ["'self'", 'data:', 'https:'],
-          // Allow dashboard to fetch from external APIs
+          // Allow Jupiter Terminal and APIs
           connectSrc: [
             "'self'",
             'https://asdev-backend.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
-            'https://price.jup.ag', // Jupiter price API
-            'https://quote-api.jup.ag', // Jupiter quotes
-            'https://api.jup.ag', // Jupiter API
+            'https://*.jup.ag', // All Jupiter APIs (terminal, api, quote-api, price, tokens, worker, cache)
             'https://*.helius-rpc.com', // Helius RPC
             'wss://*.helius-rpc.com', // Helius WebSocket
           ],
