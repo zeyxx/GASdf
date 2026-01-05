@@ -34,6 +34,7 @@ const securityHeaders = helmet({
             'https://*.jup.ag', // All Jupiter APIs (plugin, api, ultra, etc.)
             'https://*.helius-rpc.com', // Helius RPC (for our proxy)
             'wss://*.helius-rpc.com', // Helius WebSocket
+            'https://fonts.googleapis.com', // Jupiter Plugin fetches fonts via Fetch API
           ],
           frameSrc: ['https://plugin.jup.ag'], // Jupiter Plugin iframe
           objectSrc: ["'none'"],
