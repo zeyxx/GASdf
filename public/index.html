@@ -3850,7 +3850,7 @@
         navWalletBtn.innerHTML = `<span class="wallet-addr">${shortAddr}</span>`;
       }
 
-      // Fetch user stats from API
+      // Fetch real ON-CHAIN wallet stats (on-chain is truth)
       try {
         const res = await fetch('/v1/stats/wallet/' + connectedAddress);
         if (res.ok) {
@@ -3859,24 +3859,29 @@
           const tierEl = document.getElementById('userHolderTier');
           const discountEl = document.getElementById('userDiscount');
 
+          // ON-CHAIN DATA (source of truth)
           if (balanceEl) {
-            balanceEl.textContent = data.asdfBalance
-              ? data.asdfBalance.toLocaleString()
-              : '0';
+            const balance = data.onChain?.asdfBalance ?? data.asdfBalance ?? 0;
+            balanceEl.textContent = balance.toLocaleString('en-US', { maximumFractionDigits: 2 });
           }
           if (tierEl) {
-            tierEl.textContent = data.tier
-              ? data.tier.emoji + ' ' + data.tier.name
-              : '🥉 Bronze';
+            const tier = data.tier || {};
+            tierEl.textContent = (tier.emoji || '🥉') + ' ' + (tier.name || 'BRONZE');
           }
           if (discountEl) {
-            discountEl.textContent = data.discountPercent
-              ? '-' + data.discountPercent + '%'
-              : '0%';
+            const discount = data.tier?.discountPercent ?? data.discountPercent ?? 0;
+            discountEl.textContent = discount > 0 ? '-' + discount + '%' : '0%';
           }
+
+          console.log('[WALLET] On-chain data:', {
+            balance: data.onChain?.asdfBalance,
+            tier: data.tier?.name,
+            discount: data.tier?.discountPercent,
+            sharePercent: data.onChain?.sharePercent
+          });
         }
       } catch (e) {
-        console.error('Failed to fetch wallet stats:', e);
+        console.error('[WALLET] Failed to fetch on-chain stats:', e);
       }
 
       // Save to localStorage

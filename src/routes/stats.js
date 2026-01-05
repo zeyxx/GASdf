@@ -6,6 +6,7 @@ const redis = require('../utils/redis');
 const rpc = require('../utils/rpc');
 const logger = require('../utils/logger');
 const { getTreasuryAddress } = require('../services/treasury-ata');
+const { getHolderTier } = require('../services/holder-tiers');
 
 const router = express.Router();
 
@@ -85,7 +86,8 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /stats/wallet/:address
- * Get wallet's burn contribution stats
+ * Get wallet's on-chain stats + burn contribution
+ * ON-CHAIN IS TRUTH - fetches real $ASDF balance and calculates tier
  */
 router.get('/wallet/:address', async (req, res) => {
   try {
@@ -96,7 +98,9 @@ router.get('/wallet/:address', async (req, res) => {
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
-    const [walletStats, globalStats, burnerCount] = await Promise.all([
+    // Fetch on-chain data + off-chain stats in parallel
+    const [tierInfo, walletStats, globalStats, burnerCount] = await Promise.all([
+      getHolderTier(address), // ON-CHAIN: real $ASDF balance + tier calculation
       redis.getWalletBurnStats(address),
       redis.getStats(),
       redis.getBurnerCount(),
@@ -108,22 +112,31 @@ router.get('/wallet/:address', async (req, res) => {
 
     res.json({
       wallet: address,
-      totalBurned: walletStats.totalBurned,
-      burnedFormatted: formatAsdf(walletStats.totalBurned),
-      txCount: walletStats.txCount,
-      rank: walletStats.rank,
-      totalBurners: burnerCount,
-      contributionPercent: contributionPercent.toFixed(4),
-      // CCM-aligned messaging
-      impact: {
-        message:
-          walletStats.totalBurned > 0
-            ? `You've contributed ${formatAsdf(walletStats.totalBurned)} to the burn`
-            : 'Start transacting to contribute to the burn',
-        rankMessage: walletStats.rank
-          ? `Rank #${walletStats.rank} of ${burnerCount} contributors`
-          : 'Not yet ranked',
+      // ON-CHAIN DATA (source of truth)
+      onChain: {
+        asdfBalance: tierInfo.balance,
+        asdfBalanceFormatted: tierInfo.balance.toLocaleString('en-US', { maximumFractionDigits: 2 }),
+        circulatingSupply: tierInfo.circulating,
+        sharePercent: tierInfo.sharePercent,
       },
+      // HOLDER TIER (calculated from on-chain balance)
+      tier: {
+        name: tierInfo.tier,
+        emoji: tierInfo.emoji,
+        discountPercent: tierInfo.discountPercent,
+      },
+      // BURN CONTRIBUTION (off-chain tracking)
+      burns: {
+        totalBurned: walletStats.totalBurned,
+        burnedFormatted: formatAsdf(walletStats.totalBurned),
+        txCount: walletStats.txCount,
+        rank: walletStats.rank,
+        totalBurners: burnerCount,
+        contributionPercent: contributionPercent.toFixed(4),
+      },
+      // Legacy fields for backwards compat
+      asdfBalance: tierInfo.balance,
+      discountPercent: tierInfo.discountPercent,
     });
   } catch (error) {
     logger.error('STATS', 'Failed to get wallet stats', { error: error.message });
