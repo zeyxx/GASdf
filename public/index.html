@@ -3562,24 +3562,76 @@
     // ========================================================================
     let jupiterInitialized = false;
 
+    // Get current wallet provider
+    function getWalletProvider() {
+      if (connectedWallet === 'phantom') {
+        return window.phantom?.solana || window.solana;
+      } else if (connectedWallet === 'solflare') {
+        return window.solflare;
+      }
+      return null;
+    }
+
+    // Build wallet context state for Jupiter Plugin
+    function buildWalletContextState() {
+      const provider = getWalletProvider();
+      if (!provider || !connectedAddress) {
+        return {
+          wallet: null,
+          publicKey: null,
+          connected: false,
+          connecting: false,
+          disconnecting: false,
+          signTransaction: undefined,
+          signAllTransactions: undefined,
+          sendTransaction: undefined,
+        };
+      }
+
+      // Create adapter with required signing functions
+      const adapter = {
+        publicKey: provider.publicKey,
+        connected: true,
+        signTransaction: (tx) => provider.signTransaction(tx),
+        signAllTransactions: (txs) => provider.signAllTransactions(txs),
+        sendTransaction: provider.sendTransaction ? (tx, conn, opts) => provider.sendTransaction(tx, opts) : undefined,
+      };
+
+      return {
+        wallet: { adapter },
+        publicKey: provider.publicKey,
+        connected: true,
+        connecting: false,
+        disconnecting: false,
+        signTransaction: adapter.signTransaction,
+        signAllTransactions: adapter.signAllTransactions,
+        sendTransaction: adapter.sendTransaction,
+      };
+    }
+
+    // Sync wallet state with Jupiter Plugin
+    function syncJupiterWallet() {
+      if (!window.Jupiter?.syncProps) return;
+      const state = buildWalletContextState();
+      window.Jupiter.syncProps({ passthroughWalletContextState: state });
+      console.log('[Jupiter] Wallet synced:', state.connected ? 'connected' : 'disconnected');
+    }
+
     function initJupiterPlugin() {
       if (jupiterInitialized || !window.Jupiter) return;
 
       try {
-        // Get wallet provider if connected
-        let walletProvider = null;
-        if (connectedWallet === 'phantom') {
-          walletProvider = window.phantom?.solana || window.solana;
-        } else if (connectedWallet === 'solflare') {
-          walletProvider = window.solflare;
-        }
-
         // Jupiter Plugin config (RPC-less - Jupiter handles everything)
         const config = {
           displayMode: 'integrated',
           integratedTargetId: 'jupiter-terminal',
-          // Wallet passthrough for connected wallets
-          enableWalletPassthrough: !!walletProvider,
+          // Always enable passthrough - we sync state dynamically
+          enableWalletPassthrough: true,
+          // Callback when Jupiter needs wallet connection
+          onRequestConnectWallet: () => {
+            console.log('[Jupiter] Wallet connection requested');
+            if (walletModal) walletModal.style.display = 'flex';
+          },
           formProps: {
             swapMode: 'ExactIn',
             initialAmount: '1000000', // 1 USDC (6 decimals)
@@ -3595,22 +3647,15 @@
           },
         };
 
-        // Pass wallet state if connected
-        if (walletProvider && connectedAddress) {
-          config.passthroughWalletContextState = {
-            wallet: {
-              adapter: walletProvider,
-            },
-            publicKey: walletProvider.publicKey,
-            connected: true,
-            connecting: false,
-            disconnecting: false,
-          };
+        // Pass initial wallet state if connected
+        const walletState = buildWalletContextState();
+        if (walletState.connected) {
+          config.passthroughWalletContextState = walletState;
         }
 
         window.Jupiter.init(config);
         jupiterInitialized = true;
-        console.log('[Jupiter] Plugin initialized', connectedAddress ? 'with wallet' : 'without wallet');
+        console.log('[Jupiter] Plugin initialized', walletState.connected ? 'with wallet' : 'without wallet');
       } catch (e) {
         console.error('[Jupiter] Plugin init error:', e);
       }
@@ -3904,6 +3949,9 @@
       // Save to localStorage
       localStorage.setItem('connectedWallet', connectedWallet);
       localStorage.setItem('connectedAddress', connectedAddress);
+
+      // Sync wallet state with Jupiter Plugin
+      syncJupiterWallet();
     }
 
     // Disconnect wallet
@@ -3937,6 +3985,9 @@
 
       if (walletModal) walletModal.classList.remove('active');
       document.body.style.overflow = '';
+
+      // Sync wallet state with Jupiter Plugin
+      syncJupiterWallet();
     }
 
     // Auto-reconnect on page load
