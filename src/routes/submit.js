@@ -307,7 +307,8 @@ router.post('/', validate('submit'), walletSubmitLimiter, async (req, res) => {
     const simulation = await rpc.simulateWithBalanceCheck(
       signedTx,
       validation.feePayer,
-      200000 // Max expected SOL change: ~0.0002 SOL (base fee + priority fee)
+      2500000 // Max expected SOL change: ~0.0025 SOL (base fee + priority fee + ATA rent)
+      // Breakdown: base fee ~5K + priority ~200K + ATA rent ~2.04M = ~2.25M lamports
     );
 
     if (!simulation.success) {
