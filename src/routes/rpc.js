@@ -164,13 +164,13 @@ router.post('/', async (req, res) => {
 
 /**
  * GET /v1/rpc/jupiter/quote
- * Proxy Jupiter quote requests
+ * Proxy Jupiter quote requests (v6 API)
  */
 router.get('/jupiter/quote', async (req, res) => {
   try {
-    // Forward all query params to Jupiter
+    // Forward all query params to Jupiter v6 API
     const queryString = new URLSearchParams(req.query).toString();
-    const jupiterUrl = `https://api.jup.ag/quote?${queryString}`;
+    const jupiterUrl = `https://api.jup.ag/swap/v1/quote?${queryString}`;
 
     logger.debug('JUPITER_PROXY', 'Quote request', {
       inputMint: req.query.inputMint?.slice(0, 8),
@@ -208,7 +208,7 @@ router.get('/jupiter/quote', async (req, res) => {
 
 /**
  * POST /v1/rpc/jupiter/swap
- * Proxy Jupiter swap transaction requests
+ * Proxy Jupiter swap transaction requests (v6 API)
  */
 router.post('/jupiter/swap', async (req, res) => {
   try {
@@ -216,7 +216,7 @@ router.post('/jupiter/swap', async (req, res) => {
       userPublicKey: req.body.userPublicKey?.slice(0, 8),
     });
 
-    const response = await fetch('https://api.jup.ag/swap', {
+    const response = await fetch('https://api.jup.ag/swap/v1/swap', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
