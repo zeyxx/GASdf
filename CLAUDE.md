@@ -207,6 +207,14 @@ PORT=3000                 # Server port
 - **HolDex API:** https://holdex-api.onrender.com - Token verification API
 - **SDK:** `npm install gasdf-sdk` - Client SDK
 
+## Data Architecture
+
+See `.claude/DATA_MATRIX.md` for complete data documentation:
+- **Redis**: Hot data (quotes, caches, rate limits, locks)
+- **PostgreSQL**: Cold data (burns, transactions, audit, analytics)
+- **In-Memory**: Per-instance caches (balances, prices, tokens)
+- **External**: HolDex, Jupiter, Helius, Pyth, Solana RPC
+
 ## Claude Code Setup
 
 See `.claude/SETUP.md` for detailed Claude Code configuration.
