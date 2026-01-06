@@ -475,12 +475,22 @@ function verifyHmacSignature(payload, signature, secret) {
 /**
  * Notify HolDex of a burn event (HMAC-signed webhook)
  *
+ * Supports Alignment tracking via optional fields:
+ * - paymentToken: Token used to pay GASdf fee (for token Alignment score)
+ * - paymentTokenAmount: Amount of payment token used
+ * - usdValue: USD value of the burn (standardized metric)
+ * - userWallet: User wallet that initiated the payment (for E-Score)
+ *
  * @param {Object} burnData - Burn event data
  * @param {string} burnData.signature - Transaction signature
- * @param {string} burnData.mint - Token mint burned
+ * @param {string} burnData.mint - Token mint burned ($asdfasdfa)
  * @param {number} burnData.amount - Amount burned (raw)
- * @param {string} burnData.burner - Burner's pubkey
- * @param {number} burnData.timestamp - Unix timestamp
+ * @param {string} burnData.burner - Burner's pubkey (treasury)
+ * @param {number} [burnData.timestamp] - Unix timestamp
+ * @param {string} [burnData.paymentToken] - Token used to pay fee (for Alignment tracking)
+ * @param {number} [burnData.paymentTokenAmount] - Amount of payment token
+ * @param {number} [burnData.usdValue] - USD value of the burn
+ * @param {string} [burnData.userWallet] - User wallet address
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 async function notifyBurn(burnData) {
@@ -499,17 +509,31 @@ async function notifyBurn(burnData) {
   }
 
   try {
-    const payload = {
-      event: 'burn',
-      data: {
-        signature: burnData.signature,
-        mint: burnData.mint,
-        amount: burnData.amount.toString(),
-        burner: burnData.burner,
-        timestamp: burnData.timestamp || Date.now(),
-        source: 'gasdf',
-      },
+    // Build payload with required fields
+    const data = {
+      signature: burnData.signature,
+      mint: burnData.mint,
+      amount: burnData.amount.toString(),
+      burner: burnData.burner,
+      timestamp: burnData.timestamp || Date.now(),
+      source: 'gasdf',
     };
+
+    // Add optional Alignment tracking fields
+    if (burnData.paymentToken) {
+      data.paymentToken = burnData.paymentToken; // Token used to pay fee
+    }
+    if (burnData.paymentTokenAmount) {
+      data.paymentTokenAmount = burnData.paymentTokenAmount.toString();
+    }
+    if (burnData.usdValue !== undefined) {
+      data.usdValue = burnData.usdValue.toString();
+    }
+    if (burnData.userWallet) {
+      data.userWallet = burnData.userWallet; // For E-Score tracking
+    }
+
+    const payload = { event: 'burn', data };
 
     const hmacSignature = createHmacSignature(payload, webhookSecret);
 
@@ -544,10 +568,18 @@ async function notifyBurn(burnData) {
       return { success: false, error: `HolDex returned ${res.status}: ${errorText}` };
     }
 
-    logger.info('HARMONY', 'Burn notification sent', {
+    const logData = {
       signature: burnData.signature?.slice(0, 16),
       amount: burnData.amount,
-    });
+    };
+    // Add Alignment tracking info to log if present
+    if (burnData.paymentToken) {
+      logData.paymentToken = burnData.paymentToken.slice(0, 8);
+    }
+    if (burnData.usdValue !== undefined) {
+      logData.usdValue = burnData.usdValue;
+    }
+    logger.info('HARMONY', 'Burn notification sent', logData);
 
     return { success: true };
   } catch (error) {

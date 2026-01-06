@@ -2,17 +2,39 @@
  * Token Gating - Security by Design
  *
  * Determines which tokens are accepted as payment for gasless transactions.
- * Uses HolDex as the single source of truth for tier-based acceptance:
+ * Uses HolDex as the single source of truth for tier-based acceptance.
  *
- * Metal Ranks (K-score based):
- *   💎 Diamond  (90-99, 100=native) → Hardcoded trusted tokens (SOL, USDC, etc.) → Accepted
- *   💠 Platinum (80-89)  → High conviction, strong holders → Accepted
- *   🥇 Gold     (70-79)  → Good conviction → Accepted
- *   🥈 Silver   (60-69)  → Medium conviction → Accepted
- *   🥉 Bronze   (50-59)  → Speculative → Accepted (minimum tier)
- *   🟤 Copper   (40-49)  → Very speculative → Rejected
- *   ⚫ Iron     (20-39)  → Substantial risk → Rejected
- *   🔩 Rust     (0-19)   → Unknown/untrusted → Rejected
+ * =============================================================================
+ * SCORING SYSTEM EVOLUTION
+ * =============================================================================
+ *
+ * Current: K-Score Based
+ *   - Community tokens scored by conviction, liquidity, holder behavior
+ *   - Infrastructure tokens (USDC, USDT, mSOL, jitoSOL) hardcoded as Diamond
+ *
+ * Future: Unified Score (see docs/UNIFIED_SCORE_PHILOSOPHY.md)
+ *   UNIFIED_SCORE = S^(1/φ) × U^(1/φ²) × (1 + A)^(1/φ³)
+ *   Where:
+ *     S = Safety Score (K-Score or I-Score based on token type)
+ *     U = Utility Score (volume/TVL ratio, unique users)
+ *     A = Alignment Score (LP provision, burn contribution, integrations)
+ *
+ * Token Types:
+ *   - NATIVE: SOL only (always Diamond, no external scoring)
+ *   - INFRASTRUCTURE: Stablecoins, LSTs (I-Score based on liquidity/backing)
+ *   - COMMUNITY: All other tokens (K-Score based on conviction)
+ *
+ * =============================================================================
+ * METAL RANKS (Tier System)
+ * =============================================================================
+ *   💎 Diamond  (90-99, 100=native) → Accepted
+ *   💠 Platinum (80-89)  → Accepted
+ *   🥇 Gold     (70-79)  → Accepted
+ *   🥈 Silver   (60-69)  → Accepted
+ *   🥉 Bronze   (50-59)  → Accepted (minimum tier)
+ *   🟤 Copper   (40-49)  → Rejected
+ *   ⚫ Iron     (20-39)  → Rejected
+ *   🔩 Rust     (0-19)   → Rejected
  *
  * This protects the treasury from:
  *   - Rug pulls (worthless tokens)
@@ -21,26 +43,47 @@
  *   - Dust accumulation
  *
  * Security model: Binary accept/reject based on tier.
- * A token is either safe enough (Diamond/Platinum/Gold/Silver/Bronze), or it's not.
+ * A token is either safe enough (Bronze+), or it's not.
  */
 
 const logger = require('../utils/logger');
 const holdex = require('./holdex');
 
 // =============================================================================
-// DIAMOND TOKENS - Always accepted, no HolDex call needed
+// TOKEN CLASSIFICATION (Unified Score preparation)
 // =============================================================================
-// These tokens have deep liquidity and will never lose it.
-// They form the backbone of Solana DeFi.
-// HolDex should return tier="Diamond" for these, but we also check locally
-// for performance (skip network call).
-const DIAMOND_TOKENS = new Set([
+// Token types for the upcoming Unified Score system:
+//
+// NATIVE: SOL only - Always Diamond, no external scoring
+// INFRASTRUCTURE: Stablecoins & LSTs - Will use I-Score from HolDex
+// COMMUNITY: All other tokens - Use K-Score from HolDex
+//
+// When HolDex implements the Unified Score endpoint, INFRASTRUCTURE tokens
+// will transition from hardcoded Diamond to dynamic I-Score based scoring.
+// =============================================================================
+
+// SOL is the only native token - always accepted, no scoring needed
+const NATIVE_TOKENS = new Set([
   'So11111111111111111111111111111111111111112', // SOL (native)
+]);
+
+// Infrastructure tokens: stablecoins and liquid staking tokens
+// Currently hardcoded as Diamond, will transition to I-Score
+const INFRASTRUCTURE_TOKENS = new Set([
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
   'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
   'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', // jitoSOL
 ]);
+
+// =============================================================================
+// DIAMOND TOKENS - Always accepted, no HolDex call needed
+// =============================================================================
+// Combined set of NATIVE + INFRASTRUCTURE tokens for current behavior.
+// These tokens have deep liquidity and will never lose it.
+// HolDex should return tier="Diamond" for these, but we check locally
+// for performance (skip network call).
+const DIAMOND_TOKENS = new Set([...NATIVE_TOKENS, ...INFRASTRUCTURE_TOKENS]);
 
 // Get diamond tokens (no longer includes $ASDF - uses real K-score)
 // $ASDF benefits from the Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
@@ -167,6 +210,45 @@ function isDiamondToken(mint) {
   return getDiamondTokens().has(mint);
 }
 
+// =============================================================================
+// TOKEN CLASSIFICATION HELPERS (Unified Score preparation)
+// =============================================================================
+
+/**
+ * Get the token type for Unified Score classification
+ * @param {string} mint - Token mint address
+ * @returns {'native' | 'infrastructure' | 'community'}
+ */
+function getTokenType(mint) {
+  if (NATIVE_TOKENS.has(mint)) return 'native';
+  if (INFRASTRUCTURE_TOKENS.has(mint)) return 'infrastructure';
+  return 'community';
+}
+
+/**
+ * Check if a token is native (SOL only)
+ * Native tokens always get Diamond tier without any scoring
+ */
+function isNativeToken(mint) {
+  return NATIVE_TOKENS.has(mint);
+}
+
+/**
+ * Check if a token is infrastructure (stablecoins, LSTs)
+ * Will transition from hardcoded Diamond to I-Score based
+ */
+function isInfrastructureToken(mint) {
+  return INFRASTRUCTURE_TOKENS.has(mint);
+}
+
+/**
+ * Check if a token is community (everything else)
+ * Uses K-Score from HolDex
+ */
+function isCommunityToken(mint) {
+  return !NATIVE_TOKENS.has(mint) && !INFRASTRUCTURE_TOKENS.has(mint);
+}
+
 // Legacy exports for backward compatibility
 const TRUSTED_TOKENS = DIAMOND_TOKENS;
 const getAcceptedTokensList = getDiamondTokensList;
@@ -177,6 +259,15 @@ module.exports = {
   isDiamondToken,
   getDiamondTokensList,
   DIAMOND_TOKENS,
+
+  // Token classification (Unified Score preparation)
+  getTokenType,
+  isNativeToken,
+  isInfrastructureToken,
+  isCommunityToken,
+  NATIVE_TOKENS,
+  INFRASTRUCTURE_TOKENS,
+
   // Legacy (deprecated)
   isTrustedToken,
   getAcceptedTokensList,
