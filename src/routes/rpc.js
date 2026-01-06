@@ -155,6 +155,96 @@ router.post('/', async (req, res) => {
   }
 });
 
+// =============================================================================
+// JUPITER API PROXY
+// =============================================================================
+// Jupiter now requires API key for all endpoints.
+// We proxy through GASdf to keep the API key server-side.
+// =============================================================================
+
+/**
+ * GET /v1/rpc/jupiter/quote
+ * Proxy Jupiter quote requests
+ */
+router.get('/jupiter/quote', async (req, res) => {
+  try {
+    // Forward all query params to Jupiter
+    const queryString = new URLSearchParams(req.query).toString();
+    const jupiterUrl = `https://api.jup.ag/quote?${queryString}`;
+
+    logger.debug('JUPITER_PROXY', 'Quote request', {
+      inputMint: req.query.inputMint?.slice(0, 8),
+      outputMint: req.query.outputMint?.slice(0, 8),
+      amount: req.query.amount,
+    });
+
+    const response = await fetch(jupiterUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        // Jupiter API key if configured
+        ...(config.JUPITER_API_KEY && { 'x-api-key': config.JUPITER_API_KEY }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('JUPITER_PROXY', 'Quote failed', {
+        status: response.status,
+        error: errorText.slice(0, 200),
+      });
+      return res.status(response.status).json({
+        error: 'Jupiter quote failed',
+        details: errorText.slice(0, 200),
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    logger.error('JUPITER_PROXY', 'Quote proxy error', { error: error.message });
+    res.status(500).json({ error: 'Jupiter proxy error', details: error.message });
+  }
+});
+
+/**
+ * POST /v1/rpc/jupiter/swap
+ * Proxy Jupiter swap transaction requests
+ */
+router.post('/jupiter/swap', async (req, res) => {
+  try {
+    logger.debug('JUPITER_PROXY', 'Swap request', {
+      userPublicKey: req.body.userPublicKey?.slice(0, 8),
+    });
+
+    const response = await fetch('https://api.jup.ag/swap', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(config.JUPITER_API_KEY && { 'x-api-key': config.JUPITER_API_KEY }),
+      },
+      body: JSON.stringify(req.body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('JUPITER_PROXY', 'Swap failed', {
+        status: response.status,
+        error: errorText.slice(0, 200),
+      });
+      return res.status(response.status).json({
+        error: 'Jupiter swap failed',
+        details: errorText.slice(0, 200),
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    logger.error('JUPITER_PROXY', 'Swap proxy error', { error: error.message });
+    res.status(500).json({ error: 'Jupiter proxy error', details: error.message });
+  }
+});
+
 /**
  * Health check for RPC proxy
  */

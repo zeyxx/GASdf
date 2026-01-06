@@ -8,8 +8,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
-  <!-- Solana Web3.js for gasless swap transactions -->
-  <script src="https://unpkg.com/@solana/web3.js@1.95.8/lib/index.iife.min.js"></script>
+  <!-- Solana Web3.js for gasless swap transactions (jsdelivr allowed by CSP) -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.95.8/lib/index.iife.min.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -4729,8 +4729,8 @@
       const amountInSmallestUnits = Math.floor(parseFloat(amount) * Math.pow(10, decimals));
 
       try {
-        // Fetch Jupiter quote
-        const jupiterUrl = `https://api.jup.ag/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50`;
+        // Fetch Jupiter quote via GASdf proxy (Jupiter requires API key now)
+        const jupiterUrl = `/v1/rpc/jupiter/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50`;
         const jupiterRes = await fetch(jupiterUrl);
 
         if (!jupiterRes.ok) {
@@ -4881,9 +4881,9 @@
         const paymentMint = gasTokenMint === 'same' ? inputTokenMint : gasTokenMint;
         const isNativeSOL = paymentMint === 'So11111111111111111111111111111111111111112';
 
-        // Get swap transaction from Jupiter as LEGACY (easier to modify)
+        // Get swap transaction from Jupiter via GASdf proxy (API key required)
         console.log('[Swap] Requesting Jupiter swap with feePayer:', currentGasdfQuote.feePayer);
-        const swapRes = await fetch('https://api.jup.ag/swap', {
+        const swapRes = await fetch('/v1/rpc/jupiter/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
