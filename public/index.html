@@ -1981,6 +1981,17 @@
       color: var(--white-30);
     }
 
+    .swap-error {
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin: 8px 0;
+      color: #ff6b6b;
+      font-size: 13px;
+      text-align: center;
+    }
+
     .swap-quick-amounts {
       display: flex;
       gap: 6px;
@@ -2751,6 +2762,9 @@
                   <span class="swap-usd-value" id="swap-output-usd">≈ $0.00</span>
                 </div>
               </div>
+
+              <!-- Swap Error Message -->
+              <div id="swapError" class="swap-error" style="display: none;"></div>
 
               <!-- Gas Payment Section -->
               <div class="swap-gas-section">
@@ -4707,16 +4721,48 @@
       }
     }
 
+    // Show swap error message
+    function showSwapError(message) {
+      swapOutputAmount.value = '';
+      swapOutputAmount.placeholder = '0';
+      currentJupiterQuote = null;
+      currentGasdfQuote = null;
+      swapDetails.style.display = 'none';
+      updateSwapButton();
+
+      // Show error in a toast or inline
+      const errorEl = document.getElementById('swapError');
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        setTimeout(() => { errorEl.style.display = 'none'; }, 5000);
+      } else {
+        // Fallback: show in output field placeholder
+        swapOutputAmount.placeholder = message;
+      }
+    }
+
     // Fetch Jupiter quote
     async function fetchSwapQuote() {
       const amount = swapInputAmount?.value;
+
+      // Hide any previous error
+      const errorEl = document.getElementById('swapError');
+      if (errorEl) errorEl.style.display = 'none';
 
       if (!inputTokenMint || !outputTokenMint || !amount || parseFloat(amount) <= 0) {
         currentJupiterQuote = null;
         currentGasdfQuote = null;
         swapOutputAmount.value = '';
+        swapOutputAmount.placeholder = '0';
         swapDetails.style.display = 'none';
         updateSwapButton();
+        return;
+      }
+
+      // Check for same token swap
+      if (inputTokenMint === outputTokenMint) {
+        showSwapError('Cannot swap to same token');
         return;
       }
 
@@ -4735,7 +4781,18 @@
         const jupiterRes = await fetch(jupiterUrl);
 
         if (!jupiterRes.ok) {
-          throw new Error('Jupiter quote failed');
+          const errorData = await jupiterRes.json().catch(() => ({}));
+          const errorMsg = errorData.details || errorData.error || errorData.message || 'Quote failed';
+
+          // Parse common Jupiter errors
+          if (errorMsg.includes('Route not found') || errorMsg.includes('No route')) {
+            throw new Error('NO_ROUTE');
+          } else if (errorMsg.includes('Amount too small') || errorMsg.includes('minimum')) {
+            throw new Error('AMOUNT_TOO_SMALL');
+          } else if (errorMsg.includes('liquidity')) {
+            throw new Error('INSUFFICIENT_LIQUIDITY');
+          }
+          throw new Error(errorMsg);
         }
 
         currentJupiterQuote = await jupiterRes.json();
@@ -4768,10 +4825,15 @@
 
       } catch (err) {
         console.error('[Swap] Quote error:', err);
-        currentJupiterQuote = null;
-        swapOutputAmount.value = '';
-        swapDetails.style.display = 'none';
-        updateSwapButton();
+
+        // Map error codes to user-friendly messages
+        const errorMessages = {
+          'NO_ROUTE': 'No swap route available',
+          'AMOUNT_TOO_SMALL': 'Amount too small',
+          'INSUFFICIENT_LIQUIDITY': 'Insufficient liquidity',
+        };
+        const userMessage = errorMessages[err.message] || 'Quote unavailable';
+        showSwapError(userMessage);
       }
     }
 
