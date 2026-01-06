@@ -1,13 +1,18 @@
-# HolDex I-Score Integration Specification
+# HolDex Unified Score Integration Specification
 
 ## Overview
 
-This document specifies the **Infrastructure Score (I-Score)** system for HolDex, enabling proper scoring of infrastructure tokens (stablecoins, LSTs, wrapped assets) that don't fit the traditional K-Score conviction model.
+This document specifies the **Unified Score** system for HolDex, combining:
+- **K-Score** (conviction) for community tokens
+- **I-Score** (infrastructure) for stablecoins, LSTs, wrapped assets
+- **A-Score** (alignment) for ecosystem contribution
+
+> **See also:** [UNIFIED_SCORE_PHILOSOPHY.md](./UNIFIED_SCORE_PHILOSOPHY.md) for the complete incentive alignment framework.
 
 **Author:** GASdf Team
 **Target:** HolDex API
-**Status:** Proposal
-**Date:** 2026-01-05
+**Status:** Proposal v2
+**Date:** 2026-01-06
 
 ---
 

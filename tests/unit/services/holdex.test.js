@@ -13,6 +13,18 @@ jest.mock('../../../src/utils/logger', () => ({
   debug: jest.fn(),
 }));
 
+// Mock Redis for L2 cache (holdex now uses Redis as shared cache)
+jest.mock('../../../src/utils/redis', () => ({
+  getCachedHoldexToken: jest.fn().mockResolvedValue(null), // No L2 cache hit by default
+  cacheHoldexToken: jest.fn().mockResolvedValue(true),
+  clearHoldexCache: jest.fn().mockResolvedValue(undefined),
+  getHoldexCacheStats: jest.fn().mockReturnValue({
+    ttlSeconds: 300,
+    errorTtlSeconds: 30,
+    prefix: 'gasdf:holdex:token:',
+  }),
+}));
+
 describe('HolDex Service', () => {
   let holdex;
   let config;
@@ -29,8 +41,9 @@ describe('HolDex Service', () => {
     logger = require('../../../src/utils/logger');
     holdex = require('../../../src/services/holdex');
 
-    // Clear cache before each test
-    holdex.clearCache();
+    // Clear cache before each test (async since it clears Redis too)
+    // Note: In tests, the Redis mock is sync, so this won't cause issues
+    holdex.clearCache().catch(() => {}); // Fire-and-forget in tests
   });
 
   afterEach(() => {
@@ -441,22 +454,22 @@ describe('HolDex Service', () => {
       await holdex.getToken(testMint);
       expect(global.fetch).toHaveBeenCalledTimes(1);
 
-      // Clear cache
-      holdex.clearCache();
+      // Clear cache (now async - clears memory + Redis)
+      await holdex.clearCache();
 
       // Should fetch again
       await holdex.getToken(testMint);
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should log cache clear', () => {
-      holdex.clearCache();
-      expect(logger.info).toHaveBeenCalledWith('HOLDEX', 'Cache cleared');
+    it('should log cache clear', async () => {
+      await holdex.clearCache();
+      expect(logger.info).toHaveBeenCalledWith('HOLDEX', 'Cache cleared (memory + Redis)');
     });
   });
 
   describe('getCacheStats()', () => {
-    it('should return cache statistics', async () => {
+    it('should return cache statistics (L1 memory + L2 Redis)', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ tier: 'Gold', kScore: 70 }),
@@ -467,17 +480,26 @@ describe('HolDex Service', () => {
 
       const stats = holdex.getCacheStats();
 
-      expect(stats.totalEntries).toBe(2);
-      expect(stats.validEntries).toBe(2);
-      expect(stats.expiredEntries).toBe(0);
+      // L1 (memory) stats
+      expect(stats.l1.totalEntries).toBe(2);
+      expect(stats.l1.validEntries).toBe(2);
+      expect(stats.l1.expiredEntries).toBe(0);
+
+      // L2 (Redis) stats structure
+      expect(stats.l2).toBeDefined();
+      expect(stats.l2.ttlSeconds).toBe(300);
     });
 
     it('should return empty stats for empty cache', () => {
       const stats = holdex.getCacheStats();
 
-      expect(stats.totalEntries).toBe(0);
-      expect(stats.validEntries).toBe(0);
-      expect(stats.expiredEntries).toBe(0);
+      // L1 (memory) stats
+      expect(stats.l1.totalEntries).toBe(0);
+      expect(stats.l1.validEntries).toBe(0);
+      expect(stats.l1.expiredEntries).toBe(0);
+
+      // L2 (Redis) stats structure
+      expect(stats.l2).toBeDefined();
     });
   });
 

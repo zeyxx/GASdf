@@ -72,8 +72,92 @@ const HOLDER_TIERS = {
 // Maximum discount (prevents negative fees)
 const MAX_DISCOUNT = 0.95;
 
-// API configuration
-const HOLDEX_HARMONY_TIMEOUT = parseInt(process.env.HOLDEX_TIMEOUT) || 10000;
+// API configuration - use config as single source of truth
+const HOLDEX_HARMONY_TIMEOUT = config.HOLDEX_TIMEOUT;
+
+// =============================================================================
+// Circuit Breaker - Prevent cascading failures when HolDex is unavailable
+// =============================================================================
+const CIRCUIT_BREAKER = {
+  state: 'closed', // 'closed' | 'open' | 'half-open'
+  failures: 0,
+  lastFailure: 0,
+  successesInHalfOpen: 0,
+
+  // Configuration (Golden Ratio inspired)
+  failureThreshold: 5, // Open after 5 consecutive failures
+  cooldownMs: 30000, // 30 seconds before half-open
+  halfOpenSuccessThreshold: 2, // Need 2 successes to close
+
+  /**
+   * Check if request should be allowed
+   */
+  canRequest() {
+    if (this.state === 'closed') return true;
+
+    if (this.state === 'open') {
+      // Check if cooldown has passed
+      if (Date.now() - this.lastFailure >= this.cooldownMs) {
+        this.state = 'half-open';
+        this.successesInHalfOpen = 0;
+        logger.info('CIRCUIT_BREAKER', 'Half-open: testing HolDex connection');
+        return true;
+      }
+      return false;
+    }
+
+    // half-open: allow limited requests
+    return true;
+  },
+
+  /**
+   * Record a successful request
+   */
+  recordSuccess() {
+    if (this.state === 'half-open') {
+      this.successesInHalfOpen++;
+      if (this.successesInHalfOpen >= this.halfOpenSuccessThreshold) {
+        this.state = 'closed';
+        this.failures = 0;
+        logger.info('CIRCUIT_BREAKER', 'Closed: HolDex connection restored');
+      }
+    } else {
+      this.failures = 0;
+    }
+  },
+
+  /**
+   * Record a failed request
+   */
+  recordFailure() {
+    this.failures++;
+    this.lastFailure = Date.now();
+
+    if (this.state === 'half-open') {
+      this.state = 'open';
+      logger.warn('CIRCUIT_BREAKER', 'Re-opened: HolDex still unavailable');
+    } else if (this.failures >= this.failureThreshold) {
+      this.state = 'open';
+      logger.warn('CIRCUIT_BREAKER', 'Opened: HolDex unavailable', {
+        failures: this.failures,
+        cooldownMs: this.cooldownMs,
+      });
+    }
+  },
+
+  /**
+   * Get current state for monitoring
+   */
+  getState() {
+    return {
+      state: this.state,
+      failures: this.failures,
+      lastFailure: this.lastFailure,
+      cooldownRemaining:
+        this.state === 'open' ? Math.max(0, this.cooldownMs - (Date.now() - this.lastFailure)) : 0,
+    };
+  },
+};
 
 // Cache for E-scores
 const escoreCache = new Map();
@@ -152,16 +236,30 @@ function eScoreToDiscount(eScore) {
  * @returns {Promise<{eScore: number, tier: Object, discount: number, benefits: Object, cached: boolean}>}
  */
 async function getEScore(userPubkey) {
-  // Check cache
+  // Check cache first (bypass circuit breaker if cached)
   const cached = escoreCache.get(userPubkey);
   if (cached && Date.now() - cached.timestamp < ESCORE_CACHE_TTL) {
     return { ...cached.data, cached: true };
   }
 
-  const holdexUrl = process.env.HOLDEX_API_URL || config.HOLDEX_URL;
+  // Use config.HOLDEX_URL (single source of truth)
+  const holdexUrl = config.HOLDEX_URL;
   if (!holdexUrl) {
-    logger.debug('HARMONY', 'HOLDEX_API_URL not configured, returning 0');
+    logger.debug('HARMONY', 'HOLDEX_URL not configured, returning 0');
     return { eScore: 0, tier: null, discount: 0, benefits: null, cached: false };
+  }
+
+  // Circuit breaker check - prevent cascading failures
+  if (!CIRCUIT_BREAKER.canRequest()) {
+    logger.debug('HARMONY', 'Circuit breaker open, returning default score');
+    return {
+      eScore: 0,
+      tier: { name: 'Observer', icon: '👁️' },
+      discount: 0,
+      benefits: null,
+      cached: false,
+      circuitBreakerOpen: true,
+    };
   }
 
   try {
@@ -182,7 +280,8 @@ async function getEScore(userPubkey) {
 
     if (!res.ok) {
       if (res.status === 404) {
-        // User not found = new user, score 0
+        // User not found = new user, score 0 (this is success, not failure)
+        CIRCUIT_BREAKER.recordSuccess();
         const result = {
           eScore: 0,
           tier: { name: 'Observer', icon: '👁️' },
@@ -196,6 +295,7 @@ async function getEScore(userPubkey) {
     }
 
     const data = await res.json();
+    CIRCUIT_BREAKER.recordSuccess();
 
     // Map HolDex response format to GASdf format
     const eScore = data.e_score ?? 0;
@@ -217,9 +317,11 @@ async function getEScore(userPubkey) {
 
     return { ...result, cached: false };
   } catch (error) {
+    CIRCUIT_BREAKER.recordFailure();
     logger.warn('HARMONY', 'E-Score fetch failed', {
       user: userPubkey.slice(0, 8),
       error: error.message,
+      circuitBreaker: CIRCUIT_BREAKER.getState().state,
     });
 
     return {
@@ -290,9 +392,15 @@ async function getDiscount(userPubkey, holdings = 0, totalSupply = 0) {
  * @returns {Promise<{discount: number, cached: boolean}>}
  */
 async function getOperationDiscount(userPubkey, operation = 'gasdf_fee') {
-  const holdexUrl = process.env.HOLDEX_API_URL || config.HOLDEX_URL;
+  // Use config.HOLDEX_URL (single source of truth)
+  const holdexUrl = config.HOLDEX_URL;
   if (!holdexUrl) {
-    return { discount: 0, cached: false, error: 'HOLDEX_API_URL not configured' };
+    return { discount: 0, cached: false, error: 'HOLDEX_URL not configured' };
+  }
+
+  // Circuit breaker check
+  if (!CIRCUIT_BREAKER.canRequest()) {
+    return { discount: 0, cached: false, circuitBreakerOpen: true };
   }
 
   try {
@@ -312,12 +420,14 @@ async function getOperationDiscount(userPubkey, operation = 'gasdf_fee') {
 
     if (!res.ok) {
       if (res.status === 404) {
+        CIRCUIT_BREAKER.recordSuccess();
         return { discount: 0, cached: false };
       }
       throw new Error(`Oracle discount API returned ${res.status}`);
     }
 
     const data = await res.json();
+    CIRCUIT_BREAKER.recordSuccess();
 
     logger.debug('HARMONY', 'Operation discount fetched', {
       user: userPubkey.slice(0, 8),
@@ -327,6 +437,7 @@ async function getOperationDiscount(userPubkey, operation = 'gasdf_fee') {
 
     return { discount: data.discount ?? 0, cached: false };
   } catch (error) {
+    CIRCUIT_BREAKER.recordFailure();
     logger.warn('HARMONY', 'Operation discount fetch failed', {
       user: userPubkey.slice(0, 8),
       operation,
@@ -373,12 +484,13 @@ function verifyHmacSignature(payload, signature, secret) {
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 async function notifyBurn(burnData) {
-  const holdexUrl = process.env.HOLDEX_API_URL || config.HOLDEX_URL;
-  const webhookSecret = process.env.HOLDEX_WEBHOOK_SECRET;
+  // Use config (single source of truth)
+  const holdexUrl = config.HOLDEX_URL;
+  const webhookSecret = config.HOLDEX_WEBHOOK_SECRET;
 
   if (!holdexUrl) {
-    logger.debug('HARMONY', 'HOLDEX_API_URL not configured, skipping burn notification');
-    return { success: false, error: 'HOLDEX_API_URL not configured' };
+    logger.debug('HARMONY', 'HOLDEX_URL not configured, skipping burn notification');
+    return { success: false, error: 'HOLDEX_URL not configured' };
   }
 
   if (!webhookSecret) {
@@ -404,13 +516,19 @@ async function notifyBurn(burnData) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), HOLDEX_HARMONY_TIMEOUT);
 
+    // Build headers with optional API key
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': hmacSignature,
+      'X-Webhook-Source': 'gasdf',
+    };
+    if (config.HOLDEX_API_KEY) {
+      headers['x-api-key'] = config.HOLDEX_API_KEY;
+    }
+
     const res = await fetch(`${holdexUrl}/harmony/webhook/burn`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Webhook-Signature': hmacSignature,
-        'X-Webhook-Source': 'gasdf',
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -485,9 +603,10 @@ module.exports = {
   createHmacSignature,
   verifyHmacSignature,
 
-  // Cache
+  // Cache & Circuit Breaker (monitoring)
   clearCache,
   getCacheStats,
+  getCircuitBreakerState: () => CIRCUIT_BREAKER.getState(),
 
   // Constants
   PHI,

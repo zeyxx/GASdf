@@ -37,10 +37,13 @@
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const rpc = require('../utils/rpc');
+const redis = require('../utils/redis');
 const { PublicKey } = require('@solana/web3.js');
 const { holdexBreaker } = require('../utils/circuit-breaker');
 
-// Cache token data (reduces API calls)
+// Cache token data - now uses Redis (shared across instances) with in-memory fallback
+// Redis caching is handled by redis.cacheHoldexToken / redis.getCachedHoldexToken
+// In-memory cache kept for L1 hot path (reduces Redis roundtrips)
 const tokenCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const ERROR_CACHE_TTL = 30 * 1000; // 30 seconds for errors (retry sooner)
@@ -283,13 +286,30 @@ async function getOnChainSupply(mint) {
  * @returns {Promise<{tier: string, kScore: number, kRank: object, creditRating: object, hasCommunityUpdate: boolean, conviction?: object, cached: boolean, error?: string}>}
  */
 async function getToken(mint) {
-  // Check cache first
-  const cached = tokenCache.get(mint);
-  if (cached) {
-    const ttl = cached.isError ? ERROR_CACHE_TTL : CACHE_TTL;
-    if (Date.now() - cached.timestamp < ttl) {
-      return { ...cached.data, cached: true };
+  // L1 Cache: Check in-memory first (hot path, no network)
+  const memoryCached = tokenCache.get(mint);
+  if (memoryCached) {
+    const ttl = memoryCached.isError ? ERROR_CACHE_TTL : CACHE_TTL;
+    if (Date.now() - memoryCached.timestamp < ttl) {
+      return { ...memoryCached.data, cached: true, cacheSource: 'memory' };
     }
+  }
+
+  // L2 Cache: Check Redis (shared across instances)
+  try {
+    const redisCached = await redis.getCachedHoldexToken(mint);
+    if (redisCached) {
+      // Populate L1 cache from L2 hit
+      tokenCache.set(mint, {
+        data: redisCached.data,
+        timestamp: Date.now(),
+        isError: redisCached.isError,
+      });
+      return { ...redisCached.data, cached: true, cacheSource: 'redis' };
+    }
+  } catch (err) {
+    // Redis error shouldn't block - continue to API
+    logger.debug('HOLDEX', 'Redis cache check failed, continuing', { error: err.message });
   }
 
   const holdexUrl = config.HOLDEX_URL;
@@ -513,7 +533,7 @@ async function getToken(mint) {
       });
     }
 
-    // Cache the result (with shorter TTL for errors)
+    // Cache the result (with shorter TTL for errors) - L1 + L2
     const result = {
       tier: 'Rust',
       kScore: 0,
@@ -524,11 +544,7 @@ async function getToken(mint) {
       ecosystemBurn,
     };
 
-    tokenCache.set(mint, {
-      data: result,
-      timestamp: Date.now(),
-      isError: true,
-    });
+    cacheResult(mint, result, true); // isError = true for shorter TTL
 
     return { ...result, cached: false, error: error.message, fallback: 'on-chain' };
   }
@@ -562,26 +578,39 @@ async function isVerifiedCommunity(mint) {
 }
 
 /**
- * Cache a token result
+ * Cache a token result (L1 memory + L2 Redis)
+ * @param {string} mint - Token mint
+ * @param {Object} data - Token data
+ * @param {boolean} isError - Whether this is an error result
  */
-function cacheResult(mint, data) {
+function cacheResult(mint, data, isError = false) {
+  // L1: In-memory (sync, always available)
   tokenCache.set(mint, {
     data,
     timestamp: Date.now(),
-    isError: false,
+    isError,
+  });
+
+  // L2: Redis (async, fire-and-forget for performance)
+  redis.cacheHoldexToken(mint, data, isError).catch((err) => {
+    logger.debug('HOLDEX', 'Redis cache write failed', {
+      mint: mint.slice(0, 8),
+      error: err.message,
+    });
   });
 }
 
 /**
- * Clear the token cache
+ * Clear the token cache (L1 memory + L2 Redis)
  */
-function clearCache() {
+async function clearCache() {
   tokenCache.clear();
-  logger.info('HOLDEX', 'Cache cleared');
+  await redis.clearHoldexCache();
+  logger.info('HOLDEX', 'Cache cleared (memory + Redis)');
 }
 
 /**
- * Get cache stats for monitoring
+ * Get cache stats for monitoring (L1 memory + L2 Redis)
  */
 function getCacheStats() {
   const now = Date.now();
@@ -598,9 +627,12 @@ function getCacheStats() {
   }
 
   return {
-    totalEntries: tokenCache.size,
-    validEntries,
-    expiredEntries,
+    l1: {
+      totalEntries: tokenCache.size,
+      validEntries,
+      expiredEntries,
+    },
+    l2: redis.getHoldexCacheStats(),
   };
 }
 

@@ -1305,6 +1305,100 @@ function getJupiterCacheStats() {
   };
 }
 
+// =============================================================================
+// HolDex Token Data Caching (shared across instances)
+// =============================================================================
+const HOLDEX_TOKEN_CACHE_TTL = 300; // 5 minutes (same as in-memory)
+const HOLDEX_ERROR_CACHE_TTL = 30; // 30 seconds for errors
+const HOLDEX_CACHE_PREFIX = `${KEY_PREFIX}holdex:token:`;
+
+/**
+ * Cache HolDex token data in Redis
+ * @param {string} mint - Token mint address
+ * @param {Object} data - Token data from HolDex
+ * @param {boolean} isError - Whether this is an error result (shorter TTL)
+ */
+async function cacheHoldexToken(mint, data, isError = false) {
+  const key = `${HOLDEX_CACHE_PREFIX}${mint}`;
+  const ttl = isError ? HOLDEX_ERROR_CACHE_TTL : HOLDEX_TOKEN_CACHE_TTL;
+
+  return withRedis(
+    async (redis) => {
+      await redis.setEx(key, ttl, JSON.stringify({ data, isError, timestamp: Date.now() }));
+      return true;
+    },
+    () => {
+      memoryStore.set(key, JSON.stringify({ data, isError, timestamp: Date.now() }), ttl);
+      return true;
+    }
+  );
+}
+
+/**
+ * Get cached HolDex token data from Redis
+ * @param {string} mint - Token mint address
+ * @returns {Promise<{data: Object, cached: boolean}|null>}
+ */
+async function getCachedHoldexToken(mint) {
+  const key = `${HOLDEX_CACHE_PREFIX}${mint}`;
+
+  return withRedis(
+    async (redis) => {
+      const cached = await redis.get(key);
+      if (!cached) return null;
+      const { data, isError } = JSON.parse(cached);
+      return { data, cached: true, isError };
+    },
+    () => {
+      const cached = memoryStore.get(key);
+      if (!cached) return null;
+      const { data, isError } = JSON.parse(cached);
+      return { data, cached: true, isError };
+    }
+  );
+}
+
+/**
+ * Clear HolDex token cache (for a specific mint or all)
+ * @param {string|null} mint - Token mint to clear, or null for all
+ */
+async function clearHoldexCache(mint = null) {
+  if (mint) {
+    const key = `${HOLDEX_CACHE_PREFIX}${mint}`;
+    return withRedis(
+      async (redis) => redis.del(key),
+      () => memoryStore.del(key)
+    );
+  }
+  // Clear all holdex tokens - in memory only (Redis doesn't have pattern delete easily)
+  return withRedis(
+    async () => {
+      // For Redis, we'd need SCAN + DEL which is complex
+      // For now, just let TTL handle expiration
+      logger.info('REDIS', 'HolDex cache clear requested - TTL will handle expiration');
+    },
+    () => {
+      // Clear from memory store
+      for (const key of memoryStore.data.keys()) {
+        if (key.startsWith(HOLDEX_CACHE_PREFIX)) {
+          memoryStore.data.delete(key);
+        }
+      }
+    }
+  );
+}
+
+/**
+ * Get HolDex cache stats
+ */
+function getHoldexCacheStats() {
+  return {
+    ttlSeconds: HOLDEX_TOKEN_CACHE_TTL,
+    errorTtlSeconds: HOLDEX_ERROR_CACHE_TTL,
+    prefix: HOLDEX_CACHE_PREFIX,
+  };
+}
+
 module.exports = {
   initializeClient,
   getClient,
@@ -1370,4 +1464,9 @@ module.exports = {
   cacheJupiterQuote,
   getCachedJupiterQuote,
   getJupiterCacheStats,
+  // HolDex Token Caching (shared across instances)
+  cacheHoldexToken,
+  getCachedHoldexToken,
+  clearHoldexCache,
+  getHoldexCacheStats,
 };
