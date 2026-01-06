@@ -8,6 +8,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Solana Web3.js for gasless swap transactions -->
+  <script src="https://unpkg.com/@solana/web3.js@1.95.8/lib/index.iife.min.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -4647,11 +4649,30 @@
         fetchSwapQuote();
       });
 
-      // Quick amount buttons
+      // Quick amount buttons - set percentage of wallet balance
       quickAmountBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-          // TODO: Get balance and set percentage
-          console.log('[Swap] Quick amount:', btn.dataset.percent + '%');
+          const percent = parseInt(btn.dataset.percent, 10);
+          const inputToken = tokenMap[inputTokenMint];
+
+          // Get balance from cached wallet tokens
+          let balance = 0;
+          if (inputToken?.balance) {
+            balance = inputToken.balance;
+          } else if (inputToken?.balanceFormatted) {
+            // Parse from formatted string
+            const match = inputToken.balanceFormatted.match(/[\d.]+/);
+            if (match) balance = parseFloat(match[0]);
+          }
+
+          if (balance > 0) {
+            const amount = (balance * percent / 100).toFixed(inputToken?.decimals > 4 ? 4 : inputToken?.decimals || 6);
+            swapInputAmount.value = amount;
+            fetchSwapQuote();
+            console.log('[Swap] Quick amount:', percent + '% =', amount, inputToken?.symbol);
+          } else {
+            console.log('[Swap] No balance for', inputToken?.symbol);
+          }
         });
       });
 
@@ -4819,7 +4840,7 @@
       }
     }
 
-    // Execute the gasless swap
+    // Execute the gasless swap - Complete implementation
     async function executeGaslessSwap() {
       if (!connectedAddress || !currentJupiterQuote) {
         swapStatus.textContent = 'Please connect wallet and get quote first';
@@ -4840,6 +4861,13 @@
         return;
       }
 
+      // Ensure Solana web3 is available
+      if (typeof solanaWeb3 === 'undefined') {
+        swapStatus.textContent = 'Solana library not loaded';
+        swapStatus.className = 'swap-status error';
+        return;
+      }
+
       swapBtn.disabled = true;
       const btnText = swapBtn.querySelector('.btn-text');
       btnText.textContent = 'Building transaction...';
@@ -4847,7 +4875,14 @@
       swapStatus.className = 'swap-status';
 
       try {
-        // Get swap transaction from Jupiter
+        const { PublicKey, Transaction, VersionedTransaction, TransactionMessage, SystemProgram } = solanaWeb3;
+
+        // Determine gas payment token
+        const paymentMint = gasTokenMint === 'same' ? inputTokenMint : gasTokenMint;
+        const isNativeSOL = paymentMint === 'So11111111111111111111111111111111111111112';
+
+        // Get swap transaction from Jupiter as LEGACY (easier to modify)
+        console.log('[Swap] Requesting Jupiter swap with feePayer:', currentGasdfQuote.feePayer);
         const swapRes = await fetch('https://api.jup.ag/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -4855,6 +4890,10 @@
             quoteResponse: currentJupiterQuote,
             userPublicKey: connectedAddress,
             wrapAndUnwrapSol: true,
+            // Request legacy transaction (easier to add instructions)
+            asLegacyTransaction: true,
+            dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: 'auto',
           }),
         });
 
@@ -4864,19 +4903,103 @@
         }
 
         const swapData = await swapRes.json();
-        console.log('[Swap] Jupiter swap response:', swapData);
+        console.log('[Swap] Jupiter swap response received');
 
-        btnText.textContent = 'Signing transaction...';
+        btnText.textContent = 'Adding GASdf fee payment...';
 
-        // Decode and sign the transaction
-        const txBuffer = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
+        // Decode the Jupiter transaction (prefer legacy, fallback to versioned)
+        const swapTxBuffer = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
+        let swapTx;
+        let isVersioned = false;
 
-        // Sign with wallet
-        const signedTx = await provider.signTransaction({
-          serialize: () => txBuffer,
-        });
+        try {
+          swapTx = Transaction.from(swapTxBuffer);
+          console.log('[Swap] Parsed legacy transaction with', swapTx.instructions.length, 'instructions');
+        } catch (e) {
+          // Jupiter might return versioned tx even with asLegacyTransaction=true for complex routes
+          console.log('[Swap] Legacy parse failed, trying VersionedTransaction:', e.message);
+          swapTx = VersionedTransaction.deserialize(swapTxBuffer);
+          isVersioned = true;
+          console.log('[Swap] Parsed VersionedTransaction');
+        }
+
+        // For versioned transactions, we cannot easily add instructions
+        // Show user-friendly error and suggest simpler swap
+        if (isVersioned) {
+          throw new Error('This swap route requires advanced features. Try a smaller amount or different token pair.');
+        }
+
+        // Build the fee payment instruction
+        const userPubkey = new PublicKey(connectedAddress);
+        const feePayerPubkey = new PublicKey(currentGasdfQuote.feePayer);
+        const feeAmount = BigInt(currentGasdfQuote.feeAmount);
+
+        let feeInstruction;
+        if (isNativeSOL) {
+          // Native SOL transfer to treasury
+          const treasuryPubkey = new PublicKey(currentGasdfQuote.treasury.address);
+          feeInstruction = SystemProgram.transfer({
+            fromPubkey: userPubkey,
+            toPubkey: treasuryPubkey,
+            lamports: feeAmount,
+          });
+          console.log('[Swap] Created SOL fee payment:', feeAmount.toString(), 'lamports');
+        } else {
+          // SPL Token transfer to treasury ATA
+          const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+          const treasuryAta = new PublicKey(currentGasdfQuote.treasury.ata);
+          const paymentTokenMint = new PublicKey(paymentMint);
+
+          // Get user's ATA for the payment token
+          const userAta = await getAssociatedTokenAddress(userPubkey, paymentTokenMint);
+
+          // Create SPL Token transfer instruction
+          feeInstruction = createTransferInstruction(
+            userAta,
+            treasuryAta,
+            userPubkey,
+            feeAmount,
+            TOKEN_PROGRAM_ID
+          );
+          console.log('[Swap] Created SPL fee payment:', feeAmount.toString(), 'tokens to', treasuryAta.toString().slice(0, 8));
+        }
+
+        // Modify the transaction
+        // 1. Set GASdf as fee payer (they pay SOL transaction fee)
+        swapTx.feePayer = feePayerPubkey;
+
+        // 2. Prepend fee payment instruction (user pays GASdf in tokens)
+        swapTx.instructions.unshift(feeInstruction);
+
+        console.log('[Swap] Final transaction:', swapTx.instructions.length, 'instructions, feePayer:', feePayerPubkey.toString().slice(0, 8));
+
+        const finalTx = swapTx;
+
+        btnText.textContent = 'Getting fresh blockhash...';
+
+        // Get a fresh blockhash via GASdf RPC proxy (no API key in frontend)
+        const rpcUrl = window.location.origin + '/v1/rpc';
+        const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        finalTx.recentBlockhash = blockhash;
+        finalTx.lastValidBlockHeight = lastValidBlockHeight;
+
+        console.log('[Swap] Fresh blockhash:', blockhash.slice(0, 12) + '...');
+
+        btnText.textContent = 'Signing with wallet...';
+
+        // Sign with user's wallet
+        console.log('[Swap] Requesting wallet signature');
+        const signedTx = await provider.signTransaction(finalTx);
 
         btnText.textContent = 'Submitting to GASdf...';
+
+        // Serialize the signed transaction (allow missing fee payer signature)
+        const serialized = signedTx.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const signedTxBase64 = btoa(String.fromCharCode(...serialized));
+
+        console.log('[Swap] Serialized tx size:', serialized.length, 'bytes');
+        console.log('[Swap] Submitting to GASdf with quoteId:', currentGasdfQuote.quoteId);
 
         // Submit to GASdf for co-signing and broadcast
         const submitRes = await fetch('/v1/submit', {
@@ -4884,7 +5007,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quoteId: currentGasdfQuote.quoteId,
-            transaction: swapData.swapTransaction,
+            transaction: signedTxBase64,
             userPubkey: connectedAddress,
           }),
         });
@@ -4892,7 +5015,7 @@
         const result = await submitRes.json();
 
         if (!submitRes.ok) {
-          throw new Error(result.error || 'GASdf submission failed');
+          throw new Error(result.error || result.details || 'GASdf submission failed');
         }
 
         console.log('[Swap] Gasless swap success:', result);
@@ -4906,13 +5029,59 @@
         currentGasdfQuote = null;
         swapDetails.style.display = 'none';
 
+        // Refresh wallet tokens after swap
+        if (connectedAddress) {
+          setTimeout(() => fetchWalletTokens(connectedAddress), 3000);
+        }
+
       } catch (err) {
         console.error('[Swap] Error:', err);
-        swapStatus.textContent = err.message;
+        swapStatus.textContent = err.message || 'Swap failed';
         swapStatus.className = 'swap-status error';
       } finally {
         updateSwapButton();
       }
+    }
+
+    // Helper: Get Associated Token Address
+    async function getAssociatedTokenAddress(owner, mint) {
+      const { PublicKey } = solanaWeb3;
+      const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+      const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
+      const [address] = await PublicKey.findProgramAddress(
+        [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+      return address;
+    }
+
+    // Helper: Create SPL Token Transfer Instruction
+    function createTransferInstruction(source, destination, owner, amount, programId) {
+      const { PublicKey, TransactionInstruction } = solanaWeb3;
+      const dataLayout = {
+        encode: (amount) => {
+          const buffer = new ArrayBuffer(9);
+          const view = new DataView(buffer);
+          view.setUint8(0, 3); // Transfer instruction index
+          // Write amount as little-endian uint64
+          const low = Number(amount & BigInt(0xFFFFFFFF));
+          const high = Number((amount >> BigInt(32)) & BigInt(0xFFFFFFFF));
+          view.setUint32(1, low, true);
+          view.setUint32(5, high, true);
+          return new Uint8Array(buffer);
+        }
+      };
+
+      return new TransactionInstruction({
+        keys: [
+          { pubkey: source, isSigner: false, isWritable: true },
+          { pubkey: destination, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false },
+        ],
+        programId,
+        data: dataLayout.encode(amount),
+      });
     }
 
     // Legacy functions for compatibility
