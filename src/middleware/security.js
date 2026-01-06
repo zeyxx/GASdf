@@ -29,7 +29,7 @@ const securityHeaders = helmet({
           // Allow Jupiter Plugin and APIs
           connectSrc: [
             "'self'",
-            'https://asdev-backend.onrender.com', // HolDex API
+            'https://holdex-api.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
             'https://*.jup.ag', // All Jupiter APIs (plugin, api, ultra, etc.)
             'https://tokens.jup.ag', // Jupiter token list API

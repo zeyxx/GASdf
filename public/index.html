@@ -5201,7 +5201,7 @@
     // Load HolDex tokens for dropdowns
     async function loadTokens() {
       try {
-        const res = await fetch('https://asdev-backend.onrender.com/api/tokens?limit=20&verified=true');
+        const res = await fetch('https://holdex-api.onrender.com/api/tokens?limit=20&verified=true');
         if (!res.ok) return;
         const data = await res.json();
 

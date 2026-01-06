@@ -204,7 +204,7 @@ PORT=3000                 # Server port
 ## Related Projects
 
 - **HolDex:** https://holdex.asdfasdfa.tech - Token verification
-- **ASDev:** https://asdev-backend.onrender.com - Backend API
+- **HolDex API:** https://holdex-api.onrender.com - Token verification API
 - **SDK:** `npm install gasdf-sdk` - Client SDK
 
 ## License
