@@ -4777,7 +4777,8 @@
 
       try {
         // Fetch Jupiter quote via GASdf proxy (Jupiter requires API key now)
-        const jupiterUrl = `/v1/rpc/jupiter/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50`;
+        // maxAccounts=25 limits route complexity to leave room for fee instruction (1232 byte limit)
+        const jupiterUrl = `/v1/rpc/jupiter/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50&maxAccounts=25`;
         const jupiterRes = await fetch(jupiterUrl);
 
         if (!jupiterRes.ok) {
@@ -5038,6 +5039,17 @@
 
         const finalTx = swapTx;
 
+        // Pre-check transaction size before signing (Solana limit: 1232 bytes)
+        // Use a placeholder blockhash to estimate size (real blockhash added later)
+        const tempBlockhash = 'GWWy2aAev5X3TMRVwdw8W2KMN3dyVrHrQMZukGTf9R1A';
+        finalTx.recentBlockhash = tempBlockhash;
+        const estimatedSize = finalTx.serialize({ requireAllSignatures: false, verifySignatures: false }).length;
+        console.log('[Swap] Estimated transaction size:', estimatedSize, 'bytes (limit: 1232)');
+
+        if (estimatedSize > 1232) {
+          throw new Error(`Transaction too large (${estimatedSize} bytes). Try a smaller amount or simpler token pair.`);
+        }
+
         btnText.textContent = 'Getting fresh blockhash...';
 
         // Get a fresh blockhash via GASdf RPC proxy (no API key in frontend)
@@ -5198,10 +5210,11 @@
       }
     }
 
-    // Load HolDex tokens for dropdowns
+    // Load HolDex tokens for dropdowns (via GASdf proxy - no direct HolDex calls)
     async function loadTokens() {
       try {
-        const res = await fetch('https://holdex-api.onrender.com/api/tokens?limit=20&filter=verified');
+        // Use GASdf proxy to avoid CORS/auth issues with direct HolDex API calls
+        const res = await fetch('/v1/tokens/holdex?limit=20');
         if (!res.ok) return;
         const data = await res.json();
 
@@ -5213,11 +5226,11 @@
             select.innerHTML = '';
             select.appendChild(firstOpt);
 
-            // Add tokens
+            // Add tokens (use symbol from GASdf proxy, not ticker from direct HolDex)
             data.tokens.forEach(token => {
               const opt = document.createElement('option');
               opt.value = token.mint;
-              opt.textContent = token.ticker + ' (K:' + token.kScore + ')';
+              opt.textContent = (token.symbol || token.ticker) + ' (K:' + token.kScore + ')';
               select.appendChild(opt);
             });
           });
