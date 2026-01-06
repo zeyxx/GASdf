@@ -4655,14 +4655,15 @@
           const percent = parseInt(btn.dataset.percent, 10);
           const inputToken = tokenMap[inputTokenMint];
 
-          // Get balance from cached wallet tokens
+          // Get balance from cached wallet tokens (use formatted value, not raw)
           let balance = 0;
-          if (inputToken?.balance) {
-            balance = inputToken.balance;
-          } else if (inputToken?.balanceFormatted) {
-            // Parse from formatted string
+          if (inputToken?.balanceFormatted) {
+            // Parse from formatted string (e.g., "0.5285" -> 0.5285)
             const match = inputToken.balanceFormatted.match(/[\d.]+/);
             if (match) balance = parseFloat(match[0]);
+          } else if (inputToken?.balance && inputToken?.decimals !== undefined) {
+            // Fallback: convert raw balance to human-readable
+            balance = inputToken.balance / Math.pow(10, inputToken.decimals || 6);
           }
 
           if (balance > 0) {
