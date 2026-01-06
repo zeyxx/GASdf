@@ -139,6 +139,16 @@ router.get('/wallet/:address', async (req, res) => {
       // Legacy fields for backwards compat
       asdfBalance: tierInfo.balance,
       discountPercent: tierInfo.discountPercent,
+      // Burn legacy fields (for tests and old clients)
+      totalBurned: walletStats.totalBurned,
+      rank: walletStats.rank,
+      totalBurners: burnerCount,
+      impact: {
+        message:
+          walletStats.totalBurned > 0
+            ? `You've contributed ${formatAsdf(walletStats.totalBurned)} $ASDF to the burn!`
+            : 'Start transacting with GASdf to contribute to the burn!',
+      },
     });
   } catch (error) {
     logger.error('STATS', 'Failed to get wallet stats', { error: error.message });
