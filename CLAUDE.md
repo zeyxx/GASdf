@@ -207,6 +207,31 @@ PORT=3000                 # Server port
 - **HolDex API:** https://holdex-api.onrender.com - Token verification API
 - **SDK:** `npm install gasdf-sdk` - Client SDK
 
+## Claude Code Setup
+
+See `.claude/SETUP.md` for detailed Claude Code configuration.
+
+### Quick Commands
+| Command | Purpose |
+|---------|---------|
+| `/commit-push` | Git commit + push workflow |
+| `/deploy` | Run tests + deploy to Render |
+| `/monitor` | Check service health |
+| `/debug-flow` | Analyze quote/submit/burn flow |
+| `/security-review` | Security checklist |
+
+### Subagent: Librarian
+Use for Solana/crypto research without polluting context:
+```
+Use librarian to research [topic]
+```
+
+### MCP Servers
+- `context7` — Up-to-date library documentation
+- `solana` — Solana SDK + Anchor docs
+- `render` — Logs, deploys, service management
+- `github` — Issues, PRs, code search
+
 ## License
 
 MIT
