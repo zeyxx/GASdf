@@ -422,6 +422,47 @@ Suspicious token with fake volume:
 
 ---
 
+## GASdf Implementation Status
+
+### Completed
+
+1. **Token Classification** (`token-gate.js`):
+   - `NATIVE_TOKENS`: SOL only (always Diamond)
+   - `INFRASTRUCTURE_TOKENS`: Stablecoins & LSTs (will use I-Score)
+   - `COMMUNITY`: All others (use K-Score)
+   - Helper functions: `getTokenType()`, `isNativeToken()`, `isInfrastructureToken()`, `isCommunityToken()`
+
+2. **Burn Reporting** (`harmony.js`):
+   - `notifyBurn()` now supports Alignment tracking fields:
+     - `paymentToken`: Token used to pay GASdf fee
+     - `paymentTokenAmount`: Amount of payment token
+     - `usdValue`: USD value of burn
+     - `userWallet`: User wallet for E-Score tracking
+
+3. **Infrastructure** (`harmony.js`, `holdex.js`, `redis.js`):
+   - Circuit breaker for HolDex API calls
+   - Redis L2 cache for token data (shared across instances)
+   - Single source of truth for config values
+
+### Pending (Requires HolDex)
+
+1. **HolDex Unified Score Endpoint**:
+   - `GET /api/token/:mint/score` returning `{ unifiedScore, safetyScore, utilityScore, alignmentScore, tier }`
+   - Token type classification (NATIVE/INFRASTRUCTURE/COMMUNITY)
+   - I-Score calculation for infrastructure tokens
+
+2. **Frontend Alignment Badges** (`stats.html`):
+   - Add Alignment badge next to tier display
+   - Show ecosystem partner status for high-A tokens
+   - CSS: `.alignment-badge { color: var(--gold-primary); }`
+   - Icons: 🤝 (Partner), ⚡ (Aligned), 🔗 (Integrated)
+
+3. **Fee Multiplier Integration**:
+   - Update `quote.js` to factor in Alignment score
+   - Lower fees for aligned tokens (incentive mechanism)
+
+---
+
 ## Open Questions
 
 1. **Bootstrap Problem:** New tokens have A=0. Should there be a "probation period" where alignment isn't required?
