@@ -4988,9 +4988,15 @@
         }
 
         // For versioned transactions, we cannot easily add instructions
-        // Show user-friendly error and suggest simpler swap
+        // Jupiter uses VersionedTx + ALTs for complex multi-hop routes
+        // Offer clear alternatives aligned with $asdfasdfa philosophy (honest, permissionless)
         if (isVersioned) {
-          throw new Error('This swap route requires advanced features. Try a smaller amount or different token pair.');
+          const isPayingSOL = gasTokenMint === 'So11111111111111111111111111111111111111112';
+          if (isPayingSOL) {
+            throw new Error('Route too complex for gasless. Try smaller amount or different token pair.');
+          } else {
+            throw new Error('Route too complex. Try: (1) smaller amount, (2) pay gas in SOL, or (3) different token pair.');
+          }
         }
 
         // Build the fee payment instruction
@@ -5047,7 +5053,10 @@
         console.log('[Swap] Estimated transaction size:', estimatedSize, 'bytes (limit: 1232)');
 
         if (estimatedSize > 1232) {
-          throw new Error(`Transaction too large (${estimatedSize} bytes). Try a smaller amount or simpler token pair.`);
+          // Solana MTU limit: 1232 bytes - this is a network constraint, not a bug
+          const overage = estimatedSize - 1232;
+          console.log('[Swap] Transaction exceeds limit by', overage, 'bytes');
+          throw new Error(`Transaction too large (+${overage} bytes). Try: (1) smaller amount, (2) pay gas in SOL, or (3) direct token pair.`);
         }
 
         btnText.textContent = 'Getting fresh blockhash...';
