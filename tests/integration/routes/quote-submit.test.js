@@ -267,9 +267,8 @@ describe.skip('Quote → Submit Integration Flow', () => {
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
     process.env.REDIS_URL = '';
-    // Valid base58 encoded 64-byte private key (test only)
-    process.env.FEE_PAYER_PRIVATE_KEY =
-      '4wBqpZM9xwHzSXwVJA3v8XqPdNepJ8gFhJk6g6C7pvJHcqsZqXUvL9vQ4xqZpZLvMz9WbKR7hqN5VnXvdGfPEKNP';
+    // PLACEHOLDER - not a real key, tests mock the signer
+    process.env.FEE_PAYER_PRIVATE_KEY = 'TEST_PRIVATE_KEY_PLACEHOLDER_NOT_REAL';
 
     jest.resetModules();
     app = require('../../../src/index');

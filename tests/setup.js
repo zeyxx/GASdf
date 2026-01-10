@@ -4,8 +4,8 @@
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 process.env.HELIUS_API_KEY = 'test-helius-key';
-process.env.FEE_PAYER_PRIVATE_KEY =
-  '4wBqpZM9xwHtzshcmxqXQKfTu1fnjgPHykLqxGtDFaYvwXLvEv7zgRMy9aVRZpgRdCZh5Qw7BxXhyKDBPfzJML4N';
+// PLACEHOLDER - not a real key, tests mock the signer
+process.env.FEE_PAYER_PRIVATE_KEY = 'TEST_PRIVATE_KEY_PLACEHOLDER_NOT_REAL';
 process.env.ASDF_MINT = 'ASdfTest111111111111111111111111111111111111';
 process.env.REDIS_URL = ''; // Force memory fallback
 
