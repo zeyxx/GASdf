@@ -31,12 +31,12 @@ const logger = require('../utils/logger');
 const crypto = require('crypto');
 
 // =============================================================================
-// Golden Ratio Constants
+// Golden Ratio Constants (Must match HolDex/src/shared/harmony.js)
 // =============================================================================
-const PHI = 1.618033988749;
-const PHI_INV = 1 / PHI; // 0.618...
-const PHI_INV_SQ = 1 / (PHI * PHI); // 0.382...
-const PHI_INV_CUBED = 1 / (PHI * PHI * PHI); // 0.236...
+const PHI = 1.618033988749895;                // φ - Golden Ratio (15 decimals)
+const PHI_INV = 1 / PHI;                      // φ⁻¹ = 0.618033988749895
+const PHI_INV_SQ = 1 / (PHI * PHI);           // φ⁻² = 0.381966011250105
+const PHI_INV_CUBED = 1 / (PHI * PHI * PHI);  // φ⁻³ = 0.236067977499790
 
 // =============================================================================
 // E-Score Dimension Weights (sum = 1.0)

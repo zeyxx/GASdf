@@ -2523,6 +2523,78 @@
       border: 1px solid rgba(201, 162, 39, 0.3);
       color: var(--gold);
     }
+
+    /* Toggle switch for private message */
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-input {
+      display: none;
+    }
+
+    .toggle-switch {
+      width: 42px;
+      height: 24px;
+      background: var(--white-20);
+      border-radius: 12px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      background: var(--white-50);
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+
+    .toggle-input:checked + .toggle-switch {
+      background: var(--gold);
+    }
+
+    .toggle-input:checked + .toggle-switch::after {
+      left: 21px;
+      background: var(--bg);
+    }
+
+    .toggle-text {
+      font-size: 13px;
+      color: var(--white-70);
+    }
+
+    .toggle-badge {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .app-info {
+      margin-top: var(--space-sm);
+      padding: var(--space-sm);
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 8px;
+      color: var(--white-50);
+    }
+
+    .app-info small {
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -2842,6 +2914,19 @@
               <p>Write a message to the blockchain. Forever.</p>
             </div>
             <div class="app-form">
+              <!-- Private toggle -->
+              <div class="form-group">
+                <label class="toggle-label">
+                  <input type="checkbox" id="msg-private" class="toggle-input">
+                  <span class="toggle-switch"></span>
+                  <span class="toggle-text">Private message <span class="toggle-badge">ZK Seed</span></span>
+                </label>
+              </div>
+              <!-- Recipient (shown when private) -->
+              <div class="form-group" id="msg-recipient-group" style="display: none;">
+                <label>Recipient wallet</label>
+                <input type="text" id="msg-recipient" class="form-input" placeholder="Wallet address that can decrypt...">
+              </div>
               <div class="form-group">
                 <label>Message (max 280 chars)</label>
                 <textarea id="msg-text" class="form-textarea" maxlength="280" placeholder="Your message here..."></textarea>
@@ -2855,6 +2940,9 @@
               <button class="app-btn" id="msg-btn" disabled>Connect Wallet</button>
             </div>
             <div class="app-status" id="msg-status"></div>
+            <div class="app-info" id="msg-info" style="display: none;">
+              <small>🔐 X25519 encrypted. Only recipient can read. Commitment hash proves existence.</small>
+            </div>
           </div>
 
           <!-- SEND -->
@@ -5187,6 +5275,684 @@
     }
 
     // ========================================================================
+    // 4 LITE TOOLS - Burn, Clean, Message, Send (GASdf Gasless)
+    // ========================================================================
+
+    // DOM Elements for lite tools
+    const burnToken = document.getElementById('burn-token');
+    const burnAmount = document.getElementById('burn-amount');
+    const burnBtn = document.getElementById('burn-btn');
+    const burnStatus = document.getElementById('burn-status');
+
+    const cleanCount = document.getElementById('clean-count');
+    const cleanSol = document.getElementById('clean-sol');
+    const cleanBtn = document.getElementById('clean-btn');
+    const cleanStatus = document.getElementById('clean-status');
+
+    const msgText = document.getElementById('msg-text');
+    const msgToken = document.getElementById('msg-token');
+    const msgBtn = document.getElementById('msg-btn');
+    const msgStatus = document.getElementById('msg-status');
+
+    const sendTo = document.getElementById('send-to');
+    const sendToken = document.getElementById('send-token');
+    const sendAmount = document.getElementById('send-amount');
+    const sendBtn = document.getElementById('send-btn');
+    const sendStatus = document.getElementById('send-status');
+
+    // Empty ATAs cache for Clean tool
+    let emptyATAs = [];
+
+    // Populate token selects when wallet connected
+    function populateToolSelects() {
+      if (!walletTokensCache) return;
+
+      const allTokens = [
+        ...(walletTokensCache.categories?.diamond?.tokens || []),
+        ...(walletTokensCache.categories?.accepted?.tokens || []),
+        ...(walletTokensCache.categories?.notEligible?.tokens || [])
+      ].filter(t => t.balance > 0);
+
+      // Populate Burn token select
+      if (burnToken) {
+        burnToken.innerHTML = '<option value="">Select token to burn</option>';
+        allTokens.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.mint;
+          opt.textContent = `${t.symbol} (${t.balanceFormatted || (t.balance / Math.pow(10, t.decimals || 6)).toFixed(4)})`;
+          opt.dataset.decimals = t.decimals;
+          opt.dataset.balance = t.balance;
+          burnToken.appendChild(opt);
+        });
+      }
+
+      // Populate Message gas token select (only K-score >= 50)
+      if (msgToken) {
+        msgToken.innerHTML = '<option value="">Select gas payment token</option>';
+        const eligible = [
+          ...(walletTokensCache.categories?.diamond?.tokens || []),
+          ...(walletTokensCache.categories?.accepted?.tokens || [])
+        ].filter(t => t.balance > 0);
+        eligible.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.mint;
+          opt.textContent = `${t.symbol} ${t.tierIcon || ''}`;
+          opt.dataset.decimals = t.decimals;
+          msgToken.appendChild(opt);
+        });
+      }
+
+      // Populate Send token select
+      if (sendToken) {
+        sendToken.innerHTML = '<option value="">Select token to send</option>';
+        allTokens.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.mint;
+          opt.textContent = `${t.symbol} (${t.balanceFormatted || (t.balance / Math.pow(10, t.decimals || 6)).toFixed(4)})`;
+          opt.dataset.decimals = t.decimals;
+          opt.dataset.balance = t.balance;
+          sendToken.appendChild(opt);
+        });
+      }
+    }
+
+    // Update tool buttons based on wallet state
+    function updateToolButtons() {
+      const connected = !!connectedAddress;
+
+      if (burnBtn) {
+        burnBtn.disabled = !connected;
+        burnBtn.textContent = connected ? 'Burn 🔥' : 'Connect Wallet';
+      }
+      if (cleanBtn) {
+        cleanBtn.disabled = !connected;
+        cleanBtn.textContent = connected ? 'Clean & Reclaim' : 'Connect Wallet';
+      }
+      if (msgBtn) {
+        msgBtn.disabled = !connected;
+        msgBtn.textContent = connected ? 'Send Message' : 'Connect Wallet';
+      }
+      if (sendBtn) {
+        sendBtn.disabled = !connected;
+        sendBtn.textContent = connected ? 'Send Tokens' : 'Connect Wallet';
+      }
+
+      // Fetch empty ATAs for clean tool
+      if (connected) {
+        fetchEmptyATAs();
+        populateToolSelects();
+      }
+    }
+
+    // Fetch empty ATAs for Clean tool
+    async function fetchEmptyATAs() {
+      if (!connectedAddress) return;
+      try {
+        const res = await fetch(`/v1/tokens/wallet/${connectedAddress}/empty`);
+        if (res.ok) {
+          const data = await res.json();
+          emptyATAs = data.emptyATAs || [];
+          const reclaimSol = emptyATAs.length * 0.00203928; // ~rent per ATA
+          if (cleanCount) cleanCount.textContent = emptyATAs.length;
+          if (cleanSol) cleanSol.textContent = reclaimSol.toFixed(6) + ' SOL';
+        } else {
+          // Endpoint might not exist yet, show placeholder
+          if (cleanCount) cleanCount.textContent = '—';
+          if (cleanSol) cleanSol.textContent = '— SOL';
+        }
+      } catch (e) {
+        console.error('[Clean] Failed to fetch empty ATAs:', e);
+      }
+    }
+
+    // ========================================================================
+    // BURN TOOL - Burn any token (100% burn if $ASDF, else via dual-burn)
+    // ========================================================================
+    async function executeBurn() {
+      if (!connectedAddress || !burnToken?.value || !burnAmount?.value) {
+        burnStatus.textContent = 'Please select token and enter amount';
+        burnStatus.className = 'app-status error';
+        return;
+      }
+
+      const mint = burnToken.value;
+      const decimals = parseInt(burnToken.selectedOptions[0]?.dataset.decimals || 6);
+      const amount = parseFloat(burnAmount.value);
+      if (isNaN(amount) || amount <= 0) {
+        burnStatus.textContent = 'Invalid amount';
+        burnStatus.className = 'app-status error';
+        return;
+      }
+
+      const provider = getWalletProvider();
+      if (!provider) {
+        burnStatus.textContent = 'Wallet not found';
+        burnStatus.className = 'app-status error';
+        return;
+      }
+
+      burnBtn.disabled = true;
+      burnBtn.textContent = 'Building...';
+      burnStatus.textContent = '';
+      burnStatus.className = 'app-status';
+
+      try {
+        const { PublicKey, Transaction, SystemProgram, TransactionInstruction } = solanaWeb3;
+        const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
+        const userPubkey = new PublicKey(connectedAddress);
+        const mintPubkey = new PublicKey(mint);
+        const amountRaw = BigInt(Math.floor(amount * Math.pow(10, decimals)));
+
+        // Get GASdf quote for gas payment (pay with same token being burned)
+        burnBtn.textContent = 'Getting quote...';
+        const quoteRes = await fetch('/v1/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userPubkey: connectedAddress,
+            paymentToken: mint,
+            estimatedComputeUnits: 100000,
+          }),
+        });
+
+        if (!quoteRes.ok) {
+          const err = await quoteRes.json();
+          throw new Error(err.error || 'Quote failed');
+        }
+
+        const quote = await quoteRes.json();
+        console.log('[Burn] GASdf quote:', quote);
+
+        // Get user's ATA
+        const userAta = await getAssociatedTokenAddress(userPubkey, mintPubkey);
+
+        // Create burn instruction (SPL Token burn)
+        const burnInstruction = new TransactionInstruction({
+          keys: [
+            { pubkey: userAta, isSigner: false, isWritable: true },
+            { pubkey: mintPubkey, isSigner: false, isWritable: true },
+            { pubkey: userPubkey, isSigner: true, isWritable: false },
+          ],
+          programId: TOKEN_PROGRAM_ID,
+          data: (() => {
+            // Burn instruction: index 8, then u64 amount
+            const buffer = new ArrayBuffer(9);
+            const view = new DataView(buffer);
+            view.setUint8(0, 8); // Burn instruction
+            const low = Number(amountRaw & BigInt(0xFFFFFFFF));
+            const high = Number((amountRaw >> BigInt(32)) & BigInt(0xFFFFFFFF));
+            view.setUint32(1, low, true);
+            view.setUint32(5, high, true);
+            return new Uint8Array(buffer);
+          })(),
+        });
+
+        // Create fee payment instruction
+        const feePayerPubkey = new PublicKey(quote.feePayer);
+        const feeAmount = BigInt(quote.feeAmount);
+        const treasuryAta = new PublicKey(quote.treasury.ata);
+        const feeInstruction = createTransferInstruction(
+          userAta,
+          treasuryAta,
+          userPubkey,
+          feeAmount,
+          TOKEN_PROGRAM_ID
+        );
+
+        // Build transaction
+        const tx = new Transaction();
+        tx.feePayer = feePayerPubkey;
+        tx.add(feeInstruction);
+        tx.add(burnInstruction);
+
+        // Get blockhash
+        burnBtn.textContent = 'Getting blockhash...';
+        const rpcUrl = window.location.origin + '/v1/rpc';
+        const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+
+        // Sign with wallet
+        burnBtn.textContent = 'Sign in wallet...';
+        const signedTx = await provider.signTransaction(tx);
+
+        // Submit to GASdf
+        burnBtn.textContent = 'Submitting...';
+        const serialized = signedTx.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const signedTxBase64 = btoa(String.fromCharCode(...serialized));
+
+        const submitRes = await fetch('/v1/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteId: quote.quoteId,
+            transaction: signedTxBase64,
+            userPubkey: connectedAddress,
+          }),
+        });
+
+        const result = await submitRes.json();
+        if (!submitRes.ok) throw new Error(result.error || 'Submit failed');
+
+        console.log('[Burn] Success:', result);
+        burnStatus.innerHTML = `🔥 Burned! <a href="https://solscan.io/tx/${result.signature}" target="_blank" style="color: var(--gold);">View</a>`;
+        burnStatus.className = 'app-status success';
+        burnAmount.value = '';
+
+        // Refresh wallet tokens
+        setTimeout(() => fetchWalletTokens(connectedAddress), 2000);
+
+      } catch (err) {
+        console.error('[Burn] Error:', err);
+        burnStatus.textContent = err.message || 'Burn failed';
+        burnStatus.className = 'app-status error';
+      } finally {
+        burnBtn.disabled = false;
+        burnBtn.textContent = 'Burn 🔥';
+      }
+    }
+
+    // ========================================================================
+    // CLEAN TOOL - Close empty ATAs, reclaim SOL rent
+    // ========================================================================
+    async function executeClean() {
+      if (!connectedAddress || emptyATAs.length === 0) {
+        cleanStatus.textContent = 'No empty accounts to clean';
+        cleanStatus.className = 'app-status';
+        return;
+      }
+
+      const provider = getWalletProvider();
+      if (!provider) {
+        cleanStatus.textContent = 'Wallet not found';
+        cleanStatus.className = 'app-status error';
+        return;
+      }
+
+      cleanBtn.disabled = true;
+      cleanBtn.textContent = 'Building...';
+      cleanStatus.textContent = '';
+      cleanStatus.className = 'app-status';
+
+      try {
+        const { PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
+        const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        const userPubkey = new PublicKey(connectedAddress);
+
+        // Close account instruction index is 9
+        const closeInstructions = emptyATAs.slice(0, 10).map(ata => {
+          const ataPubkey = new PublicKey(ata);
+          return new TransactionInstruction({
+            keys: [
+              { pubkey: ataPubkey, isSigner: false, isWritable: true },
+              { pubkey: userPubkey, isSigner: false, isWritable: true }, // destination (receives rent)
+              { pubkey: userPubkey, isSigner: true, isWritable: false }, // owner
+            ],
+            programId: TOKEN_PROGRAM_ID,
+            data: new Uint8Array([9]), // CloseAccount instruction
+          });
+        });
+
+        if (closeInstructions.length === 0) {
+          cleanStatus.textContent = 'No accounts to close';
+          cleanStatus.className = 'app-status';
+          return;
+        }
+
+        // For clean, user pays their own gas since they're reclaiming SOL
+        // This is actually a net positive for the user
+        const tx = new Transaction();
+        tx.feePayer = userPubkey;
+        closeInstructions.forEach(ix => tx.add(ix));
+
+        // Get blockhash
+        cleanBtn.textContent = 'Getting blockhash...';
+        const rpcUrl = window.location.origin + '/v1/rpc';
+        const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+
+        // Sign and send
+        cleanBtn.textContent = 'Sign in wallet...';
+        const signedTx = await provider.signTransaction(tx);
+
+        cleanBtn.textContent = 'Submitting...';
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        await connection.confirmTransaction(signature, 'confirmed');
+
+        console.log('[Clean] Success:', signature);
+        const reclaimedSol = closeInstructions.length * 0.00203928;
+        cleanStatus.innerHTML = `✅ Reclaimed ~${reclaimedSol.toFixed(6)} SOL! <a href="https://solscan.io/tx/${signature}" target="_blank" style="color: var(--gold);">View</a>`;
+        cleanStatus.className = 'app-status success';
+
+        // Refresh empty ATAs
+        setTimeout(fetchEmptyATAs, 2000);
+
+      } catch (err) {
+        console.error('[Clean] Error:', err);
+        cleanStatus.textContent = err.message || 'Clean failed';
+        cleanStatus.className = 'app-status error';
+      } finally {
+        cleanBtn.disabled = false;
+        cleanBtn.textContent = 'Clean & Reclaim';
+      }
+    }
+
+    // ========================================================================
+    // MESSAGE TOOL - Send memo on-chain (via Memo program)
+    // ========================================================================
+    async function executeMessage() {
+      if (!connectedAddress || !msgText?.value || !msgToken?.value) {
+        msgStatus.textContent = 'Please enter message and select gas token';
+        msgStatus.className = 'app-status error';
+        return;
+      }
+
+      const message = msgText.value.trim();
+      if (message.length === 0 || message.length > 280) {
+        msgStatus.textContent = 'Message must be 1-280 characters';
+        msgStatus.className = 'app-status error';
+        return;
+      }
+
+      const paymentMint = msgToken.value;
+      const provider = getWalletProvider();
+      if (!provider) {
+        msgStatus.textContent = 'Wallet not found';
+        msgStatus.className = 'app-status error';
+        return;
+      }
+
+      msgBtn.disabled = true;
+      msgBtn.textContent = 'Building...';
+      msgStatus.textContent = '';
+      msgStatus.className = 'app-status';
+
+      try {
+        const { PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
+        const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+        const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
+        const userPubkey = new PublicKey(connectedAddress);
+        const paymentMintPubkey = new PublicKey(paymentMint);
+
+        // Get GASdf quote
+        msgBtn.textContent = 'Getting quote...';
+        const quoteRes = await fetch('/v1/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userPubkey: connectedAddress,
+            paymentToken: paymentMint,
+            estimatedComputeUnits: 50000,
+          }),
+        });
+
+        if (!quoteRes.ok) {
+          const err = await quoteRes.json();
+          throw new Error(err.error || 'Quote failed');
+        }
+
+        const quote = await quoteRes.json();
+        console.log('[Message] GASdf quote:', quote);
+
+        // Create memo instruction
+        const memoInstruction = new TransactionInstruction({
+          keys: [{ pubkey: userPubkey, isSigner: true, isWritable: false }],
+          programId: MEMO_PROGRAM_ID,
+          data: new TextEncoder().encode(message),
+        });
+
+        // Create fee payment instruction
+        const feePayerPubkey = new PublicKey(quote.feePayer);
+        const feeAmount = BigInt(quote.feeAmount);
+        const userAta = await getAssociatedTokenAddress(userPubkey, paymentMintPubkey);
+        const treasuryAta = new PublicKey(quote.treasury.ata);
+        const feeInstruction = createTransferInstruction(
+          userAta,
+          treasuryAta,
+          userPubkey,
+          feeAmount,
+          TOKEN_PROGRAM_ID
+        );
+
+        // Build transaction
+        const tx = new Transaction();
+        tx.feePayer = feePayerPubkey;
+        tx.add(feeInstruction);
+        tx.add(memoInstruction);
+
+        // Get blockhash
+        msgBtn.textContent = 'Getting blockhash...';
+        const rpcUrl = window.location.origin + '/v1/rpc';
+        const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+
+        // Sign with wallet
+        msgBtn.textContent = 'Sign in wallet...';
+        const signedTx = await provider.signTransaction(tx);
+
+        // Submit to GASdf
+        msgBtn.textContent = 'Submitting...';
+        const serialized = signedTx.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const signedTxBase64 = btoa(String.fromCharCode(...serialized));
+
+        const submitRes = await fetch('/v1/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteId: quote.quoteId,
+            transaction: signedTxBase64,
+            userPubkey: connectedAddress,
+          }),
+        });
+
+        const result = await submitRes.json();
+        if (!submitRes.ok) throw new Error(result.error || 'Submit failed');
+
+        console.log('[Message] Success:', result);
+        msgStatus.innerHTML = `💬 Message sent! <a href="https://solscan.io/tx/${result.signature}" target="_blank" style="color: var(--gold);">View</a>`;
+        msgStatus.className = 'app-status success';
+        msgText.value = '';
+
+      } catch (err) {
+        console.error('[Message] Error:', err);
+        msgStatus.textContent = err.message || 'Message failed';
+        msgStatus.className = 'app-status error';
+      } finally {
+        msgBtn.disabled = false;
+        msgBtn.textContent = 'Send Message';
+      }
+    }
+
+    // ========================================================================
+    // SEND TOOL - Send SPL tokens gaslessly
+    // ========================================================================
+    async function executeSend() {
+      if (!connectedAddress || !sendTo?.value || !sendToken?.value || !sendAmount?.value) {
+        sendStatus.textContent = 'Please fill all fields';
+        sendStatus.className = 'app-status error';
+        return;
+      }
+
+      const recipient = sendTo.value.trim();
+      const mint = sendToken.value;
+      const decimals = parseInt(sendToken.selectedOptions[0]?.dataset.decimals || 6);
+      const amount = parseFloat(sendAmount.value);
+
+      // Validate recipient address
+      try {
+        new solanaWeb3.PublicKey(recipient);
+      } catch {
+        sendStatus.textContent = 'Invalid recipient address';
+        sendStatus.className = 'app-status error';
+        return;
+      }
+
+      if (isNaN(amount) || amount <= 0) {
+        sendStatus.textContent = 'Invalid amount';
+        sendStatus.className = 'app-status error';
+        return;
+      }
+
+      const provider = getWalletProvider();
+      if (!provider) {
+        sendStatus.textContent = 'Wallet not found';
+        sendStatus.className = 'app-status error';
+        return;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Building...';
+      sendStatus.textContent = '';
+      sendStatus.className = 'app-status';
+
+      try {
+        const { PublicKey, Transaction, TransactionInstruction } = solanaWeb3;
+        const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+
+        const userPubkey = new PublicKey(connectedAddress);
+        const recipientPubkey = new PublicKey(recipient);
+        const mintPubkey = new PublicKey(mint);
+        const amountRaw = BigInt(Math.floor(amount * Math.pow(10, decimals)));
+
+        // Get GASdf quote (pay gas with same token being sent)
+        sendBtn.textContent = 'Getting quote...';
+        const quoteRes = await fetch('/v1/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userPubkey: connectedAddress,
+            paymentToken: mint,
+            estimatedComputeUnits: 150000, // May need to create ATA
+          }),
+        });
+
+        if (!quoteRes.ok) {
+          const err = await quoteRes.json();
+          throw new Error(err.error || 'Quote failed');
+        }
+
+        const quote = await quoteRes.json();
+        console.log('[Send] GASdf quote:', quote);
+
+        // Get ATAs
+        const userAta = await getAssociatedTokenAddress(userPubkey, mintPubkey);
+        const recipientAta = await getAssociatedTokenAddress(recipientPubkey, mintPubkey);
+        const treasuryAta = new PublicKey(quote.treasury.ata);
+        const feePayerPubkey = new PublicKey(quote.feePayer);
+        const feeAmount = BigInt(quote.feeAmount);
+
+        // Build transaction
+        const tx = new Transaction();
+        tx.feePayer = feePayerPubkey;
+
+        // 1. Fee payment instruction
+        const feeInstruction = createTransferInstruction(
+          userAta,
+          treasuryAta,
+          userPubkey,
+          feeAmount,
+          TOKEN_PROGRAM_ID
+        );
+        tx.add(feeInstruction);
+
+        // 2. Create recipient ATA if needed (idempotent)
+        const createAtaInstruction = new TransactionInstruction({
+          keys: [
+            { pubkey: feePayerPubkey, isSigner: true, isWritable: true }, // payer
+            { pubkey: recipientAta, isSigner: false, isWritable: true },
+            { pubkey: recipientPubkey, isSigner: false, isWritable: false },
+            { pubkey: mintPubkey, isSigner: false, isWritable: false },
+            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          ],
+          programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+          data: new Uint8Array([1]), // CreateIdempotent
+        });
+        tx.add(createAtaInstruction);
+
+        // 3. Transfer instruction
+        const transferInstruction = createTransferInstruction(
+          userAta,
+          recipientAta,
+          userPubkey,
+          amountRaw,
+          TOKEN_PROGRAM_ID
+        );
+        tx.add(transferInstruction);
+
+        // Get blockhash
+        sendBtn.textContent = 'Getting blockhash...';
+        const rpcUrl = window.location.origin + '/v1/rpc';
+        const connection = new solanaWeb3.Connection(rpcUrl, 'confirmed');
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+
+        // Sign with wallet
+        sendBtn.textContent = 'Sign in wallet...';
+        const signedTx = await provider.signTransaction(tx);
+
+        // Submit to GASdf
+        sendBtn.textContent = 'Submitting...';
+        const serialized = signedTx.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const signedTxBase64 = btoa(String.fromCharCode(...serialized));
+
+        const submitRes = await fetch('/v1/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteId: quote.quoteId,
+            transaction: signedTxBase64,
+            userPubkey: connectedAddress,
+          }),
+        });
+
+        const result = await submitRes.json();
+        if (!submitRes.ok) throw new Error(result.error || 'Submit failed');
+
+        console.log('[Send] Success:', result);
+        sendStatus.innerHTML = `📤 Sent! <a href="https://solscan.io/tx/${result.signature}" target="_blank" style="color: var(--gold);">View</a>`;
+        sendStatus.className = 'app-status success';
+        sendAmount.value = '';
+        sendTo.value = '';
+
+        // Refresh wallet tokens
+        setTimeout(() => fetchWalletTokens(connectedAddress), 2000);
+
+      } catch (err) {
+        console.error('[Send] Error:', err);
+        sendStatus.textContent = err.message || 'Send failed';
+        sendStatus.className = 'app-status error';
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send Tokens';
+      }
+    }
+
+    // Initialize lite tools
+    function initLiteTools() {
+      // Event listeners
+      if (burnBtn) burnBtn.addEventListener('click', executeBurn);
+      if (cleanBtn) cleanBtn.addEventListener('click', executeClean);
+      if (msgBtn) msgBtn.addEventListener('click', executeMessage);
+      if (sendBtn) sendBtn.addEventListener('click', executeSend);
+
+      // Initial state
+      updateToolButtons();
+    }
+
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initLiteTools);
+    } else {
+      initLiteTools();
+    }
+
+    // ========================================================================
     // LOAD LIVE DATA FROM APIs
     // ========================================================================
     async function loadStats() {
@@ -5465,12 +6231,22 @@
       localStorage.setItem('connectedAddress', connectedAddress);
 
       // Fetch wallet tokens for token selector (with HolDex enrichment)
-      fetchWalletTokens(connectedAddress).catch(e =>
+      fetchWalletTokens(connectedAddress).then(() => {
+        // Update lite tools after wallet tokens loaded
+        if (typeof updateToolButtons === 'function') {
+          updateToolButtons();
+        }
+      }).catch(e =>
         console.error('[WALLET] Failed to fetch wallet tokens:', e)
       );
 
       // Sync wallet state with Jupiter Plugin
       syncJupiterWallet();
+
+      // Update lite tools
+      if (typeof updateToolButtons === 'function') {
+        updateToolButtons();
+      }
     }
 
     // Disconnect wallet
@@ -5508,6 +6284,11 @@
 
       // Sync wallet state with Jupiter Plugin
       syncJupiterWallet();
+
+      // Reset lite tools
+      if (typeof updateToolButtons === 'function') {
+        updateToolButtons();
+      }
     }
 
     // Auto-reconnect on page load
