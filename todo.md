@@ -69,7 +69,7 @@ if (isWhitelistedApiKey(apiKey)) {
 
 **HolDex Env Var:**
 ```
-WHITELISTED_API_KEYS=1079b78fd0b1a88323bddaa81447ddb92cddb01b3359e95111be72d4fc349377
+WHITELISTED_API_KEYS=[REDACTED — clé invalide, HolDex supprimé Phase 0]
 ```
 
 ---

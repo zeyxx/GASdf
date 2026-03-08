@@ -23,7 +23,6 @@ const tokensRouter = require('./routes/tokens');
 const statsRouter = require('./routes/stats');
 const healthRouter = require('./routes/health');
 const adminRouter = require('./routes/admin');
-const holdexRouter = require('./routes/holdex');
 const rpcRouter = require('./routes/rpc');
 
 const app = express();
@@ -230,7 +229,6 @@ app.use('/v1/submit', submitRouter);
 app.use('/v1/tokens', tokensRouter);
 app.use('/v1/stats', statsRouter);
 app.use('/v1/health', healthRouter);
-app.use('/v1/holdex', holdexRouter);
 app.use('/v1/rpc', rpcRouter); // RPC proxy for Jupiter Terminal (Helius API key stays server-side)
 
 // Admin routes (protected by API key)

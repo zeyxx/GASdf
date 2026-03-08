@@ -6,7 +6,6 @@ const alt = require('../utils/alt');
 const db = require('../utils/db');
 const { getAllStatus: getCircuitBreakerStatus } = require('../utils/circuit-breaker');
 const oracle = require('../services/oracle');
-const holdex = require('../services/holdex');
 const jupiter = require('../services/jupiter');
 const pyth = require('../services/pyth');
 const jito = require('../services/jito');
@@ -68,8 +67,7 @@ router.get('/', async (req, res) => {
   // Add oracle health
   health.oracle = oracle.getOracleHealth();
 
-  // Add HolDex status (K-score oracle)
-  health.holdex = holdex.getStatus();
+  // HolDex removed — Phase 0 whitelist model.
 
   // Add Pyth oracle status (on-chain pricing)
   health.pyth = pyth.getStatus();

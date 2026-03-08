@@ -13,8 +13,6 @@ const rpc = require('../utils/rpc');
 const { pool: feePayerPool } = require('./fee-payer-pool');
 const { getTreasuryAddress } = require('./treasury-ata');
 const jupiter = require('./jupiter');
-const holdex = require('./holdex');
-const harmony = require('./harmony');
 const jito = require('./jito');
 const {
   calculateTreasurySplit,
@@ -549,20 +547,7 @@ async function executeBurnWithLock(tokenBalances) {
           treasuryAmount: results.totalAsdfRetained || 0,
         });
 
-        // Notify HolDex of burn event (HMAC-signed webhook)
-        // This updates E-Score "burning" dimension for all burners in batch
-        const treasury = getTreasuryAddress();
-        harmony
-          .notifyBurn({
-            signature: batchResult.signature,
-            mint: config.ASDF_MINT,
-            amount: totalAsdfBurned,
-            burner: treasury?.toBase58() || 'treasury',
-            timestamp: Date.now(),
-          })
-          .catch((err) => {
-            logger.warn('BURN', 'HolDex burn notification failed', { error: err.message });
-          });
+        // Phase 0: HolDex/Harmony notification removed.
       }
     } catch (error) {
       logger.error('BURN', 'Batch burn failed, falling back to individual burns', {
@@ -626,17 +611,8 @@ async function processTokenForBatch(token, pendingBurns) {
   };
   let tokenBurnedPercent = 0;
 
-  if (!isAsdf) {
-    try {
-      const tokenData = await holdex.getToken(mint);
-      if (tokenData.ecosystemBurn) {
-        ecosystemBurnBonus = tokenData.ecosystemBurn;
-        tokenBurnedPercent = tokenData.supply?.burnedPercent || 0;
-      }
-    } catch (error) {
-      logger.debug('BURN', 'Could not get ecosystem burn data', { mint: mint.slice(0, 8) });
-    }
-  }
+  // Phase 0: No ecosystem burn bonus (HolDex removed).
+  // ecosystemBurnPct stays 0 — all value flows through $ASDF at φ-ratio.
 
   const feePayer = feePayerPool.getHealthyPayer();
   if (!feePayer) {

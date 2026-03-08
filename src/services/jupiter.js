@@ -67,6 +67,15 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
       outputMint,
       amount: amount.toString(),
       slippageBps: slippageBps.toString(),
+      // ==========================================================================
+      // TX SIZE CONTROL — Solana MTU: 1232 bytes
+      // GASdf adds ~137 bytes overhead (fee instruction + 3 accounts).
+      // maxAccounts=15 limits DEX routing accounts; onlyDirectRoutes forces
+      // single-hop (A→B, one DEX) → ~9-13 accounts in practice.
+      // Phase 2: replace with ALT (Address Lookup Table) for complex routes.
+      // ==========================================================================
+      maxAccounts: '15',
+      onlyDirectRoutes: 'true',
     });
 
     // ==========================================================================

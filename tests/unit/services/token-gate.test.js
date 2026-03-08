@@ -1,15 +1,9 @@
 /**
- * Tests for Token Gate Service
+ * Tests for Token Gate Service — Phase 0 Whitelist Model
  *
- * Tier-based token acceptance (Metal Ranks):
- * - Diamond (90+): Hardcoded tokens (SOL, USDC, etc.) → Always accepted locally
- * - Platinum (80+) / Gold (70+): HolDex verified → Accepted
- * - Silver/Bronze/Copper/Iron/Rust (<70): HolDex rejected → Rejected
+ * Phase 0: Hardcoded whitelist only (no HolDex).
+ * Accepted: USDC, USDT, $ASDF (and SOL native).
  */
-
-jest.mock('../../../src/utils/config', () => ({
-  ASDF_MINT: '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump',
-}));
 
 jest.mock('../../../src/utils/logger', () => ({
   info: jest.fn(),
@@ -18,365 +12,135 @@ jest.mock('../../../src/utils/logger', () => ({
   debug: jest.fn(),
 }));
 
-jest.mock('../../../src/services/holdex', () => ({
-  isTokenAccepted: jest.fn(),
-  getKRank: jest.fn((score) => {
-    if (score >= 90) return { tier: 'Diamond', icon: '💎', level: 8 };
-    if (score >= 80) return { tier: 'Platinum', icon: '💠', level: 7 };
-    if (score >= 70) return { tier: 'Gold', icon: '🥇', level: 6 };
-    if (score >= 60) return { tier: 'Silver', icon: '🥈', level: 5 };
-    if (score >= 50) return { tier: 'Bronze', icon: '🥉', level: 4 };
-    if (score >= 40) return { tier: 'Copper', icon: '🟤', level: 3 };
-    if (score >= 20) return { tier: 'Iron', icon: '⚫', level: 2 };
-    return { tier: 'Rust', icon: '🔩', level: 1 };
-  }),
-  getCreditRating: jest.fn((score) => {
-    if (score >= 90)
-      return {
-        grade: 'A1',
-        label: 'Prime Quality',
-        risk: 'minimal',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    if (score >= 80)
-      return {
-        grade: 'A2',
-        label: 'Excellent',
-        risk: 'very_low',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    if (score >= 70)
-      return { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable', trajectory: '→ Stable' };
-    if (score >= 60)
-      return {
-        grade: 'B1',
-        label: 'Fair',
-        risk: 'moderate',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    if (score >= 50)
-      return {
-        grade: 'B2',
-        label: 'Speculative',
-        risk: 'high',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    if (score >= 40)
-      return {
-        grade: 'B3',
-        label: 'Very Speculative',
-        risk: 'very_high',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    if (score >= 20)
-      return {
-        grade: 'C',
-        label: 'Substantial Risk',
-        risk: 'severe',
-        outlook: 'stable',
-        trajectory: '→ Stable',
-      };
-    return {
-      grade: 'D',
-      label: 'Default',
-      risk: 'extreme',
-      outlook: 'stable',
-      trajectory: '→ Stable',
-    };
-  }),
-}));
-
 describe('Token Gate Service', () => {
   let tokenGate;
-  let holdex;
   let logger;
+
+  const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  const USDT = 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB';
+  const SOL = 'So11111111111111111111111111111111111111112';
+  const ASDF = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+  const UNKNOWN = 'UnknownMint1111111111111111111111111111111';
+  const MSOL = 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So';
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.resetModules();
-
-    holdex = require('../../../src/services/holdex');
     logger = require('../../../src/utils/logger');
     tokenGate = require('../../../src/services/token-gate');
   });
 
   describe('isTokenAccepted()', () => {
-    describe('DIAMOND_TOKENS (local, no network)', () => {
-      it('should accept SOL with Diamond tier and credit rating', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          'So11111111111111111111111111111111111111112'
-        );
-
+    describe('Whitelist tokens — accepted', () => {
+      it('should accept SOL', async () => {
+        const result = await tokenGate.isTokenAccepted(SOL);
         expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
+        expect(result.reason).toBe('whitelisted');
         expect(result.tier).toBe('Diamond');
         expect(result.kScore).toBe(100);
-        expect(result.kRank.level).toBe(8);
-        expect(result.creditRating.grade).toBe('A1');
-        expect(holdex.isTokenAccepted).not.toHaveBeenCalled();
       });
 
-      it('should accept USDC with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
-        );
-
+      it('should accept USDC', async () => {
+        const result = await tokenGate.isTokenAccepted(USDC);
         expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
+        expect(result.reason).toBe('whitelisted');
         expect(result.tier).toBe('Diamond');
       });
 
-      it('should accept USDT with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
-        );
-
+      it('should accept USDT', async () => {
+        const result = await tokenGate.isTokenAccepted(USDT);
         expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
-        expect(result.tier).toBe('Diamond');
+        expect(result.reason).toBe('whitelisted');
       });
 
-      it('should accept mSOL with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'
-        );
-
+      it('should accept $ASDF (100% burn channel)', async () => {
+        const result = await tokenGate.isTokenAccepted(ASDF);
         expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
+        expect(result.reason).toBe('whitelisted');
         expect(result.tier).toBe('Diamond');
       });
-
-      it('should accept jitoSOL with Diamond tier', async () => {
-        const result = await tokenGate.isTokenAccepted(
-          'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'
-        );
-
-        expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('diamond');
-        expect(result.tier).toBe('Diamond');
-      });
-
-      // NOTE: $ASDF is no longer in DIAMOND_TOKENS
-      // It uses real K-score from HolDex (benefits from Dual-Burn Flywheel instead)
-      // See HolDex tier-based acceptance tests for $ASDF handling
     });
 
-    describe('HolDex tier-based acceptance', () => {
-      const unknownMint = 'UnknownMint1111111111111111111111111111111';
-
-      it('should accept Platinum tier tokens with credit rating', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: true,
-          tier: 'Platinum',
-          kScore: 85,
-          kRank: { tier: 'Platinum', icon: '💠', level: 7 },
-          creditRating: { grade: 'A2', label: 'Excellent', risk: 'very_low', outlook: 'stable' },
-          cached: false,
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
-        expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('tier_accepted');
-        expect(result.tier).toBe('Platinum');
-        expect(result.kScore).toBe(85);
-        expect(result.creditRating.grade).toBe('A2');
-        expect(holdex.isTokenAccepted).toHaveBeenCalledWith(unknownMint);
-      });
-
-      it('should accept Gold tier tokens with credit rating', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: true,
-          tier: 'Gold',
-          kScore: 75,
-          kRank: { tier: 'Gold', icon: '🥇', level: 6 },
-          creditRating: { grade: 'A3', label: 'Good', risk: 'low', outlook: 'stable' },
-          cached: false,
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
-        expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('tier_accepted');
-        expect(result.tier).toBe('Gold');
-        expect(result.kScore).toBe(75);
-        expect(result.creditRating.grade).toBe('A3');
-      });
-
-      it('should reject Silver tier tokens', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: false,
-          tier: 'Silver',
-          kScore: 65,
-          cached: false,
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
+    describe('Non-whitelist tokens — rejected', () => {
+      it('should reject unknown token', async () => {
+        const result = await tokenGate.isTokenAccepted(UNKNOWN);
         expect(result.accepted).toBe(false);
-        expect(result.reason).toBe('tier_rejected');
-        expect(result.tier).toBe('Silver');
-        expect(result.kScore).toBe(65);
+        expect(result.reason).toBe('not_whitelisted');
+        expect(result.tier).toBeNull();
       });
 
-      it('should reject Bronze tier tokens', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: false,
-          tier: 'Bronze',
-          kScore: 55,
-          cached: false,
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
+      it('should reject mSOL (not in Phase 0 whitelist)', async () => {
+        const result = await tokenGate.isTokenAccepted(MSOL);
         expect(result.accepted).toBe(false);
-        expect(result.reason).toBe('tier_rejected');
-        expect(result.tier).toBe('Bronze');
+        expect(result.reason).toBe('not_whitelisted');
       });
 
-      it('should reject Rust tier tokens (lowest tier)', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: false,
-          tier: 'Rust',
-          kScore: 5,
-          cached: false,
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
-        expect(result.accepted).toBe(false);
-        expect(result.reason).toBe('tier_rejected');
-        expect(result.tier).toBe('Rust');
-        expect(result.kScore).toBe(5);
-      });
-
-      it('should reject tokens when HolDex returns error', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: false,
-          tier: 'Bronze',
-          kScore: 0,
-          cached: false,
-          error: 'API error',
-        });
-
-        const result = await tokenGate.isTokenAccepted(unknownMint);
-
-        expect(result.accepted).toBe(false);
-        expect(result.reason).toBe('verification_failed');
-      });
-
-      it('should log rejection for non-accepted tiers', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: false,
-          tier: 'Silver',
-          kScore: 65,
-          cached: false,
-        });
-
-        await tokenGate.isTokenAccepted(unknownMint);
-
+      it('should log rejection for non-whitelisted tokens', async () => {
+        await tokenGate.isTokenAccepted(UNKNOWN);
         expect(logger.info).toHaveBeenCalledWith(
           'TOKEN_GATE',
-          'Token rejected',
-          expect.objectContaining({
-            tier: 'Silver',
-            kScore: 65,
-          })
+          'Token rejected — not whitelisted',
+          expect.objectContaining({ mint: UNKNOWN.slice(0, 8) })
         );
       });
 
-      it('should log acceptance for accepted tiers', async () => {
-        holdex.isTokenAccepted.mockResolvedValue({
-          accepted: true,
-          tier: 'Gold',
-          kScore: 75,
-          cached: false,
-        });
-
-        await tokenGate.isTokenAccepted(unknownMint);
-
-        expect(logger.debug).toHaveBeenCalledWith(
-          'TOKEN_GATE',
-          'Token accepted',
-          expect.objectContaining({ tier: 'Gold', kScore: 75 })
-        );
+      it('should NOT make any network calls for any token', async () => {
+        // Phase 0: pure local check, no external dependencies
+        // This test verifies no network calls are made (holdex removed)
+        const result = await tokenGate.isTokenAccepted(UNKNOWN);
+        expect(result.accepted).toBe(false);
+        // If we reach here without network errors, test passes
       });
     });
   });
 
   describe('isDiamondToken()', () => {
-    it('should return true for Diamond tokens', () => {
-      expect(tokenGate.isDiamondToken('So11111111111111111111111111111111111111112')).toBe(true);
-      expect(tokenGate.isDiamondToken('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')).toBe(true);
+    it('should return true for whitelisted tokens', () => {
+      expect(tokenGate.isDiamondToken(SOL)).toBe(true);
+      expect(tokenGate.isDiamondToken(USDC)).toBe(true);
+      expect(tokenGate.isDiamondToken(USDT)).toBe(true);
+      expect(tokenGate.isDiamondToken(ASDF)).toBe(true);
     });
 
-    it('should return false for non-Diamond tokens', () => {
-      expect(tokenGate.isDiamondToken('RandomMint111111111111111111111111111111111')).toBe(false);
+    it('should return false for non-whitelisted tokens', () => {
+      expect(tokenGate.isDiamondToken(UNKNOWN)).toBe(false);
+      expect(tokenGate.isDiamondToken(MSOL)).toBe(false);
     });
 
-    it('should NOT include $ASDF in Diamond tokens (uses real K-score)', () => {
-      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
-      expect(tokenGate.isDiamondToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(false);
-    });
-  });
-
-  describe('isTrustedToken() (legacy)', () => {
-    it('should return true for trusted tokens', () => {
-      expect(tokenGate.isTrustedToken('So11111111111111111111111111111111111111112')).toBe(true);
-      expect(tokenGate.isTrustedToken('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')).toBe(true);
-    });
-
-    it('should return false for non-trusted tokens', () => {
-      expect(tokenGate.isTrustedToken('RandomMint111111111111111111111111111111111')).toBe(false);
-    });
-
-    it('should NOT include $ASDF in trusted tokens (uses real K-score)', () => {
-      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded tier
-      expect(tokenGate.isTrustedToken('9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump')).toBe(false);
+    it('should include $ASDF (100% burn channel — whitelisted in Phase 0)', () => {
+      expect(tokenGate.isDiamondToken(ASDF)).toBe(true);
     });
   });
 
   describe('getDiamondTokensList()', () => {
-    it('should return list of Diamond tier tokens', () => {
+    it('should return list of whitelisted tokens', () => {
       const tokens = tokenGate.getDiamondTokensList();
-
       expect(tokens).toBeInstanceOf(Array);
-      // 5 tokens: SOL, USDC, USDT, mSOL, jitoSOL (no longer includes $ASDF)
-      expect(tokens.length).toBe(5);
-
-      // Check structure - now uses tier instead of trusted
-      const sol = tokens.find((t) => t.symbol === 'SOL');
-      expect(sol).toBeDefined();
-      expect(sol.mint).toBe('So11111111111111111111111111111111111111112');
-      expect(sol.decimals).toBe(9);
-      expect(sol.tier).toBe('Diamond');
+      // Phase 0 whitelist: SOL, USDC, USDT, $ASDF
+      expect(tokens.length).toBe(4);
     });
 
-    it('should NOT include $asdfasdfa (uses real K-score from HolDex)', () => {
-      // $ASDF benefits from Dual-Burn Flywheel (100% burn), not hardcoded Diamond tier
+    it('should include $ASDF (100% burn channel)', () => {
       const tokens = tokenGate.getDiamondTokensList();
-
-      const asdf = tokens.find((t) => t.symbol === 'asdfasdfa');
-      expect(asdf).toBeUndefined();
+      const asdf = tokens.find((t) => t.mint === ASDF);
+      expect(asdf).toBeDefined();
+      expect(asdf.symbol).toBe('ASDF');
     });
 
-    it('should include all major stablecoins', () => {
+    it('should include all stablecoins', () => {
       const tokens = tokenGate.getDiamondTokensList();
-
       expect(tokens.find((t) => t.symbol === 'USDC')).toBeDefined();
       expect(tokens.find((t) => t.symbol === 'USDT')).toBeDefined();
     });
 
-    it('should include liquid staking tokens', () => {
+    it('should include SOL', () => {
       const tokens = tokenGate.getDiamondTokensList();
+      expect(tokens.find((t) => t.symbol === 'SOL')).toBeDefined();
+    });
 
-      expect(tokens.find((t) => t.symbol === 'mSOL')).toBeDefined();
-      expect(tokens.find((t) => t.symbol === 'jitoSOL')).toBeDefined();
+    it('should mark all tokens as Diamond tier', () => {
+      const tokens = tokenGate.getDiamondTokensList();
+      tokens.forEach((t) => expect(t.tier).toBe('Diamond'));
     });
   });
 
@@ -384,7 +148,6 @@ describe('Token Gate Service', () => {
     it('should return same list as getDiamondTokensList', () => {
       const diamond = tokenGate.getDiamondTokensList();
       const accepted = tokenGate.getAcceptedTokensList();
-
       expect(accepted).toEqual(diamond);
     });
   });
@@ -394,13 +157,16 @@ describe('Token Gate Service', () => {
       expect(tokenGate.DIAMOND_TOKENS).toBeInstanceOf(Set);
     });
 
-    it('should contain the core Diamond tokens', () => {
-      expect(tokenGate.DIAMOND_TOKENS.has('So11111111111111111111111111111111111111112')).toBe(
-        true
-      );
-      expect(tokenGate.DIAMOND_TOKENS.has('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')).toBe(
-        true
-      );
+    it('should contain Phase 0 whitelist', () => {
+      expect(tokenGate.DIAMOND_TOKENS.has(SOL)).toBe(true);
+      expect(tokenGate.DIAMOND_TOKENS.has(USDC)).toBe(true);
+      expect(tokenGate.DIAMOND_TOKENS.has(USDT)).toBe(true);
+      expect(tokenGate.DIAMOND_TOKENS.has(ASDF)).toBe(true);
+    });
+
+    it('should not contain non-whitelisted tokens', () => {
+      expect(tokenGate.DIAMOND_TOKENS.has(UNKNOWN)).toBe(false);
+      expect(tokenGate.DIAMOND_TOKENS.has(MSOL)).toBe(false);
     });
   });
 

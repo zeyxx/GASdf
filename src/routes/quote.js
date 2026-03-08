@@ -81,7 +81,7 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
       });
 
       return res.status(400).json({
-        error: 'Payment token not accepted. Use SOL, USDC, USDT, or a HolDex-verified token.',
+        error: 'Payment token not accepted. Use USDC, USDT, or $ASDF.',
         code: 'TOKEN_NOT_ACCEPTED',
         reason: tokenCheck.reason,
       });

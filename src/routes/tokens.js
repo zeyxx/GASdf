@@ -10,7 +10,6 @@ const {
   isTokenAccepted,
   isDiamondToken,
 } = require('../services/token-gate');
-const holdex = require('../services/holdex');
 const jupiter = require('../services/jupiter');
 const helius = require('../services/helius');
 
@@ -24,7 +23,7 @@ const router = express.Router();
 router.get('/', (req, res) => {
   res.json({
     tokens: getAcceptedTokensList(),
-    note: 'HolDex-verified community tokens are also accepted',
+    note: 'Accepted payment tokens: USDC, USDT, $ASDF',
   });
 });
 
@@ -194,143 +193,64 @@ router.get('/wallet/:pubkey', globalLimiter, async (req, res) => {
       });
     }
 
-    // Process SPL tokens in parallel (batch of 10 for rate limiting)
+    // Process SPL tokens — whitelist only, no external calls
     const tokensToProcess = tokenAccounts.value
-      .filter((ta) => {
-        const amount = parseInt(ta.account.data.parsed.info.tokenAmount.amount);
-        return amount > 0;
-      })
+      .filter((ta) => parseInt(ta.account.data.parsed.info.tokenAmount.amount) > 0)
       .map((ta) => ({
         mint: ta.account.data.parsed.info.mint,
         amount: parseInt(ta.account.data.parsed.info.tokenAmount.amount),
         decimals: ta.account.data.parsed.info.tokenAmount.decimals,
       }));
 
-    // Process in batches
-    const BATCH_SIZE = 10;
-    for (let i = 0; i < tokensToProcess.length; i += BATCH_SIZE) {
-      const batch = tokensToProcess.slice(i, i + BATCH_SIZE);
-
-      const results = await Promise.all(
-        batch.map(async (token) => {
-          try {
-            // Check if Diamond token (fast path)
-            if (isDiamondToken(token.mint)) {
-              const tokenData = await isTokenAccepted(token.mint);
-              const feeData = await jupiter.getFeeInToken(token.mint, discountedFee);
-              return {
-                category: 'diamond',
-                data: {
-                  mint: token.mint,
-                  symbol: feeData.symbol || 'UNKNOWN',
-                  name: feeData.name || token.mint.slice(0, 8),
-                  decimals: token.decimals,
-                  balance: token.amount,
-                  balanceFormatted: (token.amount / Math.pow(10, token.decimals)).toFixed(4),
-                  logoURI: feeData.logoURI || null,
-                  // HolDex data
-                  kScore: 100,
-                  tier: 'Diamond',
-                  tierIcon: '💎',
-                  creditRating: tokenData.creditRating || { grade: 'A1', risk: 'minimal' },
-                  // Dual-burn (for $ASDF)
-                  burnedPercent: tokenData.supply?.burnedPercent || 0,
-                  ecosystemBurn: tokenData.ecosystemBurn || null,
-                  // Fee estimate
-                  feeAmount: feeData.inputAmount,
-                  feeFormatted: `${(feeData.inputAmount / Math.pow(10, token.decimals)).toFixed(4)} ${feeData.symbol || ''}`,
-                  accepted: true,
-                  reason: 'diamond',
-                },
-              };
-            }
-
-            // Get HolDex data for non-Diamond tokens
-            const holdexData = await holdex.getToken(token.mint);
-            const isAccepted = holdex.ACCEPTED_TIERS.has(holdexData.tier);
-
-            // Get fee estimate (only if accepted)
+    await Promise.all(
+      tokensToProcess.map(async (token) => {
+        try {
+          if (isDiamondToken(token.mint)) {
             let feeData = null;
-            if (isAccepted) {
-              try {
-                feeData = await jupiter.getFeeInToken(token.mint, discountedFee);
-              } catch {
-                // Token might not have Jupiter liquidity
-              }
+            try {
+              feeData = await jupiter.getFeeInToken(token.mint, discountedFee);
+            } catch {
+              // Token might not have Jupiter liquidity
             }
-
-            // Get token metadata from Jupiter if available
-            let symbol = 'UNKNOWN';
-            let name = token.mint.slice(0, 8);
-            let logoURI = null;
-
-            if (feeData) {
-              symbol = feeData.symbol || symbol;
-              name = feeData.name || name;
-              logoURI = feeData.logoURI || null;
-            }
-
-            const tokenInfo = {
+            diamond.push({
               mint: token.mint,
-              symbol,
-              name,
+              symbol: feeData?.symbol || 'UNKNOWN',
               decimals: token.decimals,
               balance: token.amount,
               balanceFormatted: (token.amount / Math.pow(10, token.decimals)).toFixed(4),
-              logoURI,
-              // HolDex data
-              kScore: holdexData.kScore,
-              tier: holdexData.tier,
-              tierIcon: holdexData.kRank?.icon || '🔩',
-              creditRating: holdexData.creditRating,
-              conviction: holdexData.conviction || null,
-              // Dual-burn flywheel
-              burnedPercent: holdexData.supply?.burnedPercent || 0,
-              ecosystemBurn: holdexData.ecosystemBurn || null,
-              // Fee estimate
+              tier: 'Diamond',
               feeAmount: feeData?.inputAmount || null,
               feeFormatted: feeData
-                ? `${(feeData.inputAmount / Math.pow(10, token.decimals)).toFixed(4)} ${symbol}`
+                ? `${(feeData.inputAmount / Math.pow(10, token.decimals)).toFixed(4)} ${feeData.symbol || ''}`
                 : null,
-              accepted: isAccepted,
-              reason: isAccepted ? 'tier_accepted' : 'tier_rejected',
-              rejectionReason: !isAccepted
-                ? `K-score ${holdexData.kScore} < 50 (${holdexData.tier})`
-                : null,
-            };
-
-            return {
-              category: isAccepted ? 'accepted' : 'notEligible',
-              data: tokenInfo,
-            };
-          } catch (error) {
-            logger.warn('TOKENS', 'Failed to process token', {
-              mint: token.mint.slice(0, 8),
-              error: error.message,
+              accepted: true,
+              reason: 'whitelisted',
             });
-            return null;
+          } else {
+            // Phase 0: all non-whitelist tokens are not eligible
+            notEligible.push({
+              mint: token.mint,
+              decimals: token.decimals,
+              balance: token.amount,
+              balanceFormatted: (token.amount / Math.pow(10, token.decimals)).toFixed(4),
+              accepted: false,
+              reason: 'not_whitelisted',
+            });
           }
-        })
-      );
-
-      // Categorize results
-      for (const result of results) {
-        if (!result) continue;
-        if (result.category === 'diamond') diamond.push(result.data);
-        else if (result.category === 'accepted') accepted.push(result.data);
-        else notEligible.push(result.data);
-      }
-    }
+        } catch (error) {
+          logger.warn('TOKENS', 'Failed to process token', {
+            mint: token.mint.slice(0, 8),
+            error: error.message,
+          });
+        }
+      })
+    );
 
     // =========================================================================
     // 5. Sort categories
     // =========================================================================
-    // Diamond: by symbol
-    diamond.sort((a, b) => a.symbol.localeCompare(b.symbol));
-    // Accepted: by K-score (highest first), then by balance
-    accepted.sort((a, b) => b.kScore - a.kScore || b.balance - a.balance);
-    // Not eligible: by K-score (highest first - closest to acceptance)
-    notEligible.sort((a, b) => b.kScore - a.kScore);
+    diamond.sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
+    notEligible.sort((a, b) => b.balance - a.balance);
 
     const elapsed = Date.now() - startTime;
     logger.info('TOKENS', 'Wallet tokens fetched', {
@@ -362,12 +282,12 @@ router.get('/wallet/:pubkey', globalLimiter, async (req, res) => {
         },
         accepted: {
           label: '✅ Accepted',
-          description: 'HolDex K-score ≥ 50 (Bronze+)',
+          description: 'Whitelist accepted tokens',
           tokens: accepted,
         },
         notEligible: {
           label: '❌ Not Eligible',
-          description: 'K-score < 50 - upgrade needed',
+          description: 'Not in whitelist (USDC, USDT, $ASDF only)',
           tokens: notEligible,
         },
       },
@@ -388,54 +308,5 @@ router.get('/wallet/:pubkey', globalLimiter, async (req, res) => {
   }
 });
 
-// =============================================================================
-// HOLDEX TOKENS - List verified tokens from HolDex
-// =============================================================================
-
-/**
- * GET /tokens/holdex
- * Get list of HolDex verified tokens (K-score >= 50)
- * Sorted by K-score descending
- */
-router.get('/holdex', globalLimiter, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
-    const result = await holdex.getAllTokens(limit);
-
-    if (!result.success) {
-      return res.status(503).json({
-        error: 'HolDex temporarily unavailable',
-        code: 'HOLDEX_UNAVAILABLE',
-      });
-    }
-
-    // Filter and enrich tokens
-    const tokens = result.tokens
-      .filter((t) => t.kScore >= 50) // Only accepted tiers
-      .map((t) => ({
-        mint: t.mint,
-        symbol: t.symbol,
-        name: t.name,
-        logoURI: t.logoURI || null,
-        kScore: t.kScore,
-        tier: t.kRank?.tier || holdex.getKRank(t.kScore).tier,
-        tierIcon: t.kRank?.icon || holdex.getKRank(t.kScore).icon,
-        creditRating: t.creditRating || holdex.getCreditRating(t.kScore),
-        conviction: t.conviction || null,
-        burnedPercent: t.supply?.burnedPercent || 0,
-        hasCommunityUpdate: t.hasCommunityUpdate || false,
-      }))
-      .sort((a, b) => b.kScore - a.kScore);
-
-    res.json({
-      tokens,
-      count: tokens.length,
-      source: 'holdex',
-    });
-  } catch (error) {
-    logger.error('TOKENS', 'HolDex tokens fetch failed', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch HolDex tokens' });
-  }
-});
 
 module.exports = router;

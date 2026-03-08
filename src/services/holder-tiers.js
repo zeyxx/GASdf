@@ -16,7 +16,6 @@ const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
 const { getConnection } = require('../utils/rpc');
 const logger = require('../utils/logger');
-const harmony = require('./harmony');
 
 // Treasury ratio from config (Pure Golden: 1/φ³ ≈ 23.6%)
 // Used for break-even calculation to ensure consistency across codebase
@@ -263,20 +262,11 @@ function getNextTierInfo(currentTierName, currentSharePercent, circulating) {
  * @returns {Promise<Object>} - Complete fee info
  */
 async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
-  // Fetch holder tier and E-Score in parallel
-  const [tierInfo, eScoreData] = await Promise.all([
-    getHolderTier(walletAddress),
-    harmony.getEScore(walletAddress).catch((err) => {
-      logger.debug('[HOLDER-TIERS] E-Score fetch failed, using 0', { error: err.message });
-      return { eScore: 0, discount: 0 };
-    }),
-  ]);
+  const tierInfo = await getHolderTier(walletAddress);
 
-  // Use the HIGHER discount (holder tier vs E-Score)
-  const holderDiscount = tierInfo.discount;
-  const eScoreDiscount = eScoreData.discount || 0;
-  const effectiveDiscount = Math.max(holderDiscount, eScoreDiscount);
-  const discountSource = eScoreDiscount > holderDiscount ? 'escore' : 'holder';
+  // Phase 0: Holder tier discount only (E-Score / Harmony removed).
+  const effectiveDiscount = tierInfo.discount;
+  const discountSource = 'holder';
 
   const breakEvenFee = calculateBreakEvenFee(txCost);
   const discountedFee = applyDiscount(baseFee, effectiveDiscount, txCost);
@@ -286,12 +276,9 @@ async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
   // Get next tier info for upgrade motivation
   const nextTier = getNextTierInfo(tierInfo.tier, tierInfo.sharePercent, tierInfo.circulating);
 
-  logger.debug('[HOLDER-TIERS] Combined discount calculated', {
+  logger.debug('[HOLDER-TIERS] Discount calculated', {
     wallet: walletAddress.slice(0, 8),
-    holderDiscount: (holderDiscount * 100).toFixed(1) + '%',
-    eScore: eScoreData.eScore,
-    eScoreDiscount: (eScoreDiscount * 100).toFixed(1) + '%',
-    effectiveDiscount: (effectiveDiscount * 100).toFixed(1) + '%',
+    discount: (effectiveDiscount * 100).toFixed(1) + '%',
     source: discountSource,
   });
 
@@ -318,9 +305,6 @@ async function calculateDiscountedFee(walletAddress, baseFee, txCost = 5000) {
     circulating: tierInfo.circulating,
     sharePercent: tierInfo.sharePercent,
 
-    // E-Score info
-    eScore: eScoreData.eScore || 0,
-    eScoreDiscount: eScoreDiscount,
     discountSource,
   };
 }
