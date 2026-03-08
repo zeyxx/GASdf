@@ -146,16 +146,6 @@ const config = {
   // Get API key from https://portal.jup.ag
   JUPITER_API_KEY: process.env.JUPITER_API_KEY,
 
-  // HolDex - Community verification service ($ASDF ecosystem)
-  HOLDEX_URL: process.env.HOLDEX_URL || 'https://holdex-api.onrender.com/api',
-  HOLDEX_API_KEY: process.env.HOLDEX_API_KEY,
-  HOLDEX_WEBHOOK_SECRET: process.env.HOLDEX_WEBHOOK_SECRET, // HMAC-SHA256 for burn notifications
-  HOLDEX_TIMEOUT: parseInt(process.env.HOLDEX_TIMEOUT) || 10000, // API timeout in ms
-
-  // Minimum K-score for token acceptance (0-100)
-  // K-score = (accumulators + maintained) / total_holders
-  // Measures holder conviction - reject tokens where holders are fleeing
-  MIN_KSCORE: parseInt(process.env.MIN_KSCORE) || 50,
 
   // Phase 3: Monitoring
   PROMETHEUS_ENABLED: process.env.PROMETHEUS_ENABLED === 'true',

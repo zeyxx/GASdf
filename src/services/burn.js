@@ -602,25 +602,12 @@ async function processTokenForBatch(token, pendingBurns) {
   const { mint, balance, symbol, valueUsd: _valueUsd } = token;
   const isAsdf = mint === config.ASDF_MINT;
 
-  // Get ecosystem burn bonus for non-ASDF tokens
-  // Default: Golden Ratio split (no ecosystem burn bonus for unverified tokens)
-  let ecosystemBurnBonus = {
-    ecosystemBurnPct: 0,
-    asdfBurnPct: config.BURN_RATIO, // 76.4% (1 - 1/φ³)
-    treasuryPct: config.TREASURY_RATIO, // 23.6% (1/φ³)
-  };
-  let tokenBurnedPercent = 0;
-
-  // Phase 0: No ecosystem burn bonus (HolDex removed).
-  // ecosystemBurnPct stays 0 — all value flows through $ASDF at φ-ratio.
-
   const feePayer = feePayerPool.getHealthyPayer();
   if (!feePayer) {
     throw new Error('No healthy fee payer available');
   }
 
   let asdfBurned = 0;
-  let ecosystemBurned = 0;
   const swapSignatures = [];
 
   if (isAsdf) {
@@ -645,34 +632,11 @@ async function processTokenForBatch(token, pendingBurns) {
     }
   } else {
     // ==========================================================================
-    // UNIFIED $ASDF MODEL: Everything flows through $ASDF
-    //
-    // Philosophy: All value → $ASDF → burn/treasury
-    // - 1 swap instead of 2 (50% less swap fees!)
-    // - Treasury kept in $ASDF (more $ASDF in ecosystem)
-    // - Only swap $ASDF → SOL when fee payer needs refill
+    // UNIFIED MODEL: Token → $ASDF → 76.4% burn / 23.6% treasury (φ-ratio)
     // ==========================================================================
-
-    // Ecosystem burn portion (direct token burn for dual-burn flywheel)
-    const ecosystemBurnAmount = Math.floor(balance * ecosystemBurnBonus.ecosystemBurnPct);
-
-    // Everything else → swap to $ASDF (1 swap only!)
-    const amountToSwapToAsdf = balance - ecosystemBurnAmount;
-
-    // 1. Ecosystem burn (queue for batch) - supports token burning ecosystem
-    if (ecosystemBurnAmount > 0) {
-      pendingBurns.push({
-        mint,
-        amount: ecosystemBurnAmount,
-        type: 'ecosystem',
-        symbol,
-      });
-      ecosystemBurned = ecosystemBurnAmount;
-    }
-
-    // 2. UNIFIED: Swap remaining 100% → $ASDF (1 swap instead of 2!)
-    if (amountToSwapToAsdf > 0) {
-      const swapResult = await swapTokenToAsdf(mint, amountToSwapToAsdf, feePayer);
+    // Swap 100% → $ASDF (1 swap only)
+    if (balance > 0) {
+      const swapResult = await swapTokenToAsdf(mint, balance, feePayer);
 
       if (swapResult.success && swapResult.asdfReceived) {
         const asdfReceived = parseInt(swapResult.asdfReceived);
@@ -720,12 +684,6 @@ async function processTokenForBatch(token, pendingBurns) {
   logger.info('BURN', `Processed ${symbol} for batch`, {
     mint: mint.slice(0, 8),
     asdfBurned,
-    ecosystemBurned,
-    tokenBurnedPercent: tokenBurnedPercent > 0 ? tokenBurnedPercent.toFixed(1) + '%' : null,
-    ecosystemBurnBonus:
-      ecosystemBurnBonus.ecosystemBurnPct > 0
-        ? (ecosystemBurnBonus.ecosystemBurnPct * 100).toFixed(1) + '%'
-        : null,
     swapsUsed: swapSignatures.length,
     pendingBurnsTotal: pendingBurns.length,
     model: isAsdf ? '100% burn' : 'unified (76.4% burn)',
@@ -735,11 +693,6 @@ async function processTokenForBatch(token, pendingBurns) {
     mint,
     symbol,
     asdfBurned,
-    ecosystemBurned,
-    asdfRetained:
-      !isAsdf && asdfBurned > 0
-        ? Math.floor((asdfBurned * (1 - config.BURN_RATIO)) / config.BURN_RATIO)
-        : 0,
     swapSignatures,
     swapsUsed: swapSignatures.length,
     batched: true,

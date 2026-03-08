@@ -243,21 +243,8 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
         decimals: feeInToken.decimals || 6,
-        accepted: tokenCheck.reason, // 'diamond' or 'tier_accepted'
+        accepted: tokenCheck.reason,
         tier: tokenCheck.tier,
-        kScore: tokenCheck.kScore,
-        kRank: tokenCheck.kRank,
-        creditRating: tokenCheck.creditRating,
-        // Dual-burn flywheel (Pure Golden φ-based economics)
-        dualBurn: tokenCheck.ecosystemBurn
-          ? {
-              burnedPercent: tokenCheck.supply?.burnedPercent || 0,
-              ecosystemBurnPct: tokenCheck.ecosystemBurn.ecosystemBurnPct,
-              asdfBurnPct: tokenCheck.ecosystemBurn.asdfBurnPct,
-              treasuryPct: tokenCheck.ecosystemBurn.treasuryPct,
-              explanation: tokenCheck.ecosystemBurn.explanation,
-            }
-          : null,
       },
       holderTier: {
         tier: tierInfo.tier,
@@ -270,15 +257,6 @@ router.post('/', validate('quote'), walletQuoteLimiter, async (req, res) => {
         breakEvenFee: tierInfo.breakEvenFee,
         isAtBreakEven: tierInfo.isAtBreakEven,
       },
-      // E-Score from HolDex Harmony API (engagement-based discount)
-      eScore: tierInfo.eScore
-        ? {
-            score: tierInfo.eScore,
-            discount: Math.round((tierInfo.eScoreDiscount || 0) * 100),
-            isActive: tierInfo.discountSource === 'escore',
-          }
-        : null,
-      // Which discount source is active (holder tier vs E-Score)
       discountSource: tierInfo.discountSource || 'holder',
       expiresAt,
       ttl,
