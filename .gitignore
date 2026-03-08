@@ -16,3 +16,6 @@ coverage/
 # Prototypes (local development only)
 prototypes/
 .mcp.json
+
+# Strategic documents (local only)
+STRATEGY.md
