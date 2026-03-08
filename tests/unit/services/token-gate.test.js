@@ -32,14 +32,6 @@ describe('Token Gate Service', () => {
 
   describe('isTokenAccepted()', () => {
     describe('Whitelist tokens — accepted', () => {
-      it('should accept SOL', async () => {
-        const result = await tokenGate.isTokenAccepted(SOL);
-        expect(result.accepted).toBe(true);
-        expect(result.reason).toBe('whitelisted');
-        expect(result.tier).toBe('Diamond');
-        expect(result.kScore).toBe(100);
-      });
-
       it('should accept USDC', async () => {
         const result = await tokenGate.isTokenAccepted(USDC);
         expect(result.accepted).toBe(true);
@@ -62,6 +54,12 @@ describe('Token Gate Service', () => {
     });
 
     describe('Non-whitelist tokens — rejected', () => {
+      it('should reject SOL — if you have SOL, pay gas directly', async () => {
+        const result = await tokenGate.isTokenAccepted(SOL);
+        expect(result.accepted).toBe(false);
+        expect(result.reason).toBe('not_whitelisted');
+      });
+
       it('should reject unknown token', async () => {
         const result = await tokenGate.isTokenAccepted(UNKNOWN);
         expect(result.accepted).toBe(false);
@@ -96,13 +94,16 @@ describe('Token Gate Service', () => {
 
   describe('isDiamondToken()', () => {
     it('should return true for whitelisted tokens', () => {
-      expect(tokenGate.isDiamondToken(SOL)).toBe(true);
       expect(tokenGate.isDiamondToken(USDC)).toBe(true);
       expect(tokenGate.isDiamondToken(USDT)).toBe(true);
       expect(tokenGate.isDiamondToken(ASDF)).toBe(true);
     });
 
-    it('should return false for non-whitelisted tokens', () => {
+    it('should return false for SOL — contradicts the gasless purpose', () => {
+      expect(tokenGate.isDiamondToken(SOL)).toBe(false);
+    });
+
+    it('should return false for other non-whitelisted tokens', () => {
       expect(tokenGate.isDiamondToken(UNKNOWN)).toBe(false);
       expect(tokenGate.isDiamondToken(MSOL)).toBe(false);
     });
@@ -116,8 +117,8 @@ describe('Token Gate Service', () => {
     it('should return list of whitelisted tokens', () => {
       const tokens = tokenGate.getDiamondTokensList();
       expect(tokens).toBeInstanceOf(Array);
-      // Phase 0 whitelist: SOL, USDC, USDT, $ASDF
-      expect(tokens.length).toBe(4);
+      // Phase 0 whitelist: USDC, USDT, $ASDF (no SOL — contradicts gasless purpose)
+      expect(tokens.length).toBe(3);
     });
 
     it('should include $ASDF (100% burn channel)', () => {
@@ -133,9 +134,9 @@ describe('Token Gate Service', () => {
       expect(tokens.find((t) => t.symbol === 'USDT')).toBeDefined();
     });
 
-    it('should include SOL', () => {
+    it('should NOT include SOL', () => {
       const tokens = tokenGate.getDiamondTokensList();
-      expect(tokens.find((t) => t.symbol === 'SOL')).toBeDefined();
+      expect(tokens.find((t) => t.symbol === 'SOL')).toBeUndefined();
     });
 
     it('should mark all tokens as Diamond tier', () => {
@@ -158,13 +159,13 @@ describe('Token Gate Service', () => {
     });
 
     it('should contain Phase 0 whitelist', () => {
-      expect(tokenGate.DIAMOND_TOKENS.has(SOL)).toBe(true);
       expect(tokenGate.DIAMOND_TOKENS.has(USDC)).toBe(true);
       expect(tokenGate.DIAMOND_TOKENS.has(USDT)).toBe(true);
       expect(tokenGate.DIAMOND_TOKENS.has(ASDF)).toBe(true);
     });
 
-    it('should not contain non-whitelisted tokens', () => {
+    it('should not contain SOL or other non-whitelisted tokens', () => {
+      expect(tokenGate.DIAMOND_TOKENS.has(SOL)).toBe(false);
       expect(tokenGate.DIAMOND_TOKENS.has(UNKNOWN)).toBe(false);
       expect(tokenGate.DIAMOND_TOKENS.has(MSOL)).toBe(false);
     });
