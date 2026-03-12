@@ -1,21 +1,22 @@
 /**
  * Helius SDK Integration
- * Provides optimized RPC methods via the Helius SDK
+ * Priority fees, tx submission (Sender), and RPC connection.
+ *
+ * Uses helius-sdk for: getPriorityFeeEstimate, sendSmartTransaction
+ * Uses @solana/web3.js v1 Connection (via Helius RPC URL) for: raw RPC calls
  */
 
 const { createHelius } = require('helius-sdk');
+const { Connection } = require('@solana/web3.js');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 
-// Initialize Helius SDK (singleton)
 let helius = null;
+let connection = null;
 
 function getHelius() {
   if (!helius && config.HELIUS_API_KEY) {
-    helius = createHelius({
-      apiKey: config.HELIUS_API_KEY,
-      network: config.USE_MAINNET ? 'mainnet' : 'devnet',
-    });
+    helius = createHelius(config.HELIUS_API_KEY);
     logger.info('HELIUS', 'SDK initialized', {
       network: config.USE_MAINNET ? 'mainnet' : 'devnet',
     });
@@ -23,62 +24,29 @@ function getHelius() {
   return helius;
 }
 
-// Cache for priority fees (5 second TTL - network conditions change fast)
-let priorityFeeCache = {
-  estimate: null,
-  timestamp: 0,
-  ttl: 5000, // 5 seconds
-};
+// Cache for priority fees (5s TTL)
+let priorityFeeCache = { estimate: null, timestamp: 0, ttl: 5000 };
 
 /**
- * Get priority fee estimate from Helius
- * Returns recommended priority fee in microlamports per compute unit
- *
- * @param {Object} options
- * @param {string[]} options.accountKeys - Accounts involved in transaction (for localized fees)
- * @param {string} options.priorityLevel - 'Min' | 'Low' | 'Medium' | 'High' | 'VeryHigh' | 'UnsafeMax'
- * @returns {Promise<{priorityFee: number, priorityLevel: string, cached: boolean}>}
+ * Get priority fee estimate from Helius.
  */
 async function getPriorityFeeEstimate(options = {}) {
-  const {
-    accountKeys = [],
-    priorityLevel = 'Medium', // Good balance between speed and cost
-  } = options;
+  const { accountKeys = [], priorityLevel = 'Medium' } = options;
 
   const h = getHelius();
-
-  // Fallback if SDK not available
   if (!h) {
-    logger.debug('HELIUS', 'SDK not available, using fallback priority fee');
-    return {
-      priorityFee: 1000, // 1000 microlamports/CU fallback
-      priorityLevel: 'fallback',
-      cached: false,
-    };
+    return { priorityFee: 1000, priorityLevel: 'fallback', cached: false };
   }
 
-  // Check cache (only if no specific accounts - global estimate)
   const now = Date.now();
-  if (
-    accountKeys.length === 0 &&
-    priorityFeeCache.estimate &&
-    now - priorityFeeCache.timestamp < priorityFeeCache.ttl
-  ) {
-    return {
-      ...priorityFeeCache.estimate,
-      cached: true,
-    };
+  if (accountKeys.length === 0 && priorityFeeCache.estimate && now - priorityFeeCache.timestamp < priorityFeeCache.ttl) {
+    return { ...priorityFeeCache.estimate, cached: true };
   }
 
   try {
-    // Call Helius priority fee API (direct method on SDK v2)
     const response = await h.getPriorityFeeEstimate({
       accountKeys: accountKeys.length > 0 ? accountKeys : undefined,
-      options: {
-        priorityLevel,
-        includeAllPriorityFeeLevels: false,
-        lookbackSlots: 150, // ~1 minute of history
-      },
+      options: { priorityLevel, includeAllPriorityFeeLevels: false, lookbackSlots: 150 },
     });
 
     const estimate = {
@@ -87,69 +55,94 @@ async function getPriorityFeeEstimate(options = {}) {
       cached: false,
     };
 
-    // Cache global estimates
     if (accountKeys.length === 0) {
-      priorityFeeCache = {
-        estimate,
-        timestamp: now,
-        ttl: priorityFeeCache.ttl,
-      };
+      priorityFeeCache = { estimate, timestamp: now, ttl: priorityFeeCache.ttl };
     }
-
-    logger.debug('HELIUS', 'Priority fee estimate', {
-      priorityFee: estimate.priorityFee,
-      priorityLevel,
-      accountKeys: accountKeys.length,
-    });
 
     return estimate;
   } catch (error) {
-    logger.warn('HELIUS', 'Failed to get priority fee estimate', {
-      error: error.message,
-      fallback: 1000,
-    });
-
-    // Return fallback on error
-    return {
-      priorityFee: 1000,
-      priorityLevel: 'fallback',
-      cached: false,
-      error: error.message,
-    };
+    logger.warn('HELIUS', 'Priority fee estimate failed', { error: error.message });
+    return { priorityFee: 1000, priorityLevel: 'fallback', cached: false };
   }
 }
 
 /**
- * Calculate total priority fee in lamports for a transaction
- *
- * @param {number} computeUnits - Estimated compute units for transaction
- * @param {Object} options - Options for getPriorityFeeEstimate
- * @returns {Promise<{priorityFeeLamports: number, microLamportsPerCU: number, computeUnits: number}>}
+ * Calculate total priority fee in lamports.
  */
 async function calculatePriorityFee(computeUnits, options = {}) {
   const { priorityFee: microLamportsPerCU } = await getPriorityFeeEstimate(options);
-
-  // Priority fee = (microlamports per CU) × (compute units) / 1,000,000
-  // Because 1 lamport = 1,000,000 microlamports
   const priorityFeeLamports = Math.ceil((microLamportsPerCU * computeUnits) / 1_000_000);
-
-  return {
-    priorityFeeLamports,
-    microLamportsPerCU,
-    computeUnits,
-  };
+  return { priorityFeeLamports, microLamportsPerCU, computeUnits };
 }
 
 /**
- * Get SDK instance for advanced usage
+ * Get a @solana/web3.js v1 Connection using Helius RPC URL.
+ * This is separate from the SDK — used for raw RPC calls.
+ * @returns {Connection}
  */
+function getConnection() {
+  if (!connection) {
+    connection = new Connection(config.RPC_URL, 'confirmed');
+  }
+  return connection;
+}
+
+/**
+ * Send and confirm a pre-built serialized transaction via Helius RPC.
+ * Used for the main relay flow (user's pre-signed tx).
+ * @param {Buffer} serializedTx
+ * @param {Object} options
+ * @returns {Promise<{signature: string, confirmation: Object}>}
+ */
+async function sendAndConfirmTransaction(serializedTx, options = {}) {
+  const conn = getConnection();
+
+  const signature = await conn.sendRawTransaction(serializedTx, {
+    skipPreflight: true,
+    ...options,
+  });
+
+  const latestBlockhash = await conn.getLatestBlockhash('confirmed');
+  const confirmation = await conn.confirmTransaction(
+    {
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    },
+    'confirmed'
+  );
+
+  if (confirmation.value.err) {
+    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+  }
+
+  return { signature, confirmation };
+}
+
+/**
+ * Send a smart transaction via Helius SDK (for burn worker / internal ops).
+ * Uses Helius's sendSmartTransaction which handles priority fees + Jito tips.
+ * @param {TransactionInstruction[]} instructions
+ * @param {Keypair[]} signers
+ * @param {Object} options
+ * @returns {Promise<string>} signature
+ */
+async function sendSmartTransaction(instructions, signers, options = {}) {
+  const h = getHelius();
+  if (!h) throw new Error('Helius SDK not available');
+
+  const signature = await h.sendSmartTransaction(instructions, signers, [], {
+    skipPreflight: true,
+    ...options,
+  });
+
+  return signature;
+}
+
 function getSDK() {
   return getHelius();
 }
 
-/**
- * Check if Helius SDK is available
- */
 function isAvailable() {
   return !!config.HELIUS_API_KEY;
 }
@@ -157,6 +150,9 @@ function isAvailable() {
 module.exports = {
   getPriorityFeeEstimate,
   calculatePriorityFee,
+  sendAndConfirmTransaction,
+  sendSmartTransaction,
+  getConnection,
   getSDK,
   isAvailable,
 };

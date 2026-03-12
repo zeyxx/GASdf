@@ -2,14 +2,12 @@ const { createClient } = require('redis');
 const config = require('./config');
 const logger = require('./logger');
 
-// Key prefix to avoid collisions when sharing Redis with other services (e.g., HolDex)
+// Key prefix to avoid collisions when sharing Redis with other services
 const KEY_PREFIX = 'gasdf:';
 
 let client = null;
 let useMemory = false;
-let wasUsingMemory = false; // Track if we were in memory fallback mode
 let connectionState = 'disconnected'; // disconnected, connecting, connected, error
-let onReconnectCallback = null; // Callback for when Redis reconnects after memory fallback
 
 // In-memory fallback for local development ONLY
 // Includes periodic cleanup to prevent memory leaks
@@ -112,7 +110,6 @@ async function initializeClient() {
       } else if (!useMemory) {
         // Development: fallback to memory
         logger.warn('REDIS', 'Redis unavailable, using in-memory store');
-        wasUsingMemory = true;
         useMemory = true;
       }
     });
@@ -122,23 +119,9 @@ async function initializeClient() {
       logger.info('REDIS', 'Redis connecting...');
     });
 
-    client.on('ready', async () => {
+    client.on('ready', () => {
       connectionState = 'connected';
-
-      // Check if we were using memory fallback and need to sync
-      if (wasUsingMemory && onReconnectCallback) {
-        logger.info('REDIS', 'Redis reconnected after memory fallback, syncing data...');
-        try {
-          const memoryData = getMemoryStatsData();
-          await onReconnectCallback(memoryData);
-          logger.info('REDIS', 'Memory data synced to Redis');
-        } catch (err) {
-          logger.error('REDIS', 'Failed to sync memory data on reconnect', { error: err.message });
-        }
-      }
-
       useMemory = false; // Switch back to Redis
-      wasUsingMemory = false;
       logger.info('REDIS', 'Redis connected and ready');
     });
 
@@ -169,7 +152,6 @@ async function initializeClient() {
 
     // Development only: fallback to in-memory
     logger.warn('REDIS', 'Redis unavailable, using in-memory store (dev only)');
-    wasUsingMemory = true;
     useMemory = true;
     return null;
   }
@@ -207,57 +189,6 @@ function getConnectionState() {
     isMemoryFallback: useMemory,
     isHealthy: isConnected(),
   };
-}
-
-/**
- * Set callback to be called when Redis reconnects after memory fallback
- * Used by data-sync service to sync accumulated memory data
- *
- * @param {Function} callback - Async function(memoryData) to call on reconnection
- */
-function setOnReconnectCallback(callback) {
-  onReconnectCallback = callback;
-}
-
-/**
- * Get stats data accumulated in memory during fallback mode
- * Returns object with key-value pairs of stats that need syncing
- */
-function getMemoryStatsData() {
-  const statsData = {};
-
-  // Extract stats keys from memory store
-  for (const [key, item] of memoryStore.data) {
-    // Only sync stats, pending amounts, and wallet burns
-    // Skip quotes, rate limits, etc. as they're ephemeral
-    if (key.startsWith('stats:') || key.startsWith('pending:') || key.startsWith('burn:wallet:')) {
-      // Check if not expired
-      if (!item.expiry || Date.now() <= item.expiry) {
-        statsData[key] = item.value;
-      }
-    }
-  }
-
-  return statsData;
-}
-
-/**
- * Clear memory store (used after successful sync)
- */
-function clearMemoryStats() {
-  const keysToDelete = [];
-
-  for (const [key] of memoryStore.data) {
-    if (key.startsWith('stats:') || key.startsWith('pending:') || key.startsWith('burn:wallet:')) {
-      keysToDelete.push(key);
-    }
-  }
-
-  for (const key of keysToDelete) {
-    memoryStore.data.delete(key);
-  }
-
-  logger.debug('REDIS', `Cleared ${keysToDelete.length} synced keys from memory`);
 }
 
 /**
@@ -499,43 +430,10 @@ async function disconnect() {
 const TX_HASH_TTL_SECONDS = 90;
 
 /**
- * Check if a transaction hash has been seen before (anti-replay)
- * Returns true if hash exists (transaction already submitted)
- * @deprecated Use claimTransactionSlot for atomic check-and-mark
- */
-async function hasTransactionHash(txHash) {
-  return withRedis(
-    async (redis) => {
-      const exists = await redis.exists(`${KEY_PREFIX}txhash:${txHash}`);
-      return exists === 1;
-    },
-    () => {
-      return memoryStore.get(`txhash:${txHash}`) !== null;
-    }
-  );
-}
-
-/**
- * Mark a transaction hash as submitted (anti-replay)
- * @deprecated Use claimTransactionSlot for atomic check-and-mark
- */
-async function markTransactionHash(txHash) {
-  return withRedis(
-    async (redis) => {
-      await redis.setEx(`${KEY_PREFIX}txhash:${txHash}`, TX_HASH_TTL_SECONDS, '1');
-    },
-    () => {
-      memoryStore.set(`txhash:${txHash}`, '1', TX_HASH_TTL_SECONDS);
-    }
-  );
-}
-
-/**
  * ATOMIC: Claim a transaction slot (SET NX) - prevents race conditions
  * Returns { claimed: true } if this is a new transaction (slot claimed)
  * Returns { claimed: false } if transaction was already submitted (replay)
  *
- * This is the secure replacement for hasTransactionHash + markTransactionHash
  * The atomic SET NX ensures no race condition between check and mark.
  */
 async function claimTransactionSlot(txHash) {
@@ -623,63 +521,6 @@ async function getWalletRateLimit(wallet, type = 'quote') {
     () => {
       return parseInt(memoryStore.get(key)) || 0;
     }
-  );
-}
-
-// =============================================================================
-// Audit Logging
-// =============================================================================
-
-const AUDIT_KEY = `${KEY_PREFIX}audit:log`;
-const AUDIT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days retention
-const MAX_AUDIT_ENTRIES = 10000;
-
-/**
- * Append audit events to the log
- */
-async function appendAuditLog(events) {
-  if (!events || events.length === 0) return;
-
-  return withRedis(
-    async (redis) => {
-      const serialized = events.map((e) => JSON.stringify(e));
-      await redis.lPush(AUDIT_KEY, ...serialized);
-      await redis.lTrim(AUDIT_KEY, 0, MAX_AUDIT_ENTRIES - 1);
-      await redis.expire(AUDIT_KEY, AUDIT_TTL_SECONDS);
-    },
-    () => {
-      // In-memory: just log (no persistence)
-    }
-  );
-}
-
-/**
- * Get recent audit log entries
- */
-async function getAuditLog(limit = 100, offset = 0) {
-  return withRedis(
-    async (redis) => {
-      const entries = await redis.lRange(AUDIT_KEY, offset, offset + limit - 1);
-      return entries.map((e) => JSON.parse(e));
-    },
-    () => []
-  );
-}
-
-/**
- * Search audit log by event type
- */
-async function searchAuditLog(eventType, limit = 100) {
-  return withRedis(
-    async (redis) => {
-      // Get all entries and filter (not efficient for large logs, but simple)
-      const entries = await redis.lRange(AUDIT_KEY, 0, 999);
-      return entries
-        .map((e) => JSON.parse(e))
-        .filter((e) => e.type === eventType)
-        .slice(0, limit);
-    },
-    () => []
   );
 }
 
@@ -797,7 +638,7 @@ async function recordBurnProof(proof) {
     method: proof.method, // jupiter
     timestamp: Date.now(),
     network: proof.network || 'mainnet-beta',
-    explorerUrl: `https://solscan.io/tx/${proof.burnSignature}`,
+    explorerUrl: `https://orbmarkets.io/tx/${proof.burnSignature}`,
   };
 
   return withRedis(
@@ -868,71 +709,6 @@ async function getBurnProofBySignature(signature) {
     () => {
       const proof = memoryStore.get(`burn:proof:${signature}`);
       return proof ? JSON.parse(proof) : null;
-    }
-  );
-}
-
-// =============================================================================
-// Anomaly Detection State
-// =============================================================================
-
-const ANOMALY_WINDOW_SECONDS = 300; // 5 minutes
-
-/**
- * Track wallet activity for anomaly detection
- */
-async function trackWalletActivity(wallet, activityType) {
-  const key = `${KEY_PREFIX}anomaly:wallet:${activityType}:${wallet}`;
-
-  return withRedis(
-    async (redis) => {
-      const multi = redis.multi();
-      multi.incr(key);
-      multi.expire(key, ANOMALY_WINDOW_SECONDS);
-      const results = await multi.exec();
-      return results[0];
-    },
-    () => {
-      const current = parseInt(memoryStore.get(key)) || 0;
-      memoryStore.set(key, String(current + 1), ANOMALY_WINDOW_SECONDS);
-      return current + 1;
-    }
-  );
-}
-
-/**
- * Get wallet activity count
- */
-async function getWalletActivity(wallet, activityType) {
-  const key = `${KEY_PREFIX}anomaly:wallet:${activityType}:${wallet}`;
-
-  return withRedis(
-    async (redis) => {
-      const count = await redis.get(key);
-      return parseInt(count) || 0;
-    },
-    () => parseInt(memoryStore.get(key)) || 0
-  );
-}
-
-/**
- * Track IP activity for anomaly detection
- */
-async function trackIpActivity(ip, activityType) {
-  const key = `${KEY_PREFIX}anomaly:ip:${activityType}:${ip}`;
-
-  return withRedis(
-    async (redis) => {
-      const multi = redis.multi();
-      multi.incr(key);
-      multi.expire(key, ANOMALY_WINDOW_SECONDS);
-      const results = await multi.exec();
-      return results[0];
-    },
-    () => {
-      const current = parseInt(memoryStore.get(key)) || 0;
-      memoryStore.set(key, String(current + 1), ANOMALY_WINDOW_SECONDS);
-      return current + 1;
     }
   );
 }
@@ -1313,10 +1089,7 @@ module.exports = {
   getConnectionState,
   ping,
   disconnect,
-  // Data sync helpers
-  setOnReconnectCallback,
-  getMemoryStatsData,
-  clearMemoryStats,
+  withRedis,
   setQuote,
   getQuote,
   deleteQuote,
@@ -1334,20 +1107,9 @@ module.exports = {
   // Anti-Replay Protection (atomic)
   claimTransactionSlot,
   releaseTransactionSlot,
-  // Deprecated (non-atomic, kept for backward compatibility)
-  hasTransactionHash,
-  markTransactionHash,
   // Per-Wallet Rate Limiting
   incrWalletRateLimit,
   getWalletRateLimit,
-  // Audit Logging
-  appendAuditLog,
-  getAuditLog,
-  searchAuditLog,
-  // Anomaly Detection
-  trackWalletActivity,
-  getWalletActivity,
-  trackIpActivity,
   // Wallet Burn Tracking
   incrWalletBurn,
   getWalletBurnStats,
@@ -1371,4 +1133,6 @@ module.exports = {
   cacheJupiterQuote,
   getCachedJupiterQuote,
   getJupiterCacheStats,
+  // In-memory fallback (dev)
+  memoryStore,
 };

@@ -26,10 +26,8 @@ const securityHeaders = helmet({
           ],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           imgSrc: ["'self'", 'data:', 'https:'],
-          // Allow Jupiter Plugin and APIs
           connectSrc: [
             "'self'",
-            'https://holdex-api.onrender.com', // HolDex API
             'https://api.coingecko.com', // SOL price
             'https://*.jup.ag', // All Jupiter APIs (plugin, api, ultra, etc.)
             'https://tokens.jup.ag', // Jupiter token list API
@@ -82,23 +80,15 @@ const globalLimiter = rateLimit({
 const quoteLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000,
-  max: config.IS_DEV ? 200 : 60, // 60 quotes/min = 1 quote/sec per IP
+  max: config.IS_DEV ? 200 : 30, // 30 quotes/min per IP
   message: { error: 'Quote rate limit exceeded' },
 });
 
 const submitLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000,
-  max: config.IS_DEV ? 100 : 30, // 30 submits/min per IP
+  max: config.IS_DEV ? 100 : 15, // 15 submits/min per IP
   message: { error: 'Submit rate limit exceeded' },
-});
-
-// Stricter limit for token score lookups (potential oracle abuse vector)
-const scoreLimiter = rateLimit({
-  ...commonOptions,
-  windowMs: 60 * 1000,
-  max: config.IS_DEV ? 100 : 20, // 20 score lookups/min per IP
-  message: { error: 'Score lookup rate limit exceeded' },
 });
 
 // =============================================================================
@@ -175,7 +165,6 @@ module.exports = {
   globalLimiter,
   quoteLimiter,
   submitLimiter,
-  scoreLimiter,
   // Wallet-based rate limiting
   walletQuoteLimiter,
   walletSubmitLimiter,

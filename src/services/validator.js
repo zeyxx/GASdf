@@ -2,11 +2,10 @@ const { Transaction, VersionedTransaction, PublicKey, SystemProgram } = require(
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const crypto = require('crypto');
 const nacl = require('tweetnacl');
-const {
-  getAllFeePayerPublicKeys,
-  getTransactionFeePayer: _getTransactionFeePayer,
-} = require('./signer');
+const { getFeePayer } = require('./fee-payer');
+const { MAX_TX_SIZE } = require('../constants');
 const config = require('../utils/config');
+const logger = require('../utils/logger');
 
 // System Program instruction discriminators
 const SYSTEM_PROGRAM_ID = SystemProgram.programId.toBase58();
@@ -74,10 +73,6 @@ const ADVANCE_NONCE_DISCRIMINATOR = 4;
 // Solana Mainnet Specifications (2025)
 // =========================================================================
 
-// Maximum transaction size in bytes (MTU constraint: 1500 - 48 headers - 220 overhead)
-// See: https://solana.com/docs/core/transactions
-const MAX_TRANSACTION_SIZE = 1232;
-
 // Maximum compute units per transaction (Solana mainnet limit)
 const MAX_COMPUTE_UNITS = 1_400_000;
 
@@ -103,30 +98,51 @@ function validateTransactionSize(serializedTx) {
   const buffer = Buffer.from(serializedTx, 'base64');
   const size = buffer.length;
 
-  if (size > MAX_TRANSACTION_SIZE) {
+  if (size > MAX_TX_SIZE) {
     return {
       valid: false,
       size,
-      maxSize: MAX_TRANSACTION_SIZE,
-      error: `Transaction size ${size} bytes exceeds Solana limit of ${MAX_TRANSACTION_SIZE} bytes`,
+      maxSize: MAX_TX_SIZE,
+      error: `Transaction size ${size} bytes exceeds Solana limit of ${MAX_TX_SIZE} bytes`,
     };
   }
 
   return {
     valid: true,
     size,
-    maxSize: MAX_TRANSACTION_SIZE,
+    maxSize: MAX_TX_SIZE,
   };
 }
 
-function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
+/**
+ * Validate a submitted transaction against its quote.
+ *
+ * @param {string} txBase64 - Base64-encoded serialized transaction
+ * @param {Object} quoteData - The stored quote object
+ * @returns {Promise<{ valid: boolean, errors: string[], feePayer?: string, transaction?: Transaction|VersionedTransaction }>}
+ */
+async function validateTransaction(txBase64, quoteData) {
   const errors = [];
 
-  // Get all valid fee payer pubkeys
-  const validFeePayerPubkeys = getAllFeePayerPublicKeys();
-  const validPubkeySet = new Set(validFeePayerPubkeys.map((p) => p.toBase58()));
+  // --- Deserialize ----------------------------------------------------------
+  let transaction;
+  try {
+    transaction = deserializeTransaction(txBase64);
+  } catch (err) {
+    return { valid: false, errors: ['Failed to deserialize transaction: ' + err.message] };
+  }
 
-  // Check 1: Fee payer must be one of our wallets
+  // --- Size check -----------------------------------------------------------
+  const sizeResult = validateTransactionSize(txBase64);
+  if (!sizeResult.valid) {
+    errors.push(sizeResult.error);
+  }
+
+  // --- Fee payer check ------------------------------------------------------
+  const kp = getFeePayer();
+  const feePayerPubkey = kp.publicKey.toBase58();
+  const feePayerSet = new Set([feePayerPubkey]);
+
   let txFeePayer;
   if (transaction instanceof VersionedTransaction) {
     txFeePayer = transaction.message.staticAccountKeys[0];
@@ -134,39 +150,48 @@ function validateTransaction(transaction, expectedFeeAmount, userPubkey) {
     txFeePayer = transaction.feePayer;
   }
 
-  if (!txFeePayer || !validPubkeySet.has(txFeePayer.toBase58())) {
-    errors.push('Transaction fee payer must be a GASdf fee payer');
+  if (!txFeePayer || txFeePayer.toBase58() !== feePayerPubkey) {
+    errors.push('Transaction fee payer must be the GASdf fee payer');
   }
 
-  // Check 2: User must have signed the transaction (cryptographic verification)
-  const signatureVerification = verifyUserSignature(transaction, userPubkey);
-  if (!signatureVerification.valid) {
-    errors.push(signatureVerification.error);
+  // --- User signature verification -----------------------------------------
+  const userPubkey = quoteData.userPubkey;
+  if (userPubkey) {
+    const signatureVerification = verifyUserSignature(transaction, userPubkey);
+    if (!signatureVerification.valid) {
+      errors.push(signatureVerification.error);
+    }
   }
 
-  // Check 3: Validate no unauthorized SOL transfers from any fee payer
-  const drainErrors = validateNoFeePayerDrain(transaction, validPubkeySet);
+  // --- Payment instruction check --------------------------------------------
+  const paymentResult = await validateFeePayment(
+    transaction,
+    quoteData,
+    userPubkey,
+    feePayerPubkey
+  );
+  if (!paymentResult.valid) {
+    errors.push(paymentResult.error);
+  }
+
+  // --- CPI drain checks (defense in depth) ----------------------------------
+  const drainErrors = validateNoFeePayerDrain(transaction, feePayerSet);
   errors.push(...drainErrors);
 
-  // Check 4: Validate no unauthorized token transfers from any fee payer
-  const tokenErrors = validateNoFeePayerTokenDrain(transaction, validPubkeySet);
+  const tokenErrors = validateNoFeePayerTokenDrain(transaction, feePayerSet);
   errors.push(...tokenErrors);
 
   return {
     valid: errors.length === 0,
     errors,
     feePayer: txFeePayer?.toBase58(),
+    transaction,
   };
 }
 
 /**
  * Ensures no SOL is transferred out of any fee payer account
  * (except for transaction fees which are handled by the network)
- *
- * Checks for all dangerous System Program instructions:
- * - Transfer, TransferWithSeed
- * - CreateAccountWithSeed (could be used to drain)
- * - Allocate/AllocateWithSeed (account manipulation)
  */
 function validateNoFeePayerDrain(transaction, feePayerPubkeys) {
   const errors = [];
@@ -199,14 +224,6 @@ function validateNoFeePayerDrain(transaction, feePayerPubkeys) {
 
 /**
  * Ensures no tokens are transferred from any fee payer's token accounts
- *
- * Comprehensive check for ALL dangerous Token Program instructions:
- * - Transfer, TransferChecked (drain tokens)
- * - Approve, ApproveChecked (delegate access)
- * - Burn, BurnChecked (destroy tokens)
- * - CloseAccount (close and recover SOL)
- * - SetAuthority (change ownership)
- * - MintTo, MintToChecked (if fee payer is mint authority)
  */
 function validateNoFeePayerTokenDrain(transaction, feePayerPubkeys) {
   const errors = [];
@@ -311,7 +328,9 @@ function verifyUserSignature(transaction, userPubkey) {
     } else {
       // Legacy Transaction
       messageBytes = transaction.serializeMessage();
-      const userSig = transaction.signatures.find((sig) => sig.publicKey.toBase58() === userPubkey);
+      const userSig = transaction.signatures.find(
+        (sig) => sig.publicKey.toBase58() === userPubkey
+      );
 
       if (!userSig) {
         return { valid: false, error: 'User public key not found in transaction signers' };
@@ -326,7 +345,8 @@ function verifyUserSignature(transaction, userPubkey) {
     }
 
     // Cryptographic Ed25519 signature verification
-    const signatureBytes = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
+    const signatureBytes =
+      signature instanceof Uint8Array ? signature : new Uint8Array(signature);
     const messageUint8 =
       messageBytes instanceof Uint8Array ? messageBytes : new Uint8Array(messageBytes);
     const pubkeyUint8 =
@@ -345,170 +365,19 @@ function verifyUserSignature(transaction, userPubkey) {
 }
 
 /**
- * Helper: Get account keys array from transaction
- */
-function getAccountKeys(transaction) {
-  if (transaction instanceof VersionedTransaction) {
-    return transaction.message.staticAccountKeys.map((k) => k.toBase58());
-  } else {
-    return transaction.compileMessage().accountKeys.map((k) => k.toBase58());
-  }
-}
-
-/**
- * Helper: Get program ID for an instruction
- */
-function getProgramId(instruction, accountKeys) {
-  if ('programIdIndex' in instruction) {
-    // VersionedTransaction compiled instruction
-    return accountKeys[instruction.programIdIndex];
-  } else {
-    // Legacy Transaction instruction
-    return instruction.programId.toBase58();
-  }
-}
-
-/**
- * Helper: Get instruction data as Buffer
- */
-function getInstructionData(instruction) {
-  if ('data' in instruction) {
-    if (Buffer.isBuffer(instruction.data)) {
-      return instruction.data;
-    }
-    // VersionedTransaction uses Uint8Array
-    return Buffer.from(instruction.data);
-  }
-  return Buffer.alloc(0);
-}
-
-/**
- * Helper: Get account at specific index in instruction
- */
-function getAccountAtIndex(instruction, index, accountKeys) {
-  if ('accountKeyIndexes' in instruction) {
-    // VersionedTransaction compiled instruction
-    const keyIndex = instruction.accountKeyIndexes[index];
-    return keyIndex !== undefined ? accountKeys[keyIndex] : null;
-  } else {
-    // Legacy Transaction instruction
-    const key = instruction.keys[index];
-    return key ? key.pubkey.toBase58() : null;
-  }
-}
-
-function extractInstructions(transaction) {
-  if (transaction instanceof VersionedTransaction) {
-    return transaction.message.compiledInstructions;
-  } else {
-    return transaction.instructions;
-  }
-}
-
-/**
- * Extract blockhash from transaction
- */
-function getTransactionBlockhash(transaction) {
-  if (transaction instanceof VersionedTransaction) {
-    return transaction.message.recentBlockhash;
-  } else {
-    return transaction.recentBlockhash;
-  }
-}
-
-/**
- * Detect if transaction uses a durable nonce
- * Durable nonce transactions have AdvanceNonce as first instruction
- *
- * Returns: { isDurableNonce: boolean, nonceAccount?: string, nonceAuthority?: string }
- */
-function detectDurableNonce(transaction) {
-  const instructions = extractInstructions(transaction);
-  const accountKeys = getAccountKeys(transaction);
-
-  if (instructions.length === 0) {
-    return { isDurableNonce: false };
-  }
-
-  const firstIx = instructions[0];
-  const programId = getProgramId(firstIx, accountKeys);
-
-  // Check if first instruction is System Program AdvanceNonce
-  if (programId !== SYSTEM_PROGRAM_ID) {
-    return { isDurableNonce: false };
-  }
-
-  const ixData = getInstructionData(firstIx);
-  if (ixData.length < 4) {
-    return { isDurableNonce: false };
-  }
-
-  const discriminator = ixData.readUInt32LE(0);
-  if (discriminator !== ADVANCE_NONCE_DISCRIMINATOR) {
-    return { isDurableNonce: false };
-  }
-
-  // AdvanceNonce accounts: [nonce_account, recent_blockhashes_sysvar, nonce_authority]
-  const nonceAccount = getAccountAtIndex(firstIx, 0, accountKeys);
-  const nonceAuthority = getAccountAtIndex(firstIx, 2, accountKeys);
-
-  return {
-    isDurableNonce: true,
-    nonceAccount,
-    nonceAuthority,
-  };
-}
-
-/**
- * Get replay protection key for transaction
- * Uses durable nonce account if present, otherwise blockhash
- */
-function getReplayProtectionKey(transaction) {
-  const nonceInfo = detectDurableNonce(transaction);
-
-  if (nonceInfo.isDurableNonce) {
-    // For durable nonce, use nonce account + nonce value (stored in blockhash field)
-    const nonceValue = getTransactionBlockhash(transaction);
-    return `nonce:${nonceInfo.nonceAccount}:${nonceValue}`;
-  }
-
-  // For regular transactions, use blockhash
-  return `blockhash:${getTransactionBlockhash(transaction)}`;
-}
-
-/**
- * Compute SHA256 hash of serialized transaction (for anti-replay)
- * Uses the serialized message to ensure consistent hashing
- */
-function computeTransactionHash(transaction) {
-  let messageBytes;
-
-  if (transaction instanceof VersionedTransaction) {
-    messageBytes = transaction.message.serialize();
-  } else {
-    messageBytes = transaction.serializeMessage();
-  }
-
-  return crypto.createHash('sha256').update(messageBytes).digest('hex');
-}
-
-/**
  * Validate that transaction contains a fee payment instruction
  *
  * Checks for:
  * - SPL Token Transfer or TransferChecked to treasury ATA
  * - System Program Transfer (for SOL payments) to treasury
- *
- * @param {Transaction|VersionedTransaction} transaction - The transaction to validate
- * @param {Object} quote - The quote object containing fee details
- * @param {string} userPubkey - The user's public key
- * @returns {{ valid: boolean, error?: string, actualAmount?: number }}
  */
-async function validateFeePayment(transaction, quote, userPubkey) {
+async function validateFeePayment(transaction, quote, userPubkey, treasuryAddress) {
   const instructions = extractInstructions(transaction);
   const accountKeys = getAccountKeys(transaction);
 
-  const treasuryAddress = config.TREASURY_ADDRESS || getAllFeePayerPublicKeys()[0]?.toBase58();
+  if (!treasuryAddress) {
+    treasuryAddress = config.TREASURY_ADDRESS || getFeePayer().publicKey.toBase58();
+  }
   if (!treasuryAddress) {
     return { valid: false, error: 'Treasury address not configured' };
   }
@@ -551,7 +420,6 @@ async function validateFeePayment(transaction, quote, userPubkey) {
 
         // Transfer (3) or TransferChecked (12)
         if (discriminator === 3 || discriminator === 12) {
-          const _sourceAccount = getAccountAtIndex(ix, 0, accountKeys);
           const destAccount =
             discriminator === 3
               ? getAccountAtIndex(ix, 1, accountKeys)
@@ -617,7 +485,124 @@ async function validateFeePayment(transaction, quote, userPubkey) {
  * Get treasury address (from config or primary fee payer)
  */
 function getTreasuryAddress() {
-  return config.TREASURY_ADDRESS || getAllFeePayerPublicKeys()[0]?.toBase58();
+  return config.TREASURY_ADDRESS || getFeePayer().publicKey.toBase58();
+}
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+function getAccountKeys(transaction) {
+  if (transaction instanceof VersionedTransaction) {
+    return transaction.message.staticAccountKeys.map((k) => k.toBase58());
+  } else {
+    return transaction.compileMessage().accountKeys.map((k) => k.toBase58());
+  }
+}
+
+function getProgramId(instruction, accountKeys) {
+  if ('programIdIndex' in instruction) {
+    return accountKeys[instruction.programIdIndex];
+  } else {
+    return instruction.programId.toBase58();
+  }
+}
+
+function getInstructionData(instruction) {
+  if ('data' in instruction) {
+    if (Buffer.isBuffer(instruction.data)) {
+      return instruction.data;
+    }
+    return Buffer.from(instruction.data);
+  }
+  return Buffer.alloc(0);
+}
+
+function getAccountAtIndex(instruction, index, accountKeys) {
+  if ('accountKeyIndexes' in instruction) {
+    const keyIndex = instruction.accountKeyIndexes[index];
+    return keyIndex !== undefined ? accountKeys[keyIndex] : null;
+  } else {
+    const key = instruction.keys[index];
+    return key ? key.pubkey.toBase58() : null;
+  }
+}
+
+function extractInstructions(transaction) {
+  if (transaction instanceof VersionedTransaction) {
+    return transaction.message.compiledInstructions;
+  } else {
+    return transaction.instructions;
+  }
+}
+
+function getTransactionBlockhash(transaction) {
+  if (transaction instanceof VersionedTransaction) {
+    return transaction.message.recentBlockhash;
+  } else {
+    return transaction.recentBlockhash;
+  }
+}
+
+/**
+ * Detect if transaction uses a durable nonce
+ */
+function detectDurableNonce(transaction) {
+  const instructions = extractInstructions(transaction);
+  const accountKeys = getAccountKeys(transaction);
+
+  if (instructions.length === 0) {
+    return { isDurableNonce: false };
+  }
+
+  const firstIx = instructions[0];
+  const programId = getProgramId(firstIx, accountKeys);
+
+  if (programId !== SYSTEM_PROGRAM_ID) {
+    return { isDurableNonce: false };
+  }
+
+  const ixData = getInstructionData(firstIx);
+  if (ixData.length < 4) {
+    return { isDurableNonce: false };
+  }
+
+  const discriminator = ixData.readUInt32LE(0);
+  if (discriminator !== ADVANCE_NONCE_DISCRIMINATOR) {
+    return { isDurableNonce: false };
+  }
+
+  const nonceAccount = getAccountAtIndex(firstIx, 0, accountKeys);
+  const nonceAuthority = getAccountAtIndex(firstIx, 2, accountKeys);
+
+  return {
+    isDurableNonce: true,
+    nonceAccount,
+    nonceAuthority,
+  };
+}
+
+function getReplayProtectionKey(transaction) {
+  const nonceInfo = detectDurableNonce(transaction);
+
+  if (nonceInfo.isDurableNonce) {
+    const nonceValue = getTransactionBlockhash(transaction);
+    return `nonce:${nonceInfo.nonceAccount}:${nonceValue}`;
+  }
+
+  return `blockhash:${getTransactionBlockhash(transaction)}`;
+}
+
+function computeTransactionHash(transaction) {
+  let messageBytes;
+
+  if (transaction instanceof VersionedTransaction) {
+    messageBytes = transaction.message.serialize();
+  } else {
+    messageBytes = transaction.serializeMessage();
+  }
+
+  return crypto.createHash('sha256').update(messageBytes).digest('hex');
 }
 
 module.exports = {
@@ -633,6 +618,5 @@ module.exports = {
   computeTransactionHash,
   getTreasuryAddress,
   MAX_COMPUTE_UNITS,
-  MAX_TRANSACTION_SIZE,
   SIGNATURE_SIZE,
 };
