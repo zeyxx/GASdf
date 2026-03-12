@@ -13,7 +13,9 @@ router.get('/', async (req, res) => {
       feePayer.checkBalance(),
     ]);
 
-    const healthy = !!redisPing && !balanceInfo.circuitOpen;
+    const redisOk = !!redisPing;
+    // Circuit breaker is informational — don't fail healthcheck for low balance
+    const healthy = redisOk;
 
     res.status(healthy ? 200 : 503).json({
       status: healthy ? 'ok' : 'degraded',
