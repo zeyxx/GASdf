@@ -3,10 +3,13 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Native deps for bigint-buffer (solana web3.js transitive dep)
+RUN apk add --no-cache python3 make g++
+
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including devDependencies for build)
+# Install all dependencies (including devDependencies for build)
 RUN npm ci
 
 # Copy source
@@ -17,8 +20,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Native build tools + dumb-init for signal handling
+RUN apk add --no-cache dumb-init python3 make g++
 
 # Create non-root user
 RUN addgroup -g 1001 -S gasdf && \
@@ -26,12 +29,13 @@ RUN addgroup -g 1001 -S gasdf && \
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy application code
+# Remove build tools after install to keep image smaller
+RUN apk del python3 make g++
+
+# Copy application code from builder
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/sdk ./sdk
 
 # Set ownership
 RUN chown -R gasdf:gasdf /app
@@ -48,7 +52,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/v1/health || exit 1
 
 # Start with dumb-init for signal handling
 ENTRYPOINT ["dumb-init", "--"]
