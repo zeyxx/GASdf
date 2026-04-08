@@ -1,0 +1,23 @@
+[package]
+name = "cynic-governance"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Optimistic epistemic oracle — on-chain settlement for AI governance verdicts"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.9"
+pinocchio-system = "0.4"
+pinocchio-token = "0.4"
+pinocchio-pubkey = "0.3"
+five8_const = "0.1"
+
+[dev-dependencies]
+mollusk-svm = "0.2"
+
+[features]
+default = []
+no-entrypoint = []
