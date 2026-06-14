@@ -4,7 +4,6 @@ const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
-const redis = require('../utils/redis');
 const tokenGate = require('../services/token-gate');
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
@@ -50,18 +49,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // =========================================================================
-    // 4. Wallet rate limit
-    // =========================================================================
-    const rateCount = await redis.incrWalletRateLimit(userPubkey, 'quote');
-    if (rateCount > config.WALLET_QUOTE_LIMIT) {
-      return res.status(429).json({
-        error: 'Quote rate limit exceeded',
-        code: 'RATE_LIMIT',
-      });
-    }
-
-    // =========================================================================
+    // Rate limiting is now handled globally or via stateless IP limits
     // 5. Priority fee from Helius
     // =========================================================================
     const computeUnits = Math.min(Math.max(estimatedComputeUnits, 1), 1_400_000);
@@ -94,28 +82,9 @@ router.post('/', async (req, res) => {
     const mintPubkey = new PublicKey(paymentToken);
     const treasuryAta = await getAssociatedTokenAddress(mintPubkey, treasuryPubkey);
 
-    // =========================================================================
-    // 10. Store quote in Redis
-    // =========================================================================
-    const quoteId = uuidv4();
-    const expiresAt = Date.now() + config.QUOTE_TTL_SECONDS * 1000;
-
-    await redis.setQuote(quoteId, {
-      paymentToken,
-      userPubkey,
-      feePayer: feePayer.getPublicKey().toBase58(),
-      treasuryAddress: treasuryPubkey.toBase58(),
-      treasuryAta: treasuryAta.toBase58(),
-      feeAmount: feeInToken.inputAmount.toString(),
-      feeAmountLamports: discountedFeeLamports,
-      feeAmountToken: feeInToken.inputAmount,
-      estimatedComputeUnits: computeUnits,
-      expiresAt,
-      createdAt: Date.now(),
-    }, config.QUOTE_TTL_SECONDS);
+    // Quotes are no longer stored off-chain. The client builds the Pinocchio instruction directly.
 
     logger.info('QUOTE', 'Quote generated', {
-      quoteId,
       paymentToken: paymentToken.slice(0, 8),
       userPubkey: userPubkey.slice(0, 8),
       feeAmountLamports: discountedFeeLamports,
@@ -128,7 +97,6 @@ router.post('/', async (req, res) => {
     const feeFormatted = `${(feeInToken.inputAmount / Math.pow(10, decimals)).toFixed(decimals > 2 ? 4 : 2)} ${feeInToken.symbol || 'tokens'}`;
 
     res.json({
-      quoteId,
       feePayer: feePayer.getPublicKey().toBase58(),
       treasury: {
         address: treasuryPubkey.toBase58(),

@@ -1,9 +1,7 @@
 const express = require('express');
 const config = require('./utils/config');
 const logger = require('./utils/logger');
-const redis = require('./utils/redis');
 const feePayer = require('./services/fee-payer');
-const { startBurnWorker, stopBurnWorker } = require('./services/burn-worker');
 const { securityHeaders, globalLimiter, quoteLimiter, submitLimiter } = require('./middleware/security');
 
 const healthRouter = require('./routes/health');
@@ -38,9 +36,7 @@ app.use((err, req, res, _next) => {
 
 // Start
 async function start() {
-  await redis.initializeClient();
   feePayer.startBalanceMonitor();
-  startBurnWorker();
 
   app.listen(config.PORT, () => {
     logger.info('SERVER', `GASdf running on port ${config.PORT}`, {
@@ -54,8 +50,6 @@ async function start() {
 async function shutdown(signal) {
   logger.info('SERVER', `${signal} received, shutting down...`);
   feePayer.stopBalanceMonitor();
-  stopBurnWorker();
-  await redis.disconnect();
   process.exit(0);
 }
 
