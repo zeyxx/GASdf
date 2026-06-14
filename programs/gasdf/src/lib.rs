@@ -104,6 +104,7 @@ fn process_pay_fee(accounts: &[AccountInfo], data: &[u8]) -> Result<(), ProgramE
 }
 
 use pinocchio::msg;
+use pinocchio::{seeds, instruction::Signer};
 
 fn process_relay_with_vault(
     accounts: &[AccountInfo],
@@ -113,7 +114,7 @@ fn process_relay_with_vault(
         return Err(ProgramError::NotEnoughAccountKeys);
     }
 
-    if data.len() < 16 {
+    if data.len() < 17 {
         return Err(ProgramError::InvalidInstructionData);
     }
 
@@ -132,9 +133,10 @@ fn process_relay_with_vault(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // Parse amounts
+    // Parse amounts & bump
     let token_amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
     let sol_reimbursement = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let vault_bump = data[16];
 
     // 1. Transfer Token from User to Vault
     if token_amount > 0 {
@@ -149,9 +151,19 @@ fn process_relay_with_vault(
 
     // 2. Transfer SOL from Vault to Operator
     if sol_reimbursement > 0 {
-        // TODO: pinocchio_system::instructions::Transfer from vault_sol_account to operator_sol_account
-        // Requires invoke_signed with PDA seeds for vault_sol_account
-        msg!("Would reimburse operator from vault");
+        let bump_ref = &[vault_bump];
+        let vault_seeds = seeds!(b"vault", bump_ref);
+        let signer = Signer::from(&vault_seeds);
+        let signers = [signer];
+
+        pinocchio_system::instructions::Transfer {
+            from: vault_sol_account,
+            to: operator_sol_account,
+            lamports: sol_reimbursement,
+        }
+        .invoke_signed(&signers)?;
+        
+        msg!("Reimbursed operator from vault");
     }
 
     Ok(())
