@@ -28,6 +28,7 @@ pub fn process_instruction(
 
     match instruction_type {
         0 => process_pay_fee(accounts, &instruction_data[1..])?,
+        1 => process_relay_with_vault(accounts, &instruction_data[1..])?,
         _ => return Err(ProgramError::InvalidInstructionData),
     }
 
@@ -97,6 +98,60 @@ fn process_pay_fee(accounts: &[AccountInfo], data: &[u8]) -> Result<(), ProgramE
             amount: total_amount,
         }
         .invoke()?;
+    }
+
+    Ok(())
+}
+
+use pinocchio::msg;
+
+fn process_relay_with_vault(
+    accounts: &[AccountInfo],
+    data: &[u8],
+) -> Result<(), ProgramError> {
+    if accounts.len() < 7 {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    }
+
+    if data.len() < 16 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    let user_token_account = &accounts[0];
+    let user_authority = &accounts[1];
+    let vault_token_account = &accounts[2];
+    let vault_sol_account = &accounts[3];
+    let operator_sol_account = &accounts[4];
+    let _token_program = &accounts[5];
+    let _system_program = &accounts[6];
+
+    if !user_authority.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !operator_sol_account.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+
+    // Parse amounts
+    let token_amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
+    let sol_reimbursement = u64::from_le_bytes(data[8..16].try_into().unwrap());
+
+    // 1. Transfer Token from User to Vault
+    if token_amount > 0 {
+        Transfer {
+            from: user_token_account,
+            to: vault_token_account,
+            authority: user_authority,
+            amount: token_amount,
+        }
+        .invoke()?;
+    }
+
+    // 2. Transfer SOL from Vault to Operator
+    if sol_reimbursement > 0 {
+        // TODO: pinocchio_system::instructions::Transfer from vault_sol_account to operator_sol_account
+        // Requires invoke_signed with PDA seeds for vault_sol_account
+        msg!("Would reimburse operator from vault");
     }
 
     Ok(())
