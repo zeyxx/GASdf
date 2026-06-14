@@ -18,7 +18,7 @@ jest.mock('../../../src/middleware/security', () => ({
   globalLimiter: (req, res, next) => next(),
 }));
 
-jest.mock('../../../src/utils/rpc', () => ({
+jest.mock('../../../src/services/helius', () => ({
   getConnection: jest.fn().mockReturnValue({
     getParsedTokenAccountsByOwner: jest.fn().mockResolvedValue({ value: [] }),
   }),
@@ -58,7 +58,7 @@ jest.mock('../../../src/services/holdex', () => ({
   ACCEPTED_TIERS: new Set(['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze']),
 }));
 
-jest.mock('../../../src/services/holder-tiers', () => ({
+jest.mock('../../../src/services/holder-discount', () => ({
   getAllTiers: jest.fn().mockReturnValue([
     { name: 'NORMIE', emoji: '👤', minHolding: 0, discountPercent: 0 },
     { name: 'HOLDER', emoji: '💎', minHolding: 10000, discountPercent: 10 },
@@ -97,7 +97,7 @@ jest.mock('../../../src/services/token-gate', () => ({
 }));
 
 const tokensRouter = require('../../../src/routes/tokens');
-const { getHolderTier } = require('../../../src/services/holder-tiers');
+const { getHolderTier } = require('../../../src/services/holder-discount');
 const { isTokenAccepted } = require('../../../src/services/token-gate');
 
 describe('Tokens Route', () => {

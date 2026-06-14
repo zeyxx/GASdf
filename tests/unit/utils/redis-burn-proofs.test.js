@@ -55,7 +55,7 @@ describe('Burn Proofs', () => {
     test('should generate correct explorer URL', async () => {
       const result = await redis.recordBurnProof(mockProof);
 
-      expect(result.explorerUrl).toBe(`https://solscan.io/tx/${mockProof.burnSignature}`);
+      expect(result.explorerUrl).toBe(`https://orbmarkets.io/tx/${mockProof.burnSignature}`);
     });
 
     test('should include network in proof', async () => {

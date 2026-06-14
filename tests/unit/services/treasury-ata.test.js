@@ -46,7 +46,7 @@ jest.mock('../../../src/utils/logger', () => ({
   debug: jest.fn(),
 }));
 
-jest.mock('../../../src/utils/rpc', () => ({
+jest.mock('../../../src/services/helius', () => ({
   getConnection: jest.fn(),
   getLatestBlockhash: jest.fn(),
 }));
@@ -63,7 +63,7 @@ const {
 } = require('@solana/spl-token');
 const config = require('../../../src/utils/config');
 const logger = require('../../../src/utils/logger');
-const rpc = require('../../../src/utils/rpc');
+const rpc = require('../../../src/services/helius');
 const { getFeePayer } = require('../../../src/services/fee-payer-pool');
 
 // Import module under test

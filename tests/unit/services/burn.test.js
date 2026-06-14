@@ -59,7 +59,7 @@ jest.mock('../../../src/utils/redis', () => ({
   withLock: jest.fn(),
 }));
 
-jest.mock('../../../src/utils/rpc', () => ({
+jest.mock('../../../src/services/helius', () => ({
   getConnection: jest.fn().mockReturnValue({
     getParsedTokenAccountsByOwner: jest.fn(),
   }),
@@ -113,7 +113,7 @@ jest.mock('../../../src/utils/safe-math', () => ({
 
 // Get references to mocked modules
 const redis = require('../../../src/utils/redis');
-const rpc = require('../../../src/utils/rpc');
+const rpc = require('../../../src/services/helius');
 const jupiter = require('../../../src/services/jupiter');
 const feePayerPool = require('../../../src/services/fee-payer-pool');
 const _treasuryAta = require('../../../src/services/treasury-ata');

@@ -20,7 +20,7 @@ jest.mock('../../../src/utils/logger', () => ({
   debug: jest.fn(),
 }));
 
-jest.mock('../../../src/utils/rpc', () => ({
+jest.mock('../../../src/services/helius', () => ({
   getConnection: jest.fn().mockReturnValue({
     getBalance: jest.fn().mockResolvedValue(1000000000), // 1 SOL
   }),
