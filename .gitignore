@@ -23,3 +23,4 @@ STRATEGY.md
 # Pinocchio build artifacts (includes program keypair — never commit)
 programs/cynic-governance/target/
 programs/cynic-governance/test-ledger/
+data/
