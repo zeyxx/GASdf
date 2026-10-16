@@ -45,6 +45,11 @@ jest.mock('../../../src/services/helius', () => ({
     signature: 'SIG_PHASE0_TEST',
     confirmation: { value: { err: null } },
   })),
+  getConnection: jest.fn(() => ({
+    simulateTransaction: jest.fn(async () => ({
+      value: { unitsConsumed: 150, err: null },
+    })),
+  })),
 }));
 
 const feePayer = require('../../../src/services/fee-payer');
@@ -106,6 +111,7 @@ test('valid submission co-signs, sends, and appends one JSONL proof line', async
   const proof = JSON.parse(lines[lines.length - 1]);
   expect(proof.signature).toBe('SIG_PHASE0_TEST');
   expect(proof.network).toBe('devnet');
+  expect(proof.unitsConsumed).toBe(150);
   expect(typeof proof.ts).toBe('string');
   expect(JSON.stringify(proof)).not.toMatch(/PRIVATE|SECRET/i);
 });

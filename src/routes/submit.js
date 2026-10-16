@@ -69,6 +69,20 @@ router.post('/', async (req, res) => {
     // The program will revert if the fee transferred is insufficient.
 
     // =========================================================================
+    // 5b. Simulate (free): bill on consumed CUs, not declared budget.
+    // Recorded per tx — this is the calibration feed.
+    // =========================================================================
+    let unitsConsumed = null;
+    try {
+      const sim = await helius.getConnection().simulateTransaction(tx, { sigVerify: false });
+      if (sim && sim.value && sim.value.err === null) {
+        unitsConsumed = sim.value.unitsConsumed ?? null;
+      }
+    } catch {
+      unitsConsumed = null;
+    }
+
+    // =========================================================================
     // 6. Co-sign: deserialize, add fee payer signature
     // =========================================================================
     tx.sign([feePayer.getFeePayer()]);
@@ -87,6 +101,7 @@ router.post('/', async (req, res) => {
       signature: result.signature,
       explorer: `${EXPLORER_BASE}/tx/${result.signature}`,
       confirmed: true,
+      unitsConsumed,
     };
     appendProof(proof);
 
