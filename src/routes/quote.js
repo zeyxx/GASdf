@@ -1,5 +1,4 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
@@ -8,6 +7,7 @@ const tokenGate = require('../services/token-gate');
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
 const jupiter = require('../services/jupiter');
+const { computeFeeBreakdown } = require('../services/fee-schedule');
 
 const router = express.Router();
 
@@ -56,9 +56,22 @@ router.post('/', async (req, res) => {
     const priorityFeeLamports = priorityFeeData.priorityFeeLamports;
 
     // =========================================================================
-    // 6. Total fee
+    // 6. Hybrid fee: base + compute + priority (CU_CAP refuses abuse)
     // =========================================================================
-    const totalFee = config.BASE_FEE_LAMPORTS + priorityFeeLamports;
+    const fee = computeFeeBreakdown({
+      baseFeeLamports: config.BASE_FEE_LAMPORTS,
+      cuPricePerKcuLamports: config.CU_PRICE_PER_KCU_LAMPORTS,
+      cuCap: config.CU_CAP,
+      requestedCus: computeUnits,
+      priorityFeeLamports,
+    });
+    if (!fee.accepted) {
+      return res.status(400).json({
+        error: `Compute demand exceeds relay cap (${computeUnits} CU)`,
+        code: fee.code,
+      });
+    }
+    const totalFee = fee.total;
 
     // =========================================================================
     // 7. Flat fee — no holder tiers, no scores (MVP decision)
@@ -102,6 +115,12 @@ router.post('/', async (req, res) => {
       },
       feeAmount: feeInToken.inputAmount.toString(),
       feeFormatted,
+      feeBreakdown: {
+        base: fee.base,
+        cuCharge: fee.cuCharge,
+        priority: fee.priority,
+        cus: fee.cus,
+      },
       paymentToken: {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
