@@ -45,8 +45,6 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
     outputMint,
     amount: amount.toString(),
     slippageBps: slippageBps.toString(),
-    maxAccounts: '15',
-    onlyDirectRoutes: 'true',
   });
 
   const response = await fetch(`${JUPITER_API}/quote?${params}`, {
