@@ -24,7 +24,10 @@
 
 - Holder tiers (subscription levels by ASDF holdings), K-score/E-score
   gating (anti-sybil token scores), yield/revenue-sharing: monetization
-  overengineering. Re-earn by measured demand, earliest at `viable` stage.
+  overengineering.
+- Yield returns ONLY when ALL hold: user funds securable serenely
+  (audited custody, no inventive risk), PMF proven, service already
+  self-sufficient. Before that, every margin funds reserves, never rewards.
 
 ## Gates
 
