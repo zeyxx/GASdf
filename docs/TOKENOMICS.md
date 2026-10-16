@@ -21,8 +21,15 @@
 priority  = helius estimate (fallback 1000 µCU)
 fee_lamports = BASE_FEE_LAMPORTS (50000) + priority_lamports
 cost_tx      = 5000 + priority_lamports (+ rent if new account)
+             + sender_tip (0 on plain RPC path; 5000 min on Helius
+               Sender SWQOS path; 1M lamports on Sender Max)
 margin       = fee_lamports − cost_tx
 ```
+
+Helius facts (docs 2026-10-16): Free plan = 1M credits, 10 req/s —
+fits current usage; Developer ($49) when needed. Sender consumes no
+credits but demands a SOL tip per tx. Priority Fee API 401 observed
+with current key/SDK — fallback applies; typical Medium ≈ 40k µCU.
 
 Slippage quote→swap is paid by the user; swap ops calibrated live under
 stress-tests and varied market simulations. ATA rents are measured
