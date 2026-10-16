@@ -70,7 +70,7 @@ const config = {
   FEE_MARKUP: parseFloat(process.env.FEE_MARKUP) || 2.0,
   BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 50000,
   CU_PRICE_PER_KCU_LAMPORTS: parseInt(process.env.CU_PRICE_PER_KCU_LAMPORTS) || 100,
-  CU_CAP: parseInt(process.env.CU_CAP) || 400000,
+  CU_CAP: parseInt(process.env.CU_CAP) || 1400000,
   QUOTE_TTL_SECONDS: parseInt(process.env.QUOTE_TTL_SECONDS) || 60,
 
   // Burn settings

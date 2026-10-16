@@ -19,8 +19,8 @@ test('compute-heavy tx pays proportionally more', () => {
   expect(heavy.cuCharge).toBe(8 * light.cuCharge);
 });
 
-test('above CU_CAP is refused, never overcharged', () => {
-  const f = computeFeeBreakdown({ requestedCus: 400001, priorityFeeLamports: 0 });
+test('above protocol max is refused, never overcharged', () => {
+  const f = computeFeeBreakdown({ requestedCus: 1400001, priorityFeeLamports: 0 });
   expect(f.accepted).toBe(false);
   expect(f.code).toBe('CU_OVER_CAP');
 });
