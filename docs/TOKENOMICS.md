@@ -24,8 +24,14 @@ cost_tx      = 5000 + priority_lamports (+ rent if new account)
 margin       = fee_lamports − cost_tx
 ```
 
-Fee converted to the chosen payment token via Jupiter at quote time.
-Live reference 2026-10-16: ~5289 USDC base units (~$0.0053) per relay.
+Slippage quote→swap is paid by the user; swap ops calibrated live under
+stress-tests and varied market simulations. ATA rents are measured
+service costs (devnet then mainnet calibration, data-centrism).
+Payer rotation + cold standby payer land in Phase 0. Onchain vault
+program ships when the need is proven — the service turns hybrid then.
+Mainnet bootstrap via $ASDFASDFA cult crowdfunding + operator real-world
+revenue in parallel. $ASDFASDFA: pumpfun origin, ~15% already burned via
+creator fees, not mintable.
 
 ## 3. Margin waterfall (formulas with tunable params, no hardcoded amounts)
 

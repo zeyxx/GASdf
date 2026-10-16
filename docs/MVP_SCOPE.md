@@ -5,7 +5,14 @@
 ## Wants (MVP)
 
 - Pay fees in SOL / USDC / known memecoins without holding them.
+- User co-signs the FULL transaction (classic behavior, no offchain
+  anonymization): fees travel atomically with the gasless execution.
 - Relay co-signs and submits via Helius Sender; fail-closed routes.
+- First purpose is dogfooding: gasless/anti-friction for $ASDFASDFA on
+  Holdex/TrenchScanner, built by the cult without outside dependencies
+  for the first txs.
+- $0 infra: Helius free tier only (Developer plan if truly needed).
+  Second provider becomes an infra cost only when its utility is proven.
 - Quote with TTL; Jupiter API (free tier) for memecoin/SOL prices and swap route.
 - Redis/DB allowed from MVP (quotes, ledger, rate limits) — no longer deferred.
 - Strict compute-cost measurement, mandatory, both sides:
