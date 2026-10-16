@@ -73,9 +73,12 @@ Every margin before the gate funds reserves and burn, never rewards.
 - **$ASDF tilt**: cashback claimed in $ASDFASDFA earns fee-discount bonus
   + perks (not yield: discount on future fees, never rewards on holdings).
 
-Params: `RUNWAY_MONTHS` (init 6, raise to 12 before Phase 2),
+Params: `RUNWAY_MONTHS` = 6 (sweet spot — Solana pace, not YC pace),
 `CASHBACK_SHARE`, `CLAIM_MIN`, `BURN_SHARE` (remainder to burn).
 All operator-tunable, all ledger-visible.
+
+Conditional raise: only after proven self-sufficiency + formal memecoin
+ecosystem recognition, via backable.biz. Never to cover operating losses.
 
 ## 7. Stage mapping
 
