@@ -11,6 +11,11 @@
 - First purpose is dogfooding: gasless/anti-friction for $ASDFASDFA on
   Holdex/TrenchScanner, built by the cult without outside dependencies
   for the first txs.
+- 1-click rule: onboarding (first swap with no SOL), pay-per-scan
+  (single scan without subscription), and monthly sub all complete in
+  one signature. Anyone testing with a single scan never touches a swap.
+- Pay-per-scan: same fee formula, floor = quote minimum; converts
+  triallists to subscribers, measured separately in the ledger.
 - $0 infra: Helius free tier only (Developer plan if truly needed).
   Second provider becomes an infra cost only when its utility is proven.
 - Quote with TTL; Jupiter API (free tier) for memecoin/SOL prices and swap route.
