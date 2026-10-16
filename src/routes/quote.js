@@ -8,7 +8,6 @@ const tokenGate = require('../services/token-gate');
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
 const jupiter = require('../services/jupiter');
-const holderDiscount = require('../services/holder-discount');
 
 const router = express.Router();
 
@@ -62,16 +61,14 @@ router.post('/', async (req, res) => {
     const totalFee = config.BASE_FEE_LAMPORTS + priorityFeeLamports;
 
     // =========================================================================
-    // 7. Holder discount
+    // 7. Flat fee — no holder tiers, no scores (MVP decision)
     // =========================================================================
-    const txCost = config.NETWORK_FEE_LAMPORTS + priorityFeeLamports;
-    const tierInfo = await holderDiscount.calculateDiscountedFee(userPubkey, totalFee, txCost);
-    const discountedFeeLamports = tierInfo.discountedFee;
+    const feeLamports = totalFee;
 
     // =========================================================================
     // 8. Convert to payment token via Jupiter
     // =========================================================================
-    const feeInToken = await jupiter.getFeeInToken(paymentToken, discountedFeeLamports);
+    const feeInToken = await jupiter.getFeeInToken(paymentToken, feeLamports);
 
     // =========================================================================
     // 9. Treasury ATA
@@ -87,7 +84,7 @@ router.post('/', async (req, res) => {
     logger.info('QUOTE', 'Quote generated', {
       paymentToken: paymentToken.slice(0, 8),
       userPubkey: userPubkey.slice(0, 8),
-      feeAmountLamports: discountedFeeLamports,
+      feeAmountLamports: feeLamports,
     });
 
     // =========================================================================
@@ -95,6 +92,7 @@ router.post('/', async (req, res) => {
     // =========================================================================
     const decimals = feeInToken.decimals || 6;
     const feeFormatted = `${(feeInToken.inputAmount / Math.pow(10, decimals)).toFixed(decimals > 2 ? 4 : 2)} ${feeInToken.symbol || 'tokens'}`;
+    const expiresAt = new Date(Date.now() + config.QUOTE_TTL_SECONDS * 1000).toISOString();
 
     res.json({
       feePayer: feePayer.getPublicKey().toBase58(),
@@ -108,10 +106,6 @@ router.post('/', async (req, res) => {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
         decimals,
-      },
-      holderTier: {
-        tier: tierInfo.tier,
-        discountPercent: tierInfo.discountPercent,
       },
       expiresAt,
       ttl: config.QUOTE_TTL_SECONDS,
