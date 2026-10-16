@@ -51,7 +51,12 @@ router.post('/', async (req, res) => {
     // Rate limiting is now handled globally or via stateless IP limits
     // 5. Priority fee from Helius
     // =========================================================================
-    const computeUnits = Math.min(Math.max(estimatedComputeUnits, 1), 1_400_000);
+    const computeUnits = Math.max(Math.floor(estimatedComputeUnits), 1);
+    if (!Number.isFinite(computeUnits)) {
+      return res
+        .status(400)
+        .json({ error: 'estimatedComputeUnits must be a number', code: 'INVALID_INPUT' });
+    }
     const priorityFeeData = await helius.calculatePriorityFee(computeUnits);
     const priorityFeeLamports = priorityFeeData.priorityFeeLamports;
 
