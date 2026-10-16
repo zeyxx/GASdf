@@ -29,6 +29,18 @@
   (audited custody, no inventive risk), PMF proven, service already
   self-sufficient. Before that, every margin funds reserves, never rewards.
 
+## Margin waterfall (every lamport above cost)
+
+1. Hot SOL reserve refill (execution capacity first).
+2. Cold USDC reserve (treasury safety).
+3. Progressive $ASDFASDFA buyback and burn (deflationary proof of utility).
+4. Operator revenue (last, never first).
+
+No yield, no rewards until the yield gate (above) opens. This waterfall
+is also the proof of CYNIC's utility: DevOps, measures, proofs, compute —
+and distribution across Solana, starting from zero as an individual,
+as a member of the $ASDFASDFA community.
+
 ## Gates
 
 - MVP ships when: quote TTL live, Jupiter pricing live, submit fail-closed,
