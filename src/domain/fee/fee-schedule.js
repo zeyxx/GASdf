@@ -5,7 +5,11 @@
  *
  * No tiers, no scores. All params operator-tunable; this module only
  * computes. CU_CAP refuses abusive transactions instead of overcharging.
+ *
+ * Domain layer: pure logic, zero I/O. Uses value objects for validation.
  */
+
+const { ComputeUnits } = require('./value-objects');
 
 const DEFAULTS = {
   BASE_FEE_LAMPORTS: 50000,
@@ -37,7 +41,10 @@ function computeFeeBreakdown(p) {
     return { accepted: false, code: 'CU_OVER_CAP', cus: requested };
   }
 
-  const cus = requested;
+  // Validate via value object (throws if out of range, but cap already checked)
+  const cu = new ComputeUnits(requested);
+
+  const cus = cu.value;
   const cuCharge = Math.ceil(cus / 1000) * cuPrice;
   return {
     accepted: true,

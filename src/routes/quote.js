@@ -7,7 +7,7 @@ const tokenGate = require('../services/token-gate');
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
 const jupiter = require('../services/jupiter');
-const { computeFeeBreakdown } = require('../services/fee-schedule');
+const { computeFeeBreakdown } = require('../domain/fee/fee-schedule');
 
 const router = express.Router();
 

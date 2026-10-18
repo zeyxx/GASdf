@@ -2,7 +2,7 @@
  * Tests for the hybrid fee schedule (pure, offline).
  */
 
-const { computeFeeBreakdown, DEFAULTS } = require('../../../src/services/fee-schedule');
+const { computeFeeBreakdown, DEFAULTS } = require('../../../src/domain/fee/fee-schedule');
 
 test('flat fee for a light tx', () => {
   const f = computeFeeBreakdown({ requestedCus: 200000, priorityFeeLamports: 200 });
