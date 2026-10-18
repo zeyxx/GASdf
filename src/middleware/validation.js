@@ -1,32 +1,11 @@
-const { PublicKey } = require('@solana/web3.js');
+const domain = require('../domain/validation/validation');
 
-// Validation helpers
-function isValidSolanaAddress(address) {
-  if (!address || typeof address !== 'string') return false;
-  try {
-    new PublicKey(address);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Re-export pure functions from domain (thin adapter)
+const isValidSolanaAddress = domain.isValidSolanaAddress;
+const isValidBase64 = domain.isValidBase64;
+const isValidUUID = domain.isValidUUID;
 
-function isValidBase64(str) {
-  if (!str || typeof str !== 'string') return false;
-  try {
-    return Buffer.from(str, 'base64').toString('base64') === str;
-  } catch {
-    return false;
-  }
-}
-
-function isValidUUID(str) {
-  if (!str || typeof str !== 'string') return false;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
-
-// Validation schemas
+// Validation schemas (HTTP-specific, stays in middleware)
 const schemas = {
   quote: {
     paymentToken: {
