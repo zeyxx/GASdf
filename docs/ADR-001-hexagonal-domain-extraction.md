@@ -92,6 +92,66 @@ Chaque phase = 1 PR, tests verts, pas de régression.
 - Sur-ingénierie si le domaine est trop petit (fee calc = 1 fonction)
 - Mitigation : ne pas créer de port pour 1 seul usage ; fusionner si un port n'a qu'un adapter
 
-## 7. Statut
+## 7. DDD léger (ajout 2026-10-18)
 
-Accepted. Migration incrémentale selon §5, priorité P0 d'abord (fee + token-gate).
+Le domaine est petit (Fee, Quote, Token, Tx, Burn, Treasury) et le protocole
+émerge des preuves. Un DDD complet (event sourcing, bounded contexts multiples,
+CQRS) serait de la sur-ingénierie à l'échelle 0. On adopte un **DDD léger** :
+
+### 7.1 Ubiquitous language (glossaire)
+
+| Terme | Définition |
+|---|---|
+| **Quote** | Prix du service en token de paiement, TTL 60s, immuable une fois créé |
+| **Fee** | Montant total = base + CU charge + priority, en lamports puis converti en token |
+| **Burn** | Conversion d'un token de paiement en $ASDF puis destruction on-chain |
+| **Treasury** | Compte qui reçoit les fees (hot SOL + cold USDC) |
+| **Hot reserve** | SOL disponible pour l'exécution, refill en priorité |
+| **Cold reserve** | USDC de sécurité, pas de cap |
+| **Margin** | Fee - coût réel (lamports + CU + tip) |
+| **Margin waterfall** | Hot refill → cold reserve → burn → operator (dernier) |
+| **CU cap** | Plafond de compute units accepté (1.4M) ; au-delà = refus |
+| **Holder tier** | Niveau de discount selon la part de supply $ASDF détenu (Phase 2+) |
+
+### 7.2 Value objects (immuables, validés à la construction)
+
+- `Lamports` — montant en lamports (u64, >= 0)
+- `ComputeUnits` — CU (u32, 1..=1_400_000)
+- `TokenMint` — adresse de mint (base58, 32-44 chars)
+- `QuoteId` — UUID v4
+- `FeeAmount` — fee en lamports + conversion en token (montant + mint)
+- `Margin` — fee - coût (peut être négatif → cellule refusée)
+
+Règle : un value object se valide à la construction. Pas de magic numbers inline.
+
+### 7.3 Aggregates
+
+- **Quote** (root) : contient `Fee`, `PaymentToken`, `UserPubkey`, `FeePayer`, `Expiry`. Invariant : fee > 0, expiry > now, paymentToken dans la whitelist.
+- **BurnBatch** (root) : contient `BurnProof[]`. Invariant : somme des burns = total brûlé, chaque proof a une signature on-chain.
+
+Pas d'aggregate pour Transaction (stateless, validée puis soumise).
+
+### 7.4 Domain events
+
+- `QuoteCreated` — { quoteId, fee, paymentToken, expiry }
+- `TxSubmitted` — { signature, quoteId, unitsConsumed, landed }
+- `BurnExecuted` — { signature, amountBurned, mint }
+
+Les events sont append-only dans le ledger JSONL. Pas d'event sourcing complet — le ledger est le journal.
+
+### 7.5 Bounded context
+
+Un seul contexte pour l'instant : **Gasless Execution**. Pas de split tant que le domaine ne grossit pas (règle : ne pas fragmenter prématurément).
+
+### 7.6 Ce qu'on ne fait PAS (DDD complet différé)
+
+- Event sourcing complet (le JSONL ledger suffit)
+- CQRS (pas de séparation read/write au MVP)
+- Repositories complexes (le ledger est le repository)
+- Multiples bounded contexts (1 seul domaine = 1 contexte)
+
+Réévaluation au BLOC 2 (présence publique) si le domaine grossit.
+
+## 8. Statut
+
+Accepted. Migration incrémentale selon §5, priorité P0 d'abord (fee + token-gate), avec DDD léger intégré (§7).
