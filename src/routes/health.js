@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const redis = require('../utils/redis');
+const redis = (() => {
+  try {
+    return require('../utils/redis');
+  } catch (e) {
+    return null;
+  }
+})();
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
 const logger = require('../utils/logger');
@@ -9,7 +15,7 @@ const logger = require('../utils/logger');
 router.get('/', async (req, res) => {
   try {
     const [redisPing, balanceInfo] = await Promise.all([
-      redis.ping(),
+      redis ? redis.ping() : Promise.resolve(null),
       feePayer.checkBalance(),
     ]);
 
