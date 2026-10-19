@@ -7,7 +7,6 @@ const {
   globalLimiter,
   quoteLimiter,
   submitLimiter,
-  scoreLimiter,
   walletQuoteLimiter,
   walletSubmitLimiter,
 } = require('../../../src/middleware/security');
@@ -73,15 +72,6 @@ describe('Security Middleware', () => {
       });
     });
 
-    describe('scoreLimiter', () => {
-      it('should be defined', () => {
-        expect(scoreLimiter).toBeDefined();
-      });
-
-      it('should be a function', () => {
-        expect(typeof scoreLimiter).toBe('function');
-      });
-    });
   });
 
   describe('walletQuoteLimiter', () => {
