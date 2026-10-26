@@ -1,60 +1,65 @@
 /**
- * Token Gating - Phase 0 Whitelist Model
+ * Token Gating — Phase 0 Whitelist Model (service facade).
  *
- * Accepted tokens: USDC, USDT, PYUSD, $ASDF
- * HolDex K-score removed — single point of failure.
+ * Thin adapter over the pure domain. Holds mutable state (whitelist,
+ * HolDex cache) and I/O (fetch, logger). Domain logic lives in
+ * src/domain/token-gate/.
  */
 
 const { MINTS, TOKEN_INFO } = require('../constants');
 const logger = require('../utils/logger');
+const domain = require('../domain/token-gate/token-gate');
+const holdexAdapter = require('../adapters/holdex/token-list');
 
-const WHITELIST = new Map([
-  [MINTS.USDC, TOKEN_INFO[MINTS.USDC]],
-  [MINTS.USDT, TOKEN_INFO[MINTS.USDT]],
-  [MINTS.PYUSD, TOKEN_INFO[MINTS.PYUSD]],
-  [MINTS.ASDF, TOKEN_INFO[MINTS.ASDF]],
-]);
+// Mutable whitelist state (adapter concern, not domain)
+let whitelist = domain.createBaseWhitelist(MINTS, TOKEN_INFO);
+
+const HOLDEX_TTL_MS = 60 * 60 * 1000;
+let holdexRefreshedAt = 0;
 
 /**
- * Check if a token is accepted for payment.
- * @param {string} mint - Token mint address
- * @returns {{accepted: boolean, reason: string}}
+ * Merge HolDex-listed tokens into the whitelist (I/O + cache).
+ * @returns {Promise<number>} merged entries count
  */
+async function refreshFromHoldex() {
+  const url = process.env.HOLDEX_TOKENS_URL;
+  if (!url) return 0;
+  const now = Date.now();
+  if (now - holdexRefreshedAt < HOLDEX_TTL_MS) return 0;
+  const list = await holdexAdapter.fetchTokens(url);
+  const before = whitelist.size;
+  whitelist = domain.mergeHoldexTokens(whitelist, list);
+  const merged = whitelist.size - before;
+  holdexRefreshedAt = now;
+  logger.info('TOKEN_GATE', 'HolDex list merged', { merged });
+  return merged;
+}
+
 function isTokenAccepted(mint) {
-  if (WHITELIST.has(mint)) {
-    return { accepted: true, reason: 'whitelisted' };
+  const result = domain.isTokenAccepted(whitelist, mint);
+  if (!result.accepted) {
+    logger.info('TOKEN_GATE', 'Token rejected - not whitelisted', {
+      mint: typeof mint === 'string' ? mint.slice(0, 8) : mint,
+    });
   }
-
-  logger.info('TOKEN_GATE', 'Token rejected - not whitelisted', {
-    mint: mint.slice(0, 8),
-  });
-
-  return { accepted: false, reason: 'not_whitelisted' };
+  return result;
 }
 
-/**
- * Get list of accepted tokens (for /tokens endpoint).
- * @returns {Array<{mint: string, symbol: string, name: string, decimals: number}>}
- */
 function getAcceptedTokens() {
-  return [...WHITELIST.entries()].map(([mint, info]) => ({
-    mint,
-    ...info,
-  }));
+  return domain.getAcceptedTokens(whitelist);
 }
 
-/**
- * Check if a token is in the whitelist (sync).
- * @param {string} mint
- * @returns {boolean}
- */
 function isWhitelisted(mint) {
-  return WHITELIST.has(mint);
+  return domain.isWhitelisted(whitelist, mint);
 }
 
 module.exports = {
   isTokenAccepted,
   getAcceptedTokens,
   isWhitelisted,
-  WHITELIST,
+  refreshFromHoldex,
+  // Expose for testing / backward compat
+  get WHITELIST() {
+    return whitelist;
+  },
 };

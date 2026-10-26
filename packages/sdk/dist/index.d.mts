@@ -1,5 +1,21 @@
 export { B as BurnStats, D as DualBurnInfo, G as GASdf, a as GASdfConfig, h as GASdfError, f as HealthStatus, H as HolderTierInfo, K as KScoreTier, N as NetworkError, P as PaymentToken, Q as Quote, i as QuoteExpiredError, j as QuoteNotFoundError, d as QuotePaymentToken, b as QuoteRequest, l as RateLimitError, R as RetryConfig, S as SubmitRequest, c as SubmitResult, g as SupportedTransaction, T as TokenScore, k as TransactionError, e as TreasuryInfo, V as ValidationError } from './errors-CEsZX8T7.mjs';
-import '@solana/web3.js';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+
+declare const GASDF_PROGRAM_ID: PublicKey;
+interface RelayWithVaultParams {
+    userTokenAccount: PublicKey;
+    userAuthority: PublicKey;
+    vaultTokenAccount: PublicKey;
+    vaultSolAccount: PublicKey;
+    operatorSolAccount: PublicKey;
+    tokenAmount: bigint;
+    solReimbursement: bigint;
+    vaultBump: number;
+}
+/**
+ * Creates a RelayWithVault instruction for the GASdf Pinocchio program.
+ */
+declare function createRelayWithVaultInstruction(params: RelayWithVaultParams, programId?: PublicKey): TransactionInstruction;
 
 /**
  * Resilient fetch utility with timeout, retry, and correlation IDs
@@ -11,4 +27,4 @@ import '@solana/web3.js';
  */
 declare function generateCorrelationId(): string;
 
-export { generateCorrelationId };
+export { GASDF_PROGRAM_ID, type RelayWithVaultParams, createRelayWithVaultInstruction, generateCorrelationId };

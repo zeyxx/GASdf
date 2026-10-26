@@ -332,7 +332,37 @@ var GASdf = class {
     );
   }
 };
+var TOKEN_PROGRAM_ID = new web3_js.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+new web3_js.PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+new web3_js.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+new web3_js.PublicKey("So11111111111111111111111111111111111111112");
+new web3_js.PublicKey("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP");
 
+// src/instructions.ts
+var GASDF_PROGRAM_ID = new web3_js.PublicKey("GASdf11111111111111111111111111111111111111");
+function createRelayWithVaultInstruction(params, programId = GASDF_PROGRAM_ID) {
+  const keys = [
+    { pubkey: params.userTokenAccount, isSigner: false, isWritable: true },
+    { pubkey: params.userAuthority, isSigner: true, isWritable: false },
+    { pubkey: params.vaultTokenAccount, isSigner: false, isWritable: true },
+    { pubkey: params.vaultSolAccount, isSigner: false, isWritable: true },
+    { pubkey: params.operatorSolAccount, isSigner: true, isWritable: true },
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: web3_js.SystemProgram.programId, isSigner: false, isWritable: false }
+  ];
+  const data = Buffer.alloc(1 + 8 + 8 + 1);
+  data.writeUInt8(1, 0);
+  data.writeBigUInt64LE(params.tokenAmount, 1);
+  data.writeBigUInt64LE(params.solReimbursement, 9);
+  data.writeUInt8(params.vaultBump, 17);
+  return new web3_js.TransactionInstruction({
+    keys,
+    programId,
+    data
+  });
+}
+
+exports.GASDF_PROGRAM_ID = GASDF_PROGRAM_ID;
 exports.GASdf = GASdf;
 exports.GASdfError = GASdfError;
 exports.NetworkError = NetworkError;
@@ -341,4 +371,5 @@ exports.QuoteNotFoundError = QuoteNotFoundError;
 exports.RateLimitError = RateLimitError;
 exports.TransactionError = TransactionError;
 exports.ValidationError = ValidationError;
+exports.createRelayWithVaultInstruction = createRelayWithVaultInstruction;
 exports.generateCorrelationId = generateCorrelationId;

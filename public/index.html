@@ -4865,8 +4865,8 @@
 
       try {
         // Fetch Jupiter quote via GASdf proxy (Jupiter requires API key now)
-        // maxAccounts=25 limits route complexity to leave room for fee instruction (1232 byte limit)
-        const jupiterUrl = `/v1/rpc/jupiter/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50&maxAccounts=25`;
+        // maxAccounts=15 limits route complexity to leave room for fee instruction (1232 byte limit)
+        const jupiterUrl = `/v1/rpc/jupiter/quote?inputMint=${inputTokenMint}&outputMint=${outputTokenMint}&amount=${amountInSmallestUnits}&slippageBps=50&maxAccounts=15&onlyDirectRoutes=true`;
         const jupiterRes = await fetch(jupiterUrl);
 
         if (!jupiterRes.ok) {

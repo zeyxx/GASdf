@@ -1,519 +1,117 @@
 /**
- * Tests for Submit Route
+ * Tests for Submit Route (Phase 0 Sender adapter).
+ * Route must read `transaction` from the body, fail closed without it,
+ * respect the fee-payer circuit breaker, co-sign, submit via Helius,
+ * and append one JSONL proof line per accepted submission.
  */
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const request = require('supertest');
 const express = require('express');
+const {
+  Keypair,
+  VersionedTransaction,
+  TransactionMessage,
+  SystemProgram,
+} = require('@solana/web3.js');
 
-// Mock dependencies before requiring the route
+const LEDGER = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gasdf-ledger-')), 'submit.jsonl');
+process.env.GASDF_LEDGER_PATH = LEDGER;
+
 jest.mock('../../../src/utils/config', () => ({
-  IS_DEV: true,
-  BURN_RATIO: 0.5,
+  NETWORK: 'devnet',
 }));
-
 jest.mock('../../../src/utils/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
   debug: jest.fn(),
 }));
-
-jest.mock('../../../src/utils/redis', () => ({
-  getQuote: jest.fn(),
-  deleteQuote: jest.fn().mockResolvedValue(true),
-  hasTransactionHash: jest.fn().mockResolvedValue(false),
-  markTransactionHash: jest.fn().mockResolvedValue(true),
-  claimTransactionSlot: jest.fn().mockResolvedValue({ claimed: true }),
-  addPendingSwap: jest.fn().mockResolvedValue(true),
-  incrTxCount: jest.fn().mockResolvedValue(true),
-  incrWalletBurn: jest.fn().mockResolvedValue(true),
-  recordTransactionVelocity: jest.fn().mockResolvedValue(true),
+jest.mock('../../../src/constants', () => ({
+  EXPLORER_BASE: 'https://orbmarkets.io',
 }));
 
-jest.mock('../../../src/utils/rpc', () => ({
-  isBlockhashValid: jest.fn().mockResolvedValue(true),
-  simulateTransaction: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
-  simulateWithBalanceCheck: jest.fn().mockResolvedValue({ success: true, unitsConsumed: 200000 }),
-  sendTransaction: jest.fn().mockResolvedValue('test-signature-abc123'),
-  confirmTransaction: jest.fn().mockResolvedValue(true),
-  checkSignatureStatus: jest
-    .fn()
-    .mockResolvedValue({ confirmed: true, slot: 12345, confirmationStatus: 'confirmed' }),
+const mockUser = Keypair.generate();
+const mockPayer = Keypair.generate();
+
+jest.mock('../../../src/services/fee-payer', () => ({
+  getFeePayer: jest.fn(() => mockPayer),
+  isCircuitOpen: jest.fn(() => false),
+}));
+jest.mock('../../../src/services/helius', () => ({
+  sendAndConfirmTransaction: jest.fn(async () => ({
+    signature: 'SIG_PHASE0_TEST',
+    confirmation: { value: { err: null } },
+  })),
+  getConnection: jest.fn(() => ({
+    simulateTransaction: jest.fn(async () => ({
+      value: { unitsConsumed: 150, err: null },
+    })),
+  })),
 }));
 
-jest.mock('../../../src/services/signer', () => ({
-  signTransaction: jest.fn((tx) => tx),
-  markPayerUnhealthy: jest.fn(),
-}));
-
-jest.mock('../../../src/services/fee-payer-pool', () => ({
-  releaseReservation: jest.fn(),
-  getReservation: jest.fn().mockReturnValue(null),
-  pool: {
-    balances: new Map([['FeePayerPubkey111111111111111111111111111111', 1000000000]]),
-  },
-}));
-
-jest.mock('../../../src/services/validator', () => ({
-  deserializeTransaction: jest.fn().mockReturnValue({ message: {} }),
-  validateTransaction: jest.fn().mockReturnValue({
-    valid: true,
-    feePayer: 'FeePayerPubkey111111111111111111111111111111',
-  }),
-  validateTransactionSize: jest.fn().mockReturnValue({ valid: true, size: 500 }),
-  validateFeePayment: jest.fn().mockResolvedValue({ valid: true }),
-  getTransactionBlockhash: jest.fn().mockReturnValue('blockhash123'),
-  computeTransactionHash: jest.fn().mockReturnValue('txhash456'),
-}));
-
-jest.mock('../../../src/middleware/security', () => ({
-  submitLimiter: (req, res, next) => next(),
-  walletSubmitLimiter: (req, res, next) => next(),
-}));
-
-jest.mock('../../../src/middleware/validation', () => ({
-  validate: () => (req, res, next) => next(),
-}));
-
-jest.mock('../../../src/services/tx-queue', () => ({
-  enqueue: jest.fn().mockResolvedValue({ id: 'tx-entry-1' }),
-  markProcessing: jest.fn().mockResolvedValue(true),
-  markSuccess: jest.fn().mockResolvedValue(true),
-  markRetryOrFailed: jest.fn().mockResolvedValue(true),
-  getEntry: jest.fn(),
-  MAX_RETRIES: 3,
-  RETRY_DELAYS: [1000, 2000, 4000],
-  isRetryableError: jest.fn().mockReturnValue(false),
-  getRetryDelay: jest.fn().mockReturnValue(10), // Fast retry for tests
-}));
-
-jest.mock('../../../src/utils/metrics', () => ({
-  submitsTotal: { inc: jest.fn() },
-  submitDuration: { observe: jest.fn() },
-  activeQuotes: { inc: jest.fn(), dec: jest.fn() },
-}));
-
-jest.mock('../../../src/services/audit', () => ({
-  logSubmitSuccess: jest.fn(),
-  logSubmitRejected: jest.fn(),
-  logSecurityEvent: jest.fn(),
-  AUDIT_EVENTS: {
-    REPLAY_ATTACK_DETECTED: 'security.replay_attack',
-    BLOCKHASH_EXPIRED: 'security.blockhash_expired',
-    SIMULATION_FAILED: 'security.simulation_failed',
-    VALIDATION_FAILED: 'security.validation_failed',
-    FEE_PAYER_MISMATCH: 'security.fee_payer_mismatch',
-  },
-}));
-
-jest.mock('../../../src/services/anomaly-detector', () => ({
-  anomalyDetector: {
-    trackWallet: jest.fn().mockResolvedValue(undefined),
-    trackIp: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
-describe('Submit Route', () => {
-  let app;
-  let submitRouter;
-  let redis;
-  let rpc;
-  let validator;
-  let feePayerPool;
-  let txQueue;
-  let metrics;
-  let audit;
-  let anomalyDetector;
-
-  const validQuote = {
-    paymentToken: 'So11111111111111111111111111111111111111112',
-    userPubkey: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    feePayer: 'FeePayerPubkey111111111111111111111111111111',
-    feeAmountLamports: 5000,
-    feeAmountToken: 100000,
-    expiresAt: Date.now() + 60000,
-  };
-
-  const validRequest = {
-    quoteId: '550e8400-e29b-41d4-a716-446655440000',
-    transaction: 'SGVsbG8gV29ybGQ=', // base64 encoded
-    userPubkey: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Get mocked modules
-    redis = require('../../../src/utils/redis');
-    rpc = require('../../../src/utils/rpc');
-    validator = require('../../../src/services/validator');
-    feePayerPool = require('../../../src/services/fee-payer-pool');
-    txQueue = require('../../../src/services/tx-queue');
-    metrics = require('../../../src/utils/metrics');
-    audit = require('../../../src/services/audit');
-    anomalyDetector = require('../../../src/services/anomaly-detector').anomalyDetector;
-
-    // Reset all mocks to default values
-    redis.getQuote.mockResolvedValue(validQuote);
-    redis.claimTransactionSlot.mockResolvedValue({ claimed: true });
-    rpc.isBlockhashValid.mockResolvedValue(true);
-    rpc.simulateWithBalanceCheck.mockResolvedValue({ success: true, unitsConsumed: 200000 });
-    rpc.sendTransaction.mockResolvedValue('test-signature-abc123');
-    validator.deserializeTransaction.mockReturnValue({ message: {} });
-    validator.validateTransaction.mockReturnValue({
-      valid: true,
-      feePayer: 'FeePayerPubkey111111111111111111111111111111',
-    });
-    validator.validateTransactionSize.mockReturnValue({ valid: true, size: 500 });
-    feePayerPool.getReservation.mockReturnValue(null);
-    txQueue.isRetryableError.mockReturnValue(false);
-
-    // Create express app with submit router
-    app = express();
-    app.use(express.json());
-    app.use((req, res, next) => {
-      req.requestId = 'test-request-id';
-      next();
-    });
-
-    // Re-require route to get fresh instance
-    jest.isolateModules(() => {
-      submitRouter = require('../../../src/routes/submit');
-    });
-    app.use('/submit', submitRouter);
-  });
-
-  describe('POST /submit', () => {
-    it('should return signature for valid submission', async () => {
-      const response = await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(response.body).toHaveProperty('signature');
-      expect(response.body).toHaveProperty('status', 'submitted');
-      expect(response.body).toHaveProperty('attempts');
-      expect(response.body).toHaveProperty('explorer');
-    });
-
-    it('should include explorer link in response', async () => {
-      const response = await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(response.body.explorer).toContain('solscan.io/tx/');
-    });
-
-    it('should delete quote after successful submission', async () => {
-      await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(redis.deleteQuote).toHaveBeenCalledWith(validRequest.quoteId);
-    });
-
-    it('should claim transaction slot to prevent replay', async () => {
-      await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(redis.claimTransactionSlot).toHaveBeenCalled();
-    });
-
-    it('should track pending swap', async () => {
-      await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(redis.addPendingSwap).toHaveBeenCalledWith(validQuote.feeAmountLamports);
-      expect(redis.incrTxCount).toHaveBeenCalled();
-    });
-
-    it('should increment success metrics', async () => {
-      await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(metrics.submitsTotal.inc).toHaveBeenCalledWith({ status: 'success' });
-      expect(metrics.activeQuotes.dec).toHaveBeenCalled();
-    });
-
-    it('should log successful submission', async () => {
-      await request(app).post('/submit').send(validRequest).expect(200);
-
-      expect(audit.logSubmitSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          quoteId: validRequest.quoteId,
-          signature: expect.any(String),
-          userPubkey: validRequest.userPubkey,
-        })
-      );
-    });
-  });
-
-  describe('quote validation', () => {
-    it('should return 400 for non-existent quote', async () => {
-      redis.getQuote.mockResolvedValue(null);
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.error).toContain('Quote not found');
-      expect(response.body.code).toBe('QUOTE_NOT_FOUND');
-    });
-
-    it('should return 400 for expired quote', async () => {
-      redis.getQuote.mockResolvedValue({
-        ...validQuote,
-        expiresAt: Date.now() - 1000, // Expired
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.error).toBe('Quote expired');
-      expect(response.body.code).toBe('QUOTE_EXPIRED');
-    });
-
-    it('should delete expired quote', async () => {
-      redis.getQuote.mockResolvedValue({
-        ...validQuote,
-        expiresAt: Date.now() - 1000,
-      });
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(redis.deleteQuote).toHaveBeenCalledWith(validRequest.quoteId);
-    });
-  });
-
-  describe('transaction size validation', () => {
-    it('should return 400 for oversized transaction', async () => {
-      validator.validateTransactionSize.mockReturnValue({
-        valid: false,
-        error: 'Transaction too large',
-        size: 2000,
-        maxSize: 1232,
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('TX_TOO_LARGE');
-      expect(response.body.size).toBe(2000);
-      expect(response.body.maxSize).toBe(1232);
-    });
-
-    it('should log security event for oversized transaction', async () => {
-      validator.validateTransactionSize.mockReturnValue({
-        valid: false,
-        size: 2000,
-        maxSize: 1232,
-      });
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(audit.logSecurityEvent).toHaveBeenCalledWith(
-        audit.AUDIT_EVENTS.VALIDATION_FAILED,
-        expect.objectContaining({
-          reason: 'transaction_size_exceeded',
-        })
-      );
-    });
-  });
-
-  describe('transaction deserialization', () => {
-    it('should return 400 for invalid transaction format', async () => {
-      validator.deserializeTransaction.mockImplementation(() => {
-        throw new Error('Invalid transaction');
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('INVALID_TX_FORMAT');
-    });
-  });
-
-  describe('anti-replay protection', () => {
-    it('should return 400 for replay attack', async () => {
-      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.error).toBe('Transaction already submitted');
-      expect(response.body.code).toBe('REPLAY_DETECTED');
-    });
-
-    it('should log security event for replay', async () => {
-      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(audit.logSecurityEvent).toHaveBeenCalledWith(
-        audit.AUDIT_EVENTS.REPLAY_ATTACK_DETECTED,
-        expect.objectContaining({
-          quoteId: validRequest.quoteId,
-        })
-      );
-    });
-
-    it('should track failure for anomaly detection', async () => {
-      redis.claimTransactionSlot.mockResolvedValue({ claimed: false });
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(anomalyDetector.trackWallet).toHaveBeenCalledWith(
-        validRequest.userPubkey,
-        'failure',
-        expect.any(String)
-      );
-    });
-  });
-
-  describe('blockhash validation', () => {
-    it('should return 400 for expired blockhash', async () => {
-      rpc.isBlockhashValid.mockResolvedValue(false);
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.error).toContain('blockhash expired');
-      expect(response.body.code).toBe('BLOCKHASH_EXPIRED');
-    });
-
-    it('should log security event for stale blockhash', async () => {
-      rpc.isBlockhashValid.mockResolvedValue(false);
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(audit.logSecurityEvent).toHaveBeenCalledWith(
-        audit.AUDIT_EVENTS.BLOCKHASH_EXPIRED,
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe('transaction validation', () => {
-    it('should return 400 for invalid transaction', async () => {
-      validator.validateTransaction.mockReturnValue({
-        valid: false,
-        errors: ['Invalid instruction'],
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('VALIDATION_FAILED');
-      expect(response.body.details).toContain('Invalid instruction');
-    });
-  });
-
-  describe('fee payer validation', () => {
-    it('should return 400 for fee payer mismatch with reservation', async () => {
-      feePayerPool.getReservation.mockReturnValue({
-        pubkey: 'DifferentPayer11111111111111111111111111111',
-      });
-      validator.validateTransaction.mockReturnValue({
-        valid: true,
-        feePayer: 'FeePayerPubkey111111111111111111111111111111',
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('FEE_PAYER_MISMATCH');
-    });
-
-    it('should return 400 for fee payer mismatch with quote', async () => {
-      redis.getQuote.mockResolvedValue({
-        ...validQuote,
-        feePayer: 'DifferentPayer11111111111111111111111111111',
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('FEE_PAYER_MISMATCH');
-    });
-  });
-
-  describe('transaction simulation', () => {
-    it('should return 400 for failed simulation', async () => {
-      rpc.simulateWithBalanceCheck.mockResolvedValue({
-        success: false,
-        error: 'Simulation failed',
-        logs: ['Error log 1', 'Error log 2'],
-      });
-
-      const response = await request(app).post('/submit').send(validRequest).expect(400);
-
-      expect(response.body.code).toBe('SIMULATION_FAILED');
-      expect(response.body.details).toBe('Simulation failed');
-    });
-
-    it('should release reservation on simulation failure', async () => {
-      rpc.simulateWithBalanceCheck.mockResolvedValue({
-        success: false,
-        error: 'Simulation failed',
-      });
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(feePayerPool.releaseReservation).toHaveBeenCalledWith(validRequest.quoteId);
-    });
-  });
-
-  describe('transaction submission failure', () => {
-    it('should return 500 when all retries fail', async () => {
-      rpc.sendTransaction.mockRejectedValue(new Error('Network error'));
-      txQueue.isRetryableError.mockReturnValue(true);
-
-      const response = await request(app).post('/submit').send(validRequest).expect(500);
-
-      expect(response.body.code).toBe('SUBMIT_FAILED');
-      expect(response.body.attempts).toBeDefined();
-    });
-  });
-
-  describe('error handling', () => {
-    it('should return 500 on unexpected error', async () => {
-      redis.getQuote.mockRejectedValue(new Error('Database error'));
-
-      const response = await request(app).post('/submit').send(validRequest).expect(500);
-
-      expect(response.body.error).toBe('Failed to submit transaction');
-      expect(response.body.code).toBe('SUBMIT_FAILED');
-    });
-
-    it('should increment error metrics on failure', async () => {
-      redis.getQuote.mockRejectedValue(new Error('Database error'));
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(metrics.submitsTotal.inc).toHaveBeenCalledWith({ status: 'error' });
-    });
-
-    it('should release reservation on error', async () => {
-      redis.getQuote.mockRejectedValue(new Error('Database error'));
-
-      await request(app).post('/submit').send(validRequest);
-
-      expect(feePayerPool.releaseReservation).toHaveBeenCalled();
-    });
-  });
-
-  describe('GET /submit/status/:txId', () => {
-    it('should return transaction status', async () => {
-      txQueue.getEntry.mockResolvedValue({
-        id: 'tx-123',
-        status: 'completed',
-        signature: 'sig-abc',
-        attempts: 1,
-        createdAt: Date.now(),
-        completedAt: Date.now(),
-      });
-
-      const response = await request(app).get('/submit/status/tx-123').expect(200);
-
-      expect(response.body.id).toBe('tx-123');
-      expect(response.body.status).toBe('completed');
-      expect(response.body.signature).toBe('sig-abc');
-    });
-
-    it('should return 404 for unknown transaction', async () => {
-      txQueue.getEntry.mockResolvedValue(null);
-
-      const response = await request(app).get('/submit/status/unknown-tx').expect(404);
-
-      expect(response.body.code).toBe('TX_NOT_FOUND');
-    });
-
-    it('should return 500 on error', async () => {
-      txQueue.getEntry.mockRejectedValue(new Error('Database error'));
-
-      const response = await request(app).get('/submit/status/tx-123').expect(500);
-
-      expect(response.body.error).toBe('Failed to get transaction status');
-    });
-  });
+const feePayer = require('../../../src/services/fee-payer');
+const helius = require('../../../src/services/helius');
+const route = require('../../../src/routes/submit');
+
+function app() {
+  const a = express();
+  a.use(express.json());
+  a.use('/v1/submit', route);
+  return a;
+}
+
+function signedUserTxBase64() {
+  const message = new TransactionMessage({
+    payerKey: mockPayer.publicKey,
+    recentBlockhash: '11111111111111111111111111111111',
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: mockUser.publicKey,
+        toPubkey: mockPayer.publicKey,
+        lamports: 1,
+      }),
+    ],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(message);
+  tx.sign([mockUser]);
+  return Buffer.from(tx.serialize()).toString('base64');
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  feePayer.isCircuitOpen.mockReturnValue(false);
+});
+
+test('missing transaction fails closed with 400, never touches Helius', async () => {
+  const res = await request(app()).post('/v1/submit').send({});
+  expect(res.status).toBe(400);
+  expect(res.body.code).toBe('INVALID_INPUT');
+  expect(helius.sendAndConfirmTransaction).not.toHaveBeenCalled();
+});
+
+test('open circuit breaker rejects with 503 before co-sign', async () => {
+  feePayer.isCircuitOpen.mockReturnValue(true);
+  const res = await request(app()).post('/v1/submit').send({ transaction: signedUserTxBase64() });
+  expect(res.status).toBe(503);
+  expect(res.body.code).toBe('CIRCUIT_OPEN');
+  expect(helius.sendAndConfirmTransaction).not.toHaveBeenCalled();
+});
+
+test('valid submission co-signs, sends, and appends one JSONL proof line', async () => {
+  const res = await request(app()).post('/v1/submit').send({ transaction: signedUserTxBase64() });
+  expect(res.status).toBe(200);
+  expect(res.body.signature).toBe('SIG_PHASE0_TEST');
+  expect(res.body.explorer).toContain('SIG_PHASE0_TEST');
+  expect(helius.sendAndConfirmTransaction).toHaveBeenCalledTimes(1);
+
+  const lines = fs.readFileSync(LEDGER, 'utf8').trim().split('\n');
+  const proof = JSON.parse(lines[lines.length - 1]);
+  expect(proof.signature).toBe('SIG_PHASE0_TEST');
+  expect(proof.network).toBe('devnet');
+  expect(proof.unitsConsumed).toBe(150);
+  expect(typeof proof.ts).toBe('string');
+  expect(JSON.stringify(proof)).not.toMatch(/PRIVATE|SECRET/i);
 });
