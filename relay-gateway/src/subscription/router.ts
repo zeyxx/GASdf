@@ -22,6 +22,7 @@ import {
 export function createSubscriptionRouter(
   tokenRegistry: PaymentTokenRegistry,
   planRegistry: PlanRegistry,
+  ledger?: { record: (entry: any) => void },
 ): Router {
   const router = Router();
 
@@ -220,6 +221,19 @@ export function createSubscriptionRouter(
       if (settleTransition.kind === 'to_settled') {
         session.status = SessionStatus.Settled;
         session.settledAt = settleTransition.settledAt;
+        if (ledger) {
+          ledger.record({
+            kind: 'subscription_settle',
+            id: session.sessionId,
+            amountTokenBaseUnits: receivedAsdf,
+            metadata: {
+              appId: session.appId,
+              planId: session.planId,
+              buyerPubkey: session.buyerPubkey,
+              inputTokenMint: session.inputTokenMint,
+            },
+          });
+        }
       }
       res.json({ status: 'settled', session });
       return;
