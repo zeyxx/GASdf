@@ -1,5 +1,4 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const { PublicKey } = require('@solana/web3.js');
 const config = require('../utils/config');
@@ -8,7 +7,7 @@ const tokenGate = require('../services/token-gate');
 const feePayer = require('../services/fee-payer');
 const helius = require('../services/helius');
 const jupiter = require('../services/jupiter');
-const holderDiscount = require('../services/holder-discount');
+const { computeFeeBreakdown } = require('../domain/fee/fee-schedule');
 
 const router = express.Router();
 
@@ -52,26 +51,42 @@ router.post('/', async (req, res) => {
     // Rate limiting is now handled globally or via stateless IP limits
     // 5. Priority fee from Helius
     // =========================================================================
-    const computeUnits = Math.min(Math.max(estimatedComputeUnits, 1), 1_400_000);
+    const computeUnits = Math.max(Math.floor(estimatedComputeUnits), 1);
+    if (!Number.isFinite(computeUnits)) {
+      return res
+        .status(400)
+        .json({ error: 'estimatedComputeUnits must be a number', code: 'INVALID_INPUT' });
+    }
     const priorityFeeData = await helius.calculatePriorityFee(computeUnits);
     const priorityFeeLamports = priorityFeeData.priorityFeeLamports;
 
     // =========================================================================
-    // 6. Total fee
+    // 6. Hybrid fee: base + compute + priority (CU_CAP refuses abuse)
     // =========================================================================
-    const totalFee = config.BASE_FEE_LAMPORTS + priorityFeeLamports;
+    const fee = computeFeeBreakdown({
+      baseFeeLamports: config.BASE_FEE_LAMPORTS,
+      cuPricePerKcuLamports: config.CU_PRICE_PER_KCU_LAMPORTS,
+      cuCap: config.CU_CAP,
+      requestedCus: computeUnits,
+      priorityFeeLamports,
+    });
+    if (!fee.accepted) {
+      return res.status(400).json({
+        error: `Compute demand exceeds relay cap (${computeUnits} CU)`,
+        code: fee.code,
+      });
+    }
+    const totalFee = fee.total;
 
     // =========================================================================
-    // 7. Holder discount
+    // 7. Flat fee — no holder tiers, no scores (MVP decision)
     // =========================================================================
-    const txCost = config.NETWORK_FEE_LAMPORTS + priorityFeeLamports;
-    const tierInfo = await holderDiscount.calculateDiscountedFee(userPubkey, totalFee, txCost);
-    const discountedFeeLamports = tierInfo.discountedFee;
+    const feeLamports = totalFee;
 
     // =========================================================================
     // 8. Convert to payment token via Jupiter
     // =========================================================================
-    const feeInToken = await jupiter.getFeeInToken(paymentToken, discountedFeeLamports);
+    const feeInToken = await jupiter.getFeeInToken(paymentToken, feeLamports);
 
     // =========================================================================
     // 9. Treasury ATA
@@ -87,7 +102,7 @@ router.post('/', async (req, res) => {
     logger.info('QUOTE', 'Quote generated', {
       paymentToken: paymentToken.slice(0, 8),
       userPubkey: userPubkey.slice(0, 8),
-      feeAmountLamports: discountedFeeLamports,
+      feeAmountLamports: feeLamports,
     });
 
     // =========================================================================
@@ -95,6 +110,7 @@ router.post('/', async (req, res) => {
     // =========================================================================
     const decimals = feeInToken.decimals || 6;
     const feeFormatted = `${(feeInToken.inputAmount / Math.pow(10, decimals)).toFixed(decimals > 2 ? 4 : 2)} ${feeInToken.symbol || 'tokens'}`;
+    const expiresAt = new Date(Date.now() + config.QUOTE_TTL_SECONDS * 1000).toISOString();
 
     res.json({
       feePayer: feePayer.getPublicKey().toBase58(),
@@ -104,14 +120,16 @@ router.post('/', async (req, res) => {
       },
       feeAmount: feeInToken.inputAmount.toString(),
       feeFormatted,
+      feeBreakdown: {
+        base: fee.base,
+        cuCharge: fee.cuCharge,
+        priority: fee.priority,
+        cus: fee.cus,
+      },
       paymentToken: {
         mint: paymentToken,
         symbol: feeInToken.symbol || 'UNKNOWN',
         decimals,
-      },
-      holderTier: {
-        tier: tierInfo.tier,
-        discountPercent: tierInfo.discountPercent,
       },
       expiresAt,
       ttl: config.QUOTE_TTL_SECONDS,

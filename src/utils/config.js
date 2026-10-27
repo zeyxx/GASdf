@@ -69,6 +69,8 @@ const config = {
   NETWORK_FEE_LAMPORTS: parseInt(process.env.NETWORK_FEE_LAMPORTS) || 5000,
   FEE_MARKUP: parseFloat(process.env.FEE_MARKUP) || 2.0,
   BASE_FEE_LAMPORTS: parseInt(process.env.BASE_FEE_LAMPORTS) || 50000,
+  CU_PRICE_PER_KCU_LAMPORTS: parseInt(process.env.CU_PRICE_PER_KCU_LAMPORTS) || 100,
+  CU_CAP: parseInt(process.env.CU_CAP) || 1400000,
   QUOTE_TTL_SECONDS: parseInt(process.env.QUOTE_TTL_SECONDS) || 60,
 
   // Burn settings
@@ -100,7 +102,9 @@ function validateConfig() {
   }
 
   if (config.FEE_PAYER_PRIVATE_KEY && !PRIVATE_KEY_REGEX.test(config.FEE_PAYER_PRIVATE_KEY)) {
-    errors.push('FEE_PAYER_PRIVATE_KEY must be a valid base58 encoded private key (64-88 characters)');
+    errors.push(
+      'FEE_PAYER_PRIVATE_KEY must be a valid base58 encoded private key (64-88 characters)'
+    );
   }
 
   if (config.ASDF_MINT) {

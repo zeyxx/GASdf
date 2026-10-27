@@ -12,6 +12,7 @@ const redis = (() => {
   }
 })();
 const logger = require('../utils/logger');
+const { VersionedTransaction } = require('@solana/web3.js');
 const { TOKEN_INFO } = require('../constants');
 
 const JUPITER_API = 'https://api.jup.ag/swap/v1';
@@ -50,8 +51,6 @@ async function getQuote(inputMint, outputMint, amount, slippageBps = 50) {
     outputMint,
     amount: amount.toString(),
     slippageBps: slippageBps.toString(),
-    maxAccounts: '15',
-    onlyDirectRoutes: 'true',
   });
 
   const response = await fetch(`${JUPITER_API}/quote?${params}`, {
@@ -184,9 +183,47 @@ async function getTokenToAsdfQuote(tokenMint, tokenAmount, slippageBps = 100) {
   return getQuote(tokenMint, config.ASDF_MINT, tokenAmount, slippageBps);
 }
 
+/**
+ * Execute a quoted swap: build, sign (treasury), send, confirm, verify.
+ * Pure execution — quote comes from getQuote/getTokenToAsdfQuote.
+ * Refuses before signing when quoted output is below minOutAmount.
+ */
+async function executeSwap({ quoteResponse, signer, connection, minOutAmount = 0 }) {
+  const quotedOut = parseInt(quoteResponse.outAmount, 10) || 0;
+  if (quotedOut < minOutAmount) {
+    throw new Error(`Swap refused: quoted output ${quotedOut} below minimum ${minOutAmount}`);
+  }
+  const swap = await getSwapTransaction(quoteResponse, signer.publicKey.toBase58());
+  if (!swap.swapTransaction) {
+    throw new Error('Jupiter swap response missing swapTransaction');
+  }
+  const tx = VersionedTransaction.deserialize(Buffer.from(swap.swapTransaction, 'base64'));
+  tx.sign([signer]);
+  const signature = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: false,
+  });
+  await connection.confirmTransaction(signature, 'confirmed');
+  const statuses = await connection.getSignatureStatuses([signature]);
+  const statusErr = statuses && statuses.value && statuses.value[0] && statuses.value[0].err;
+  if (statusErr) {
+    throw new Error(`Swap tx failed onchain: ${JSON.stringify(statusErr)}`);
+  }
+  logger.info('JUPITER', 'Swap executed', {
+    signature,
+    inAmount: quoteResponse.inAmount,
+    outAmountQuote: quoteResponse.outAmount,
+  });
+  return {
+    signature,
+    inAmount: quoteResponse.inAmount,
+    outAmountQuote: quoteResponse.outAmount,
+  };
+}
+
 module.exports = {
   getQuote,
   getSwapTransaction,
+  executeSwap,
   getFeeInToken,
   swapToAsdf,
   getTokenToSolQuote,
