@@ -18,17 +18,61 @@ import {
   decideSessionTransition,
   decideSettlement,
 } from '../domain/subscription/decision.js';
+import { JupiterQuoteAdapter } from '../adapters/jupiter/quote-client.js';
 
 export function createSubscriptionRouter(
   tokenRegistry: PaymentTokenRegistry,
   planRegistry: PlanRegistry,
   ledger?: { record: (entry: any) => void },
+  jupQuoteAdapter: JupiterQuoteAdapter = new JupiterQuoteAdapter(),
 ): Router {
   const router = Router();
 
   // In-memory session store (persisted state in future phases)
   const sessions = new Map<string, SubscriptionSession>();
   const quotes = new Map<string, PaymentQuote>();
+
+  // Live dynamic quoting via Jupiter with TTL
+  router.get('/quote/live', async (req: Request, res: Response) => {
+    try {
+      const tokenSymbol = (req.query['token'] as string)?.toUpperCase() ?? 'USDC';
+      const planId = (req.query['planId'] as string) ?? 'pro-monthly';
+      const token = tokenRegistry.tokens.find(
+        (t) => t.symbol.toUpperCase() === tokenSymbol || t.mint === tokenSymbol,
+      );
+
+      if (!token || !token.enabled) {
+        return res.status(400).json({ error: `Token ${tokenSymbol} not allowed or disabled` });
+      }
+
+      const plan = planRegistry.plans.find((p) => p.planId === planId);
+      if (!plan || !plan.enabled) {
+        return res.status(400).json({ error: `Plan ${planId} not found or disabled` });
+      }
+
+      const targetAsdfBaseUnits = BigInt(plan.priceAsdfBaseUnits);
+
+      // Resolve SOL alias to Wrapped SOL mint for Jupiter routing
+      const resolvedInputMint =
+        token.mint === 'SOL' ? 'So11111111111111111111111111111111111111112' : token.mint;
+
+      const decision = await jupQuoteAdapter.getLiveQuoteForAsdf({
+        inputMint: resolvedInputMint,
+        inputSymbol: token.symbol,
+        inputDecimals: token.decimals,
+        targetAsdfBaseUnits,
+        slippageBps: token.slippageBpsDefault,
+      });
+
+      if (decision.status !== 'valid') {
+        return res.status(422).json(decision);
+      }
+
+      res.json(decision);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown quote error' });
+    }
+  });
 
   // 1. Discovery: List available plans
   router.get('/plans', (_req: Request, res: Response) => {
