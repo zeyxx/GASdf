@@ -4,6 +4,33 @@
  * Zero-I/O Core.
  */
 
+export const SPL_TOKEN_ATA_RENT_LAMPORTS = 1_488_440n; // 165 bytes rent-exempt floor
+export const TOKEN_2022_ATA_RENT_LAMPORTS = 1_828_800n; // 232 bytes rent-exempt floor
+
+export interface AccountLifespanPolicy {
+  preserveAsdfAta: boolean; // Never close target ASDF ATA (prevents NonZeroBalance abort)
+  allowEphemeralWsolCleanup: boolean; // Clean up temporary WSOL account
+  chargeAtaCreationRent: boolean; // Charge rent if ATA does not exist
+  requiredRentLamports: bigint;
+}
+
+export function evaluateAccountLifespanPolicy(params: {
+  isInputNativeSol: boolean;
+  userAsdfAtaExists: boolean;
+  preserveAsdfAta?: boolean;
+}): AccountLifespanPolicy {
+  const preserveAsdfAta = params.preserveAsdfAta ?? true;
+  const chargeAtaCreationRent = !params.userAsdfAtaExists;
+  const requiredRentLamports = chargeAtaCreationRent ? SPL_TOKEN_ATA_RENT_LAMPORTS : 0n;
+
+  return {
+    preserveAsdfAta,
+    allowEphemeralWsolCleanup: params.isInputNativeSol,
+    chargeAtaCreationRent,
+    requiredRentLamports,
+  };
+}
+
 export interface AtomicTxSpec {
   userWallet: string;
   userAta: string;
