@@ -1,4 +1,4 @@
-import { PublicKey, VersionedTransaction } from '@solana/web3.js';
+import { PublicKey, VersionedTransaction, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 
 // src/client.ts
 
@@ -330,5 +330,34 @@ var GASdf = class {
     );
   }
 };
+var TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+new PublicKey("So11111111111111111111111111111111111111112");
+new PublicKey("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP");
 
-export { GASdf, GASdfError, NetworkError, QuoteExpiredError, QuoteNotFoundError, RateLimitError, TransactionError, ValidationError, generateCorrelationId };
+// src/instructions.ts
+var GASDF_PROGRAM_ID = new PublicKey("GASdf11111111111111111111111111111111111111");
+function createRelayWithVaultInstruction(params, programId = GASDF_PROGRAM_ID) {
+  const keys = [
+    { pubkey: params.userTokenAccount, isSigner: false, isWritable: true },
+    { pubkey: params.userAuthority, isSigner: true, isWritable: false },
+    { pubkey: params.vaultTokenAccount, isSigner: false, isWritable: true },
+    { pubkey: params.vaultSolAccount, isSigner: false, isWritable: true },
+    { pubkey: params.operatorSolAccount, isSigner: true, isWritable: true },
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+  ];
+  const data = Buffer.alloc(1 + 8 + 8 + 1);
+  data.writeUInt8(1, 0);
+  data.writeBigUInt64LE(params.tokenAmount, 1);
+  data.writeBigUInt64LE(params.solReimbursement, 9);
+  data.writeUInt8(params.vaultBump, 17);
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data
+  });
+}
+
+export { GASDF_PROGRAM_ID, GASdf, GASdfError, NetworkError, QuoteExpiredError, QuoteNotFoundError, RateLimitError, TransactionError, ValidationError, createRelayWithVaultInstruction, generateCorrelationId };

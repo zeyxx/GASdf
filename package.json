@@ -26,8 +26,9 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@solana/spl-token": "^0.4.8",
-    "@solana/web3.js": "^1.95.0",
+    "@solana/kit": "^8.5.0",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
     "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -35,7 +36,6 @@
     "express-rate-limit": "^8.2.1",
     "helius-sdk": "^2.0.5",
     "helmet": "^8.1.0",
-    "redis": "^4.7.0",
     "tweetnacl": "^1.0.3",
     "uuid": "^10.0.0"
   },
@@ -49,6 +49,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "jest": "^29.7.0",
+    "pg": "^8.23.1",
     "prettier": "^3.7.4",
     "supertest": "^6.3.3"
   }

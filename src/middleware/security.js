@@ -1,7 +1,13 @@
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const config = require('../utils/config');
-const redis = require('../utils/redis');
+const redis = (() => {
+  try {
+    return require('../utils/redis');
+  } catch (e) {
+    return null;
+  }
+})();
 const logger = require('../utils/logger');
 
 // Security headers

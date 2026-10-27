@@ -25,6 +25,7 @@
  */
 
 export { GASdf } from './client';
+export * from './instructions';
 
 export type {
   GASdfConfig,

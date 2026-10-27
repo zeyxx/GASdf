@@ -1,0 +1,23 @@
+[package]
+name = "gasdf"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "On-chain gasless fee abstraction with Pinocchio (ultra-low CU)"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.9"
+pinocchio-system = "0.4"
+pinocchio-token = "0.4"
+pinocchio-pubkey = "0.3"
+five8_const = "0.1"
+
+[dev-dependencies]
+mollusk-svm = "0.2"
+
+[features]
+default = []
+no-entrypoint = []

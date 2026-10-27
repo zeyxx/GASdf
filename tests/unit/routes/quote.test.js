@@ -41,7 +41,7 @@ jest.mock('../../../src/services/token-gate', () => ({
   }),
 }));
 
-jest.mock('../../../src/services/holder-tiers', () => ({
+jest.mock('../../../src/services/holder-discount', () => ({
   calculateDiscountedFee: jest.fn().mockResolvedValue({
     originalFee: 50000,
     discountedFee: 50000,
