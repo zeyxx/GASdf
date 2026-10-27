@@ -71,7 +71,7 @@ export function uptoRelayPaymentMiddleware(pricing: UptoRelayPricing) {
   const facilitatorClient = new HTTPFacilitatorClient({ url: pricing.facilitatorUrl });
   const server = new x402ResourceServer(facilitatorClient).register(
     pricing.network,
-    new UptoSvmScheme({ receiverAuthorizerSigner: pricing.receiverAuthorizerSigner }),
+    new UptoSvmScheme({ receiverAuthorizerSigner: pricing.receiverAuthorizerSigner as any }),
   );
   return paymentMiddleware(
     {
