@@ -120,6 +120,17 @@ export async function startServer(): Promise<void> {
       }
     });
   }
+  app.get('/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      service: 'relay-gateway',
+      version: process.env['BUILD_VERSION'] ?? '0.1.0',
+      gitSha: process.env['GIT_SHA'] ?? 'unknown',
+      buildDate: process.env['BUILD_DATE'] ?? 'unknown',
+      uptime: process.uptime(),
+    });
+  });
+
   const port = Number(process.env['PORT'] ?? 3000);
   app.listen(port, () => console.info(`Relay gateway listening on :${port}`));
 }
