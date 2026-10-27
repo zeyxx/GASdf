@@ -19,6 +19,13 @@ test('gasdf sdk client: live query against live LXC 107 container', async () => 
   assert.ok(quote.inputAmountFormatted > 0);
   assert.equal(quote.ttlSeconds, 45);
 
+  // 1b. Fetch live quote for CultScreener Cultify plan (5,000 ASDF)
+  const cultifyQuote = await client.getLiveQuote('USDC', 'cultify-12h', 'cultscreener');
+  assert.equal(cultifyQuote.status, 'valid');
+  assert.equal(cultifyQuote.targetAsdfFormatted, 5000);
+  assert.ok(cultifyQuote.inputAmountFormatted > 0);
+  assert.ok(cultifyQuote.inputAmountFormatted < quote.inputAmountFormatted);
+
   // 2. Create session
   const session = await client.createSession(
     'trenchscanner',
