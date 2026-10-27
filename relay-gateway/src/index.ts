@@ -129,7 +129,18 @@ export async function startServer(): Promise<void> {
       enabled: p.enabled,
     })),
   };
-  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans, sessionStore, ledger));
+  app.use(
+    '/subscription',
+    createSubscriptionRouter(
+      normalizedTokens,
+      normalizedPlans,
+      sessionStore,
+      ledger,
+      undefined,
+      kora,
+      KORA_SIGNER.toString(),
+    ),
+  );
   app.use(
     relayPaymentMiddleware({
       price: (process.env['X402_PRICE'] ?? '$0.005') as `$${string}`,

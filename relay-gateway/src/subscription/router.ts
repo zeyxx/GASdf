@@ -20,6 +20,8 @@ import {
   decideSettlement,
 } from '../domain/subscription/decision.js';
 import { JupiterQuoteAdapter } from '../adapters/jupiter/quote-client.js';
+import { AtomicSubscriptionTxBuilder } from '../adapters/builder/atomic-tx-builder.js';
+import { signAndSend, type KoraConfig } from '../kora/client.js';
 
 export function createSubscriptionRouter(
   tokenRegistry: PaymentTokenRegistry,
@@ -27,8 +29,12 @@ export function createSubscriptionRouter(
   sessionStore: SessionStore,
   ledger?: { record: (entry: any) => void },
   jupQuoteAdapter: JupiterQuoteAdapter = new JupiterQuoteAdapter(),
+  koraConfig?: KoraConfig,
+  koraSignerAddress?: string,
+  solanaRpcUrl: string = process.env['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com',
 ): Router {
   const router = Router();
+  const txBuilder = new AtomicSubscriptionTxBuilder();
 
   // In-memory quote cache (TTL-driven)
   const quotes = new Map<string, PaymentQuote>();
@@ -304,21 +310,146 @@ export function createSubscriptionRouter(
     res.status(422).json({ error: settlementDecision.reason, session });
   });
 
-  // 6. Inspect: Read session status
-  router.get('/sessions/:sessionId', async (req: Request, res: Response) => {
-    const sessionId = Array.isArray(req.params['sessionId'])
-      ? req.params['sessionId'][0]
-      : req.params['sessionId'];
-    if (!sessionId) {
-      res.status(400).json({ error: 'Missing sessionId' });
-      return;
+  // 7. Atomic Transaction: Prepare wire transaction for user signature
+  router.post('/sessions/:sessionId/prepare-tx', async (req: Request, res: Response) => {
+    try {
+      const sessionId = Array.isArray(req.params['sessionId'])
+        ? req.params['sessionId'][0]
+        : req.params['sessionId'];
+      if (!sessionId) {
+        res.status(400).json({ error: 'Missing sessionId' });
+        return;
+      }
+      const session = await sessionStore.get(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found or expired' });
+        return;
+      }
+
+      const { inputTokenMint } = req.body ?? {};
+      const token = tokenRegistry.tokens.find(
+        (t) => t.mint === inputTokenMint || t.symbol.toUpperCase() === inputTokenMint?.toUpperCase(),
+      );
+      if (!token || !token.enabled) {
+        res.status(400).json({ error: `Token ${inputTokenMint} not allowed or disabled` });
+        return;
+      }
+
+      const plan = planRegistry.plans.find((p) => p.planId === session.planId);
+      if (!plan || !plan.enabled) {
+        res.status(400).json({ error: `Plan ${session.planId} not found or disabled` });
+        return;
+      }
+
+      if (!koraSignerAddress) {
+        res.status(500).json({ error: 'Fee payer (Kora signer) not configured on gateway' });
+        return;
+      }
+
+      const targetAsdfBaseUnits = BigInt(plan.priceAsdfBaseUnits);
+      const resolvedInputMint =
+        token.mint === 'SOL' ? 'So11111111111111111111111111111111111111112' : token.mint;
+
+      // 1. Get exact live quote for input requirement
+      const quoteDecision = await jupQuoteAdapter.getLiveQuoteForAsdf({
+        inputMint: resolvedInputMint,
+        inputSymbol: token.symbol,
+        inputDecimals: token.decimals,
+        targetAsdfBaseUnits,
+        slippageBps: token.slippageBpsDefault,
+      });
+
+      if (quoteDecision.status !== 'valid') {
+        res.status(422).json({ error: quoteDecision.reason ?? 'Failed to compute valid quote' });
+        return;
+      }
+
+      // 2. Build atomic wire transaction
+      const built = await txBuilder.buildAtomicSubscriptionTx({
+        userWallet: session.buyerPubkey,
+        inputMint: resolvedInputMint,
+        inputAmountBaseUnits: BigInt(quoteDecision.inputAmountBaseUnits),
+        burnAsdfBaseUnits: targetAsdfBaseUnits,
+        feePayerAddress: koraSignerAddress,
+        rpcUrl: solanaRpcUrl,
+        slippageBps: token.slippageBpsDefault,
+      });
+
+      res.json({
+        sessionId: session.sessionId,
+        planId: session.planId,
+        buyerPubkey: session.buyerPubkey,
+        feePayer: koraSignerAddress,
+        inputToken: token.symbol,
+        inputAmountFormatted: quoteDecision.inputAmountFormatted,
+        burnAsdfFormatted: quoteDecision.targetAsdfFormatted,
+        base64WireTx: built.base64WireTx,
+        recentBlockhash: built.recentBlockhash,
+        validUntil: quoteDecision.validUntil,
+        ttlSeconds: quoteDecision.ttlSeconds,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Prepare atomic tx failed' });
     }
-    const session = await sessionStore.get(sessionId);
-    if (!session) {
-      res.status(404).json({ error: 'Session not found' });
-      return;
+  });
+
+  // 8. Atomic Transaction: Submit partially-signed transaction (Kora signs fee payer & broadcasts)
+  router.post('/sessions/:sessionId/submit-tx', async (req: Request, res: Response) => {
+    try {
+      const sessionId = Array.isArray(req.params['sessionId'])
+        ? req.params['sessionId'][0]
+        : req.params['sessionId'];
+      if (!sessionId) {
+        res.status(400).json({ error: 'Missing sessionId' });
+        return;
+      }
+      const session = await sessionStore.get(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found or expired' });
+        return;
+      }
+
+      const { base64SignedTx } = req.body ?? {};
+      if (!base64SignedTx || typeof base64SignedTx !== 'string') {
+        res.status(400).json({ error: 'Missing base64SignedTx parameter' });
+        return;
+      }
+
+      if (!koraConfig) {
+        res.status(500).json({ error: 'Kora relay not configured on gateway' });
+        return;
+      }
+
+      // Delegate co-signing and broadcasting to Kora
+      const txSignature = await signAndSend(koraConfig, base64SignedTx);
+
+      // Record on ledger
+      if (ledger) {
+        ledger.record({
+          kind: 'subscription_atomic_settle',
+          sessionId: session.sessionId,
+          appId: session.appId,
+          planId: session.planId,
+          buyerPubkey: session.buyerPubkey,
+          txSignature,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Mark session settled
+      session.status = SessionStatus.Settled;
+      session.settledAt = Math.floor(Date.now() / 1000);
+      await sessionStore.update(session.sessionId, session);
+
+      res.json({
+        status: 'settled',
+        sessionId: session.sessionId,
+        txSignature,
+        explorerUrl: `https://solscan.io/tx/${txSignature}`,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Submit atomic tx failed' });
     }
-    res.json(session);
   });
 
   return router;

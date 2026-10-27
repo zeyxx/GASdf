@@ -6,8 +6,8 @@
     {
       "app_id": "trenchscanner",
       "plan_id": "pro-monthly",
-      "name": "Pro monthly",
-      "price_asdf_base_units": 100000000,
+      "name": "TrenchScanner Pro Monthly",
+      "price_asdf_base_units": 30000000000,
       "duration_seconds": 2592000,
       "enabled": true
     },
