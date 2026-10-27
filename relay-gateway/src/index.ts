@@ -85,6 +85,9 @@ export async function startServer(): Promise<void> {
 
   // Subscription API routes
   const { createSubscriptionRouter } = await import('./subscription/router.js');
+  const { SqliteSessionStore } = await import('./adapters/storage/sqlite-session-store.js');
+  const sqliteDbPath = process.env['SQLITE_DB_PATH'] ?? 'data/gasdf.sqlite';
+  const sessionStore = new SqliteSessionStore(sqliteDbPath);
   const tokenRegistry = JSON.parse(
     readFileSync(
       new URL('../../contracts/subscription-reference/fixtures/payment-tokens.json', import.meta.url),
@@ -126,7 +129,7 @@ export async function startServer(): Promise<void> {
       enabled: p.enabled,
     })),
   };
-  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans, ledger));
+  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans, sessionStore, ledger));
   app.use(
     relayPaymentMiddleware({
       price: (process.env['X402_PRICE'] ?? '$0.005') as `$${string}`,

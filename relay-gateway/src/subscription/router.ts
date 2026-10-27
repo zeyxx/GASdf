@@ -7,6 +7,7 @@ import {
   type PaymentQuote,
   type SubscriptionPlan,
   type PaymentToken,
+  type SessionStore,
   SessionStatus,
   SessionEvent,
   GASDF_SESSION_SCHEMA,
@@ -23,13 +24,13 @@ import { JupiterQuoteAdapter } from '../adapters/jupiter/quote-client.js';
 export function createSubscriptionRouter(
   tokenRegistry: PaymentTokenRegistry,
   planRegistry: PlanRegistry,
+  sessionStore: SessionStore,
   ledger?: { record: (entry: any) => void },
   jupQuoteAdapter: JupiterQuoteAdapter = new JupiterQuoteAdapter(),
 ): Router {
   const router = Router();
 
-  // In-memory session store (persisted state in future phases)
-  const sessions = new Map<string, SubscriptionSession>();
+  // In-memory quote cache (TTL-driven)
   const quotes = new Map<string, PaymentQuote>();
 
   // Live dynamic quoting via Jupiter with TTL
@@ -92,7 +93,7 @@ export function createSubscriptionRouter(
   });
 
   // 3. Lifecycle: Create a subscription session
-  router.post('/sessions', (req: Request, res: Response) => {
+  router.post('/sessions', async (req: Request, res: Response) => {
     const { appId, planId, buyerPubkey } = req.body ?? {};
 
     if (!appId || !planId || !buyerPubkey) {
@@ -123,12 +124,12 @@ export function createSubscriptionRouter(
       settledAt: null,
     };
 
-    sessions.set(sessionId, session);
+    await sessionStore.set(session);
     res.status(201).json(session);
   });
 
   // 4. Lifecycle: Request a quote for a session
-  router.post('/sessions/:sessionId/quote', (req: Request, res: Response) => {
+  router.post('/sessions/:sessionId/quote', async (req: Request, res: Response) => {
     const sessionId = Array.isArray(req.params['sessionId'])
       ? req.params['sessionId'][0]
       : req.params['sessionId'];
@@ -136,7 +137,7 @@ export function createSubscriptionRouter(
       res.status(400).json({ error: 'Missing sessionId' });
       return;
     }
-    const session = sessions.get(sessionId);
+    const session = await sessionStore.get(sessionId);
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -189,6 +190,7 @@ export function createSubscriptionRouter(
     if (transition.kind === 'to_quoted') {
       session.status = SessionStatus.Quoted;
       session.inputTokenMint = token.mint;
+      await sessionStore.update(session.sessionId, session);
     }
 
     const quoteId = randomUUID();
@@ -210,7 +212,7 @@ export function createSubscriptionRouter(
   });
 
   // 5. Lifecycle: Settle session (confirm onchain payment)
-  router.post('/sessions/:sessionId/settle', (req: Request, res: Response) => {
+  router.post('/sessions/:sessionId/settle', async (req: Request, res: Response) => {
     const sessionId = Array.isArray(req.params['sessionId'])
       ? req.params['sessionId'][0]
       : req.params['sessionId'];
@@ -218,7 +220,7 @@ export function createSubscriptionRouter(
       res.status(400).json({ error: 'Missing sessionId' });
       return;
     }
-    const session = sessions.get(sessionId);
+    const session = await sessionStore.get(sessionId);
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -265,6 +267,7 @@ export function createSubscriptionRouter(
       if (settleTransition.kind === 'to_settled') {
         session.status = SessionStatus.Settled;
         session.settledAt = settleTransition.settledAt;
+        await sessionStore.update(session.sessionId, session);
         if (ledger) {
           ledger.record({
             kind: 'subscription_settle',
@@ -293,6 +296,7 @@ export function createSubscriptionRouter(
     }
 
     if (settlementDecision.kind === 'pending_confirmation') {
+      await sessionStore.update(session.sessionId, session);
       res.status(202).json({ status: 'pending_confirmation', session });
       return;
     }
@@ -301,7 +305,7 @@ export function createSubscriptionRouter(
   });
 
   // 6. Inspect: Read session status
-  router.get('/sessions/:sessionId', (req: Request, res: Response) => {
+  router.get('/sessions/:sessionId', async (req: Request, res: Response) => {
     const sessionId = Array.isArray(req.params['sessionId'])
       ? req.params['sessionId'][0]
       : req.params['sessionId'];
@@ -309,7 +313,7 @@ export function createSubscriptionRouter(
       res.status(400).json({ error: 'Missing sessionId' });
       return;
     }
-    const session = sessions.get(sessionId);
+    const session = await sessionStore.get(sessionId);
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
       return;
