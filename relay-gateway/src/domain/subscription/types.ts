@@ -84,6 +84,19 @@ export interface PlanRegistry {
   plans: SubscriptionPlan[];
 }
 
+/**
+ * Storage Port for subscription sessions.
+ * Allows switching between SQLite, Redis or PostgreSQL without touching domain logic.
+ */
+export interface SessionStore {
+  get(sessionId: string): Promise<SubscriptionSession | null>;
+  set(session: SubscriptionSession, ttlSeconds?: number): Promise<void>;
+  update(sessionId: string, patch: Partial<SubscriptionSession>): Promise<void>;
+  delete(sessionId: string): Promise<void>;
+  pruneExpired(nowMs?: number): Promise<number>;
+  close?(): Promise<void>;
+}
+
 export enum TokenDecision {
   Allowed = 'allowed',
   Disabled = 'disabled',
