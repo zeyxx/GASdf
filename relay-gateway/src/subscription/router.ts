@@ -44,6 +44,7 @@ export function createSubscriptionRouter(
     try {
       const tokenSymbol = (req.query['token'] as string)?.toUpperCase() ?? 'USDC';
       const planId = (req.query['planId'] as string) ?? 'pro-monthly';
+      const appId = (req.query['appId'] as string) ?? 'trenchscanner';
       const token = tokenRegistry.tokens.find(
         (t) => t.symbol.toUpperCase() === tokenSymbol || t.mint === tokenSymbol,
       );
@@ -52,9 +53,9 @@ export function createSubscriptionRouter(
         return res.status(400).json({ error: `Token ${tokenSymbol} not allowed or disabled` });
       }
 
-      const plan = planRegistry.plans.find((p) => p.planId === planId);
+      const plan = planRegistry.plans.find((p) => p.planId === planId && p.appId === appId);
       if (!plan || !plan.enabled) {
-        return res.status(400).json({ error: `Plan ${planId} not found or disabled` });
+        return res.status(400).json({ error: `Plan ${planId} for app ${appId} not found or disabled` });
       }
 
       const targetAsdfBaseUnits = BigInt(plan.priceAsdfBaseUnits);
@@ -335,9 +336,9 @@ export function createSubscriptionRouter(
         return;
       }
 
-      const plan = planRegistry.plans.find((p) => p.planId === session.planId);
+      const plan = planRegistry.plans.find((p) => p.planId === session.planId && p.appId === session.appId);
       if (!plan || !plan.enabled) {
-        res.status(400).json({ error: `Plan ${session.planId} not found or disabled` });
+        res.status(400).json({ error: `Plan ${session.planId} for app ${session.appId} not found or disabled` });
         return;
       }
 

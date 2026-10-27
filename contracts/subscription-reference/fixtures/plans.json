@@ -13,10 +13,18 @@
     },
     {
       "app_id": "cultscreener",
-      "plan_id": "pro-monthly",
-      "name": "Pro monthly",
-      "price_asdf_base_units": 100000000,
-      "duration_seconds": 2592000,
+      "plan_id": "cultify-12h",
+      "name": "Cultify 12h Token Analysis",
+      "price_asdf_base_units": 5000000000,
+      "duration_seconds": 43200,
+      "enabled": true
+    },
+    {
+      "app_id": "cultscreener",
+      "plan_id": "holder-behavior-12h",
+      "name": "Holder Behavior 12h Analysis",
+      "price_asdf_base_units": 10000000000,
+      "duration_seconds": 43200,
       "enabled": true
     }
   ]

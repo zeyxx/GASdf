@@ -79,8 +79,14 @@ export class GasdfClient {
   /**
    * Fetches a live dynamic quote with TTL for a subscription plan.
    */
-  async getLiveQuote(token: SupportedTokenSymbol = 'USDC', planId: string = 'pro-monthly'): Promise<LiveQuote> {
-    return this.fetchJson<LiveQuote>(`/subscription/quote/live?token=${encodeURIComponent(token)}&planId=${encodeURIComponent(planId)}`);
+  async getLiveQuote(
+    token: SupportedTokenSymbol = 'USDC',
+    planId: string = 'pro-monthly',
+    appId: string = 'trenchscanner',
+  ): Promise<LiveQuote> {
+    return this.fetchJson<LiveQuote>(
+      `/subscription/quote/live?token=${encodeURIComponent(token)}&planId=${encodeURIComponent(planId)}&appId=${encodeURIComponent(appId)}`,
+    );
   }
 
   /**
