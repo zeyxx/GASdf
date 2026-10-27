@@ -24,3 +24,4 @@ STRATEGY.md
 programs/cynic-governance/target/
 programs/cynic-governance/test-ledger/
 data/
+relay-gateway/dist/
