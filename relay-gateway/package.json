@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test dist/domain/**/*.test.js",
     "start": "node dist/index.js",
     "facilitator": "node dist/facilitator/server.js"
   },
