@@ -1,6 +1,10 @@
 # GASdf Agent API Documentation
 
-**Base URL**: `https://asdfasdfa.tech` (or `https://gasdf-api.onrender.com`)
+**Base URL**: `http://10.10.10.127:3000` (relay) / `http://10.10.10.127:4021` (facilitator)
+
+> Note: The legacy API (`src/`, routes `/v1/health`, `/v1/tokens`, `/v1/quote`, `/v1/submit`)
+> is deprecated. The current production surface is the relay-gateway (TypeScript).
+> See ARCHITECTURE.md for the full system design.
 
 Agents can seamlessly integrate with GASdf to enable gasless transactions for Solana.
 
