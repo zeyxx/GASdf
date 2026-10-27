@@ -78,6 +78,11 @@ export async function startServer(): Promise<void> {
   const app = express();
   app.use(express.json());
 
+  // Accounting ledger
+  const { LedgerService } = await import('./ledger/ledger.js');
+  const ledgerPath = process.env['LEDGER_PATH'] ?? 'data/ledger.jsonl';
+  const ledger = new LedgerService(ledgerPath);
+
   // Subscription API routes
   const { createSubscriptionRouter } = await import('./subscription/router.js');
   const tokenRegistry = JSON.parse(
@@ -121,7 +126,7 @@ export async function startServer(): Promise<void> {
       enabled: p.enabled,
     })),
   };
-  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans));
+  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans, ledger));
   app.use(
     relayPaymentMiddleware({
       price: (process.env['X402_PRICE'] ?? '$0.005') as `$${string}`,
@@ -133,6 +138,15 @@ export async function startServer(): Promise<void> {
   app.post('/relay/send', async (_req, res) => {
     try {
       const out = await sponsoredSellOnce({ wallet: userSigner.address, signer: userSigner });
+      ledger.record({
+        kind: 'relay_x402',
+        id: out.signature,
+        usdValueApprox: 0.005,
+        metadata: {
+          quoteOutAmount: out.quoteOutAmount,
+          feeInToken: out.feeInToken.toString(),
+        },
+      });
       res.json({ signature: out.signature, quoteOutAmount: out.quoteOutAmount });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
@@ -159,6 +173,16 @@ export async function startServer(): Promise<void> {
       try {
         const out = await sponsoredSellOnce({ wallet: userSigner.address, signer: userSigner });
         setSettlementOverrides(res, { amount: '5000' });
+        ledger.record({
+          kind: 'relay_x402',
+          id: out.signature,
+          usdValueApprox: 0.005,
+          metadata: {
+            channel: 'upto',
+            quoteOutAmount: out.quoteOutAmount,
+            feeInToken: out.feeInToken.toString(),
+          },
+        });
         res.json({ signature: out.signature, quoteOutAmount: out.quoteOutAmount });
       } catch (error) {
         res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
