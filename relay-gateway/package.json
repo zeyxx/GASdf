@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test dist/domain/quote/**/*.test.js dist/refill/**/*.test.js dist/calibration/**/*.test.js dist/burn/**/*.test.js dist/domain/gasless/**/*.test.js dist/domain/subscription/**/*.test.js",
+    "test": "tsc -p tsconfig.json && node --test dist/domain/priority/**/*.test.js dist/domain/quote/**/*.test.js dist/refill/**/*.test.js dist/calibration/**/*.test.js dist/burn/**/*.test.js dist/domain/gasless/**/*.test.js dist/domain/subscription/**/*.test.js",
     "start": "node dist/index.js",
     "facilitator": "node dist/facilitator/server.js"
   },
