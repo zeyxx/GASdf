@@ -77,6 +77,51 @@ export async function startServer(): Promise<void> {
 
   const app = express();
   app.use(express.json());
+
+  // Subscription API routes
+  const { createSubscriptionRouter } = await import('./subscription/router.js');
+  const tokenRegistry = JSON.parse(
+    readFileSync(
+      new URL('../../contracts/subscription-reference/fixtures/payment-tokens.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  // Normalize snake_case fixture keys to camelCase domain model
+  const normalizedTokens = {
+    schema: tokenRegistry.schema,
+    tokens: tokenRegistry.tokens.map((t: any) => ({
+      mint: t.mint,
+      symbol: t.symbol,
+      decimals: t.decimals,
+      kind: t.kind,
+      enabled: t.enabled,
+      minAmount: t.min_amount,
+      slippageBpsDefault: t.slippage_bps_default,
+    })),
+    limits: {
+      maxSlippageBps: tokenRegistry.limits.max_slippage_bps,
+      quoteTtlSeconds: tokenRegistry.limits.quote_ttl_seconds,
+      minQuoteAmountAsdf: tokenRegistry.limits.min_quote_amount_asdf,
+    },
+  };
+  const planRegistry = JSON.parse(
+    readFileSync(
+      new URL('../../contracts/subscription-reference/fixtures/plans.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const normalizedPlans = {
+    schema: planRegistry.schema,
+    plans: planRegistry.plans.map((p: any) => ({
+      appId: p.app_id,
+      planId: p.plan_id,
+      name: p.name,
+      priceAsdfBaseUnits: p.price_asdf_base_units,
+      durationSeconds: p.duration_seconds,
+      enabled: p.enabled,
+    })),
+  };
+  app.use('/subscription', createSubscriptionRouter(normalizedTokens, normalizedPlans));
   app.use(
     relayPaymentMiddleware({
       price: (process.env['X402_PRICE'] ?? '$0.005') as `$${string}`,
