@@ -120,14 +120,33 @@ export async function startServer(): Promise<void> {
       }
     });
   }
-  app.get('/health', (_req, res) => {
-    res.json({
-      status: 'ok',
+  app.get('/health', async (_req, res) => {
+    const koraUrl = process.env['KORA_URL'] ?? 'http://localhost:14001';
+    const facilitatorUrl = process.env['FACILITATOR_URL'] ?? 'http://localhost:4021';
+
+    let koraOk = false;
+    let facilitatorOk = false;
+    try {
+      const r = await fetch(`${koraUrl}/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'liveness', id: 1 }) });
+      koraOk = r.ok || r.status === 405; // 405 = method not allowed but server is up
+    } catch { koraOk = false; }
+    try {
+      const r = await fetch(`${facilitatorUrl}/supported`);
+      facilitatorOk = r.ok;
+    } catch { facilitatorOk = false; }
+
+    const healthy = koraOk && facilitatorOk;
+    res.status(healthy ? 200 : 503).json({
+      status: healthy ? 'ok' : 'degraded',
       service: 'relay-gateway',
       version: process.env['BUILD_VERSION'] ?? '0.1.0',
       gitSha: process.env['GIT_SHA'] ?? 'unknown',
       buildDate: process.env['BUILD_DATE'] ?? 'unknown',
       uptime: process.uptime(),
+      checks: {
+        kora: { status: koraOk ? 'ok' : 'down' },
+        facilitator: { status: facilitatorOk ? 'ok' : 'down' },
+      },
     });
   });
 
