@@ -1,0 +1,17 @@
+{
+  "name": "@gasdf/sdk",
+  "version": "0.1.0",
+  "description": "Client SDK for GASdf Gas-as-a-Service, atomic 1-click subscription swaps & burns",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test dist/**/*.test.js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}
