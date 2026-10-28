@@ -23,6 +23,7 @@ import {
 import { fetchAddressLookupTable } from '@solana-program/address-lookup-table';
 import {
   getBurnCheckedInstruction,
+  getCloseAccountInstruction,
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
@@ -237,12 +238,21 @@ export class AtomicSubscriptionTxBuilder {
       addressesByLookupTableAddress[tableAddress] = [...table.data.addresses];
     }
 
-    // 4. Derive user's ASDF ATA
+    // 4. Derive user's ASDF ATA & check on-chain existence
     const [userAsdfAta] = await findAssociatedTokenPda({
       mint: address(ASDF_MINT),
       owner: userWalletAddr,
       tokenProgram: TOKEN_PROGRAM_ADDRESS,
     });
+
+    // Check if user already holds an ATA on-chain
+    let userHadAta = false;
+    try {
+      const ataInfo = await rpc.getAccountInfo(userAsdfAta).send();
+      userHadAta = ataInfo.value !== null;
+    } catch {
+      userHadAta = false;
+    }
 
     // 5. Append SPL BurnChecked instruction
     const burnIx = getBurnCheckedInstruction({
@@ -254,6 +264,16 @@ export class AtomicSubscriptionTxBuilder {
     });
 
     const instructions: Instruction[] = [...decompiled.instructions, burnIx as unknown as Instruction];
+
+    // If user did not have an ATA beforehand, close it post-burn and refund rent to feePayer
+    if (!userHadAta) {
+      const closeIx = getCloseAccountInstruction({
+        account: userAsdfAta,
+        destination: feePayerAddr,
+        owner: userWalletAddr,
+      });
+      instructions.push(closeIx as unknown as Instruction);
+    }
 
     // 6. Refresh blockhash & re-point Fee Payer to Kora
     if (decompiled.version !== 0) {
