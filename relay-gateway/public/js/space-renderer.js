@@ -666,25 +666,4 @@ export class SpaceRenderer {
       }
     }
 
-    // Initialize
-    new SpaceRenderer(document.getElementById('space-container'));
-
-    // ========================================================================
-    // BLACK HOLE SCROLL ANIMATION
-    // ========================================================================
-    const blackHole = document.getElementById('blackHole');
-    let bhScrollY = 0, bhTargetY = 0;
-
-    function updateBlackHole() {
-      bhScrollY += (bhTargetY - bhScrollY) * 0.08;
-      const maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
-      const progress = bhScrollY / maxScroll;
-
-      const bottom = -40 + progress * 70;
-      const scale = 1 + progress * 0.12;
-      blackHole.style.bottom = `${bottom}vh`;
-      blackHole.style.transform = `translateX(-50%) scale(${scale})`;
-
-      requestAnimationFrame(updateBlackHole);
-    }
-    window.addEventListener('scroll', () => { bhTargetY = window.scrollY; }, { passive: true });
+      }
