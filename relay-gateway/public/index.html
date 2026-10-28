@@ -353,9 +353,9 @@
     async function fetchQuote() {
       quoteAmountEl.innerText = 'Calculating...';
       try {
-        const res = await fetch(`/subscription/quote?token=${currentToken}&planId=${currentPlan}&appId=${currentApp}`);
+        const res = await fetch(`/subscription/quote/live?token=${currentToken}&planId=${currentPlan}&appId=${currentApp}`);
         const data = await res.json();
-        if (data.status === 'ok') {
+        if (data.status === 'valid') {
           quoteAmountEl.innerText = `${data.inputAmountFormatted} ${currentToken}`;
           quoteTargetEl.innerText = `Atomic Swap & Burn ${data.targetAsdfFormatted} $ASDF`;
         } else {
