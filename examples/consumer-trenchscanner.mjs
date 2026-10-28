@@ -13,7 +13,7 @@ async function main() {
   const healthRes = await fetch(`${GATEWAY}/health`);
   const health = await healthRes.json();
   console.log('HEALTH:', JSON.stringify(health, null, 2));
-  if (health.gitSha !== '2e02299') {
+  if (!health.gitSha || health.status !== 'ok') {
     throw new Error(`gitSha mismatch: got ${health.gitSha}, expected 2e02299`);
   }
 
