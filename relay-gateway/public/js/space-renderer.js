@@ -221,42 +221,70 @@ export class SpaceRenderer {
       // Nebulae with FBM noise
       createNebulae() {
         this.nebulae = [];
+        // Differentiated astronomical shapes: filamentary, gaseous wisps, varied scales and rotations
         const configs = [
-          { x: -320, y: 160, z: -400, size: 650, color: new THREE.Color(0x4070d0), opacity: 0.55 }, // Electric Blue Nebula (Upper Left)
-          { x: 380, y: -100, z: -480, size: 600, color: new THREE.Color(0x9a44d0), opacity: 0.50 }, // Deep Violet Orchid Nebula (Mid Right)
-          { x: -220, y: -240, z: -380, size: 520, color: new THREE.Color(0xdf5535), opacity: 0.45 }, // Solar Flame Nebula (Lower Left)
-          { x: 260, y: 280, z: -550, size: 700, color: new THREE.Color(0x3085b5), opacity: 0.48 }, // Cyan Lagoon Nebula (Upper Right)
+          // 1. Slender Blue Cosmic Wisp (Far Upper Left)
+          { x: -440, y: 220, z: -680, width: 420, height: 180, rotZ: 0.35, color: new THREE.Color(0x3262b8), opacity: 0.28, stretchX: 0.8, stretchY: 2.2 },
+          // 2. Violet Filamentary Veil (Mid-Far Right)
+          { x: 460, y: -80, z: -720, width: 220, height: 460, rotZ: -0.45, color: new THREE.Color(0x8238ba), opacity: 0.26, stretchX: 2.0, stretchY: 0.9 },
+          // 3. Compact Amber Emission Cloud (Lower Left Background)
+          { x: -320, y: -260, z: -620, width: 340, height: 210, rotZ: 0.8, color: new THREE.Color(0xb54625), opacity: 0.24, stretchX: 1.4, stretchY: 1.1 },
+          // 4. Subtle Cyan Lagoon Veil (Upper Right)
+          { x: 360, y: 310, z: -800, width: 480, height: 260, rotZ: -0.2, color: new THREE.Color(0x287a9e), opacity: 0.22, stretchX: 1.1, stretchY: 1.8 },
+          // 5. Deep Indigo Molecular Pocket (Lower Right Horizon)
+          { x: 220, y: -300, z: -750, width: 280, height: 160, rotZ: 0.5, color: new THREE.Color(0x224488), opacity: 0.20, stretchX: 1.5, stretchY: 1.2 },
         ];
 
         const geometry = new THREE.PlaneGeometry(1, 1);
 
         configs.forEach(cfg => {
           const material = new THREE.ShaderMaterial({
-            uniforms: { time: { value: 0 }, baseColor: { value: cfg.color }, opacity: { value: cfg.opacity } },
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            uniforms: {
+              time: { value: 0 },
+              baseColor: { value: cfg.color },
+              opacity: { value: cfg.opacity },
+              stretch: { value: new THREE.Vector2(cfg.stretchX, cfg.stretchY) }
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
             fragmentShader: `
               uniform float time;
               uniform vec3 baseColor;
               uniform float opacity;
+              uniform vec2 stretch;
               varying vec2 vUv;
+
               float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
               float noise(vec2 p) {
                 vec2 i = floor(p), f = fract(p);
                 f = f * f * (3.0 - 2.0 * f);
-                return mix(mix(hash(i), hash(i + vec2(1,0)), f.x), mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+                return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
               }
               float fbm(vec2 p) {
                 float v = 0.0, a = 0.5;
-                for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+                for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.1; a *= 0.48; }
                 return v;
               }
+
               void main() {
                 vec2 uv = vUv - 0.5;
-                float dist = length(uv);
-                float falloff = pow(1.0 - smoothstep(0.0, 0.5, dist), 1.5);
-                float structure = fbm(uv * 3.0 + time * 0.015) * 0.5 + fbm(uv * 6.0 - time * 0.01) * 0.3 + fbm(uv * 9.0 + time * 0.008) * 0.2;
-                vec3 color = baseColor + vec3(structure * 0.15);
-                gl_FragColor = vec4(color, clamp(falloff * (structure + 0.25) * opacity * 1.8, 0.0, 0.95));
+                // Domain warping creates organic filamentary cosmic gas tendrils
+                vec2 warpedUv = uv * stretch;
+                float q = fbm(warpedUv * 2.2 + vec2(time * 0.008, -time * 0.005));
+                warpedUv += vec2(q * 0.25, -q * 0.2);
+
+                float dist = length(warpedUv);
+                float falloff = pow(clamp(1.0 - dist * 2.2, 0.0, 1.0), 2.0);
+                float structure = fbm(warpedUv * 4.0 - time * 0.01) * 0.6 + fbm(warpedUv * 8.0 + time * 0.005) * 0.4;
+
+                vec3 finalColor = baseColor + vec3(structure * 0.12);
+                float alpha = clamp(falloff * structure * opacity * 2.6, 0.0, 0.75);
+                gl_FragColor = vec4(finalColor, alpha);
               }
             `,
             transparent: true,
@@ -266,8 +294,9 @@ export class SpaceRenderer {
           });
 
           const nebula = new THREE.Mesh(geometry, material);
-          nebula.scale.set(cfg.size, cfg.size, 1);
+          nebula.scale.set(cfg.width, cfg.height, 1);
           nebula.position.set(cfg.x, cfg.y, cfg.z);
+          nebula.rotation.z = cfg.rotZ;
           nebula.userData.baseX = cfg.x;
           nebula.userData.baseY = cfg.y;
           nebula.userData.baseZ = cfg.z;
