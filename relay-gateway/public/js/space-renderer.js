@@ -222,10 +222,10 @@ export class SpaceRenderer {
       createNebulae() {
         this.nebulae = [];
         const configs = [
-          { x: -350, y: 180, z: -550, size: 280, color: new THREE.Color(0x4466aa), opacity: 0.035 },
-          { x: 450, y: -130, z: -650, size: 230, color: new THREE.Color(0x884488), opacity: 0.03 },
-          { x: -180, y: -280, z: -450, size: 180, color: new THREE.Color(0xaa4455), opacity: 0.025 },
-          { x: 280, y: 350, z: -800, size: 320, color: new THREE.Color(0x446688), opacity: 0.02 },
+          { x: -350, y: 180, z: -550, size: 420, color: new THREE.Color(0x3a60a8), opacity: 0.18 },
+          { x: 450, y: -130, z: -650, size: 380, color: new THREE.Color(0x7e3ea8), opacity: 0.16 },
+          { x: -180, y: -280, z: -450, size: 320, color: new THREE.Color(0xba4838), opacity: 0.15 },
+          { x: 280, y: 350, z: -800, size: 460, color: new THREE.Color(0x356898), opacity: 0.14 },
         ];
 
         const geometry = new THREE.PlaneGeometry(1, 1);
@@ -309,7 +309,7 @@ export class SpaceRenderer {
               pos.y += scrollOffset * 0.03;
               pos = mod(pos + 90.0, 180.0) - 90.0;
               vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-              vAlpha = 0.25 * (1.0 - smoothstep(10.0, 90.0, -mvPosition.z));
+              vAlpha = 0.65 * (1.0 - smoothstep(10.0, 90.0, -mvPosition.z));
               gl_PointSize = 1.2 * (40.0 / -mvPosition.z);
               gl_Position = projectionMatrix * mvPosition;
             }
