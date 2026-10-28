@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '/js/three.module.js';
 
 export class SpaceCosmos {
   constructor(container) {
