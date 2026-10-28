@@ -56,9 +56,12 @@ export class AtomicSubscriptionTxBuilder {
     amountBaseUnits: bigint,
     slippageBps: number = 50,
     wrapAndUnwrapSol: boolean = true,
+    jupiterApiKey?: string,
   ): Promise<{ quoteOutAmount: string; wireTransaction: string }> {
+    const headers: Record<string, string> = {};
+    if (jupiterApiKey) headers['x-api-key'] = jupiterApiKey;
     const quoteUrl = `${this.jupiterBaseUrl}/quote?inputMint=${inputMint}&outputMint=${ASDF_MINT}&amount=${amountBaseUnits}&slippageBps=${slippageBps}`;
-    const quoteRes = await fetch(quoteUrl);
+    const quoteRes = await fetch(quoteUrl, { headers });
     if (!quoteRes.ok) {
       throw new Error(`Jupiter quote failed: ${quoteRes.status} ${await quoteRes.text()}`);
     }
@@ -67,7 +70,7 @@ export class AtomicSubscriptionTxBuilder {
     const swapUrl = `${this.jupiterBaseUrl}/swap`;
     const swapRes = await fetch(swapUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
         quoteResponse: quoteData,
         userPublicKey: userWallet,
@@ -103,6 +106,7 @@ export class AtomicSubscriptionTxBuilder {
       params.inputAmountBaseUnits,
       params.slippageBps ?? 50,
       params.wrapAndUnwrapSol ?? true,
+      params.jupiterApiKey,
     );
 
     // 2. Decode wire transaction & decompile fetching ALTs
