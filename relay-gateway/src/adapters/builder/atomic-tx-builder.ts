@@ -28,6 +28,116 @@ import {
 } from '@solana-program/token';
 import { ASDF_MINT } from '../../domain/quote/decision.js';
 
+export interface VerifyAtomicTxParams {
+  base64WireTx: string;
+  expectedBuyerPubkey: string;
+  expectedFeePayer: string;
+  expectedBurnAmountBaseUnits: bigint;
+}
+
+export interface VerifyAtomicTxResult {
+  valid: boolean;
+  reason?: string;
+  burnFound?: boolean;
+  burnAmount?: bigint;
+}
+
+const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const ASDF_MINT_ADDRESS = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
+
+export function verifyAtomicSubscriptionTxIntegrity(
+  params: VerifyAtomicTxParams,
+): VerifyAtomicTxResult {
+  try {
+    const wireBytes = getBase64Encoder().encode(params.base64WireTx);
+    const decoded = getTransactionDecoder().decode(wireBytes);
+    const compiled = getCompiledTransactionMessageDecoder().decode(decoded.messageBytes);
+
+    if (!compiled || compiled.version !== 0) {
+      return { valid: false, reason: 'Unsupported or invalid transaction version' };
+    }
+
+    if (!compiled.staticAccounts || compiled.staticAccounts.length === 0) {
+      return { valid: false, reason: 'No static accounts in transaction' };
+    }
+
+    if (compiled.staticAccounts[0] !== params.expectedFeePayer) {
+      return { valid: false, reason: 'Fee payer mismatch' };
+    }
+
+    const buyer = params.expectedBuyerPubkey;
+    const numSigners = compiled.header?.numSignerAccounts ?? 0;
+    const buyerIsSigner = compiled.staticAccounts
+      .slice(0, numSigners)
+      .includes(buyer as (typeof compiled.staticAccounts)[number]);
+    if (!compiled.staticAccounts.includes(buyer as (typeof compiled.staticAccounts)[number]) && !buyerIsSigner) {
+      return { valid: false, reason: 'Buyer not present in transaction' };
+    }
+
+    for (const ix of compiled.instructions ?? []) {
+      const programId = compiled.staticAccounts[ix.programAddressIndex];
+      if (programId !== TOKEN_PROGRAM_ID) continue;
+
+      const data = ix.data as Uint8Array | undefined;
+      if (!data || data.length === 0) continue;
+
+      const discriminator = data[0];
+      if (discriminator !== 15 && discriminator !== 8) continue;
+
+      const accountIndices = ix.accountIndices ?? [];
+      if (accountIndices.length < 3) continue;
+
+      const mintAddr = compiled.staticAccounts[accountIndices[1]];
+      const authorityAddr = compiled.staticAccounts[accountIndices[2]];
+      if (mintAddr !== ASDF_MINT_ADDRESS) continue;
+      if (authorityAddr !== buyer) continue;
+
+      let burnAmount: bigint | undefined;
+      if (discriminator === 15) {
+        if (data.length < 9) {
+          return { valid: false, reason: 'Invalid BurnChecked instruction data', burnFound: true };
+        }
+        let amt = 0n;
+        for (let i = 0; i < 8; i++) {
+          amt |= BigInt(data[1 + i]) << BigInt(8 * i);
+        }
+        burnAmount = amt;
+        if (amt !== params.expectedBurnAmountBaseUnits) {
+          return {
+            valid: false,
+            reason: 'Burn amount mismatch',
+            burnFound: true,
+            burnAmount: amt,
+          };
+        }
+      } else if (data.length >= 9) {
+        let amt = 0n;
+        for (let i = 0; i < 8; i++) {
+          amt |= BigInt(data[1 + i]) << BigInt(8 * i);
+        }
+        burnAmount = amt;
+        if (amt !== params.expectedBurnAmountBaseUnits) {
+          return {
+            valid: false,
+            reason: 'Burn amount mismatch',
+            burnFound: true,
+            burnAmount: amt,
+          };
+        }
+      }
+
+      return { valid: true, burnFound: true, burnAmount: burnAmount ?? params.expectedBurnAmountBaseUnits };
+    }
+
+    return { valid: false, reason: 'No valid burn instruction found', burnFound: false };
+  } catch (error) {
+    return {
+      valid: false,
+      reason: error instanceof Error ? error.message : 'Failed to decode transaction',
+    };
+  }
+}
+
 export interface BuildAtomicSubscriptionTxParams {
   userWallet: string;
   inputMint: string;
