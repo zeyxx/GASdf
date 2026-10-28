@@ -23,6 +23,33 @@ import { JupiterQuoteAdapter } from '../adapters/jupiter/quote-client.js';
 import { AtomicSubscriptionTxBuilder, verifyAtomicSubscriptionTxIntegrity } from '../adapters/builder/atomic-tx-builder.js';
 import { signAndSend, type KoraConfig } from '../kora/client.js';
 
+
+class InMemoryRateLimiter {
+  private requests: Map<string, number[]> = new Map();
+  private maxRequests: number;
+  private windowMs: number;
+
+  constructor(maxRequests: number = 60, windowMs: number = 60_000) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+  }
+
+  isAllowed(ip: string): boolean {
+    const now = Date.now();
+    const timestamps = this.requests.get(ip) ?? [];
+    const valid = timestamps.filter((t) => now - t < this.windowMs);
+    if (valid.length >= this.maxRequests) {
+      this.requests.set(ip, valid);
+      return false;
+    }
+    valid.push(now);
+    this.requests.set(ip, valid);
+    return true;
+  }
+}
+
+const quoteRateLimiter = new InMemoryRateLimiter(60, 60_000); // 60 req/min/IP
+
 export function createSubscriptionRouter(
   tokenRegistry: PaymentTokenRegistry,
   planRegistry: PlanRegistry,
@@ -41,6 +68,11 @@ export function createSubscriptionRouter(
 
   // Live dynamic quoting via Jupiter with TTL
   router.get('/quote/live', async (req: Request, res: Response) => {
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    if (!quoteRateLimiter.isAllowed(clientIp)) {
+      res.status(429).json({ error: 'Too many quote requests. Rate limit is 60 requests per minute.' });
+      return;
+    }
     try {
       const tokenSymbol = (req.query['token'] as string)?.toUpperCase() ?? 'USDC';
       const planId = (req.query['planId'] as string) ?? 'pro-monthly';
@@ -137,6 +169,11 @@ export function createSubscriptionRouter(
 
   // 4. Lifecycle: Request a quote for a session
   router.post('/sessions/:sessionId/quote', async (req: Request, res: Response) => {
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    if (!quoteRateLimiter.isAllowed(clientIp)) {
+      res.status(429).json({ error: 'Too many quote requests. Rate limit is 60 requests per minute.' });
+      return;
+    }
     const sessionId = Array.isArray(req.params['sessionId'])
       ? req.params['sessionId'][0]
       : req.params['sessionId'];
@@ -407,6 +444,12 @@ export function createSubscriptionRouter(
       const session = await sessionStore.get(sessionId);
       if (!session) {
         res.status(404).json({ error: 'Session not found or expired' });
+        return;
+      }
+
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (session.expiresAt && nowSec > session.expiresAt) {
+        res.status(400).json({ error: 'Session has expired, cannot submit transaction' });
         return;
       }
 
