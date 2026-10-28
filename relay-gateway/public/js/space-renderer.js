@@ -114,7 +114,7 @@ export class SpaceRenderer {
               vBrightness = brightness;
               vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
               float sizeVar = 1.0 + sin(time * 0.2 + position.x * 0.01) * 0.08;
-              gl_PointSize = size * sizeVar * pixelRatio * (550.0 / -mvPosition.z);
+              gl_PointSize = max(2.0, size * sizeVar * pixelRatio * (850.0 / -mvPosition.z));
               gl_Position = projectionMatrix * mvPosition;
             }
           `,
@@ -126,7 +126,7 @@ export class SpaceRenderer {
               float dist = length(uv);
               float core = exp(-dist * 5.0);
               float glow = exp(-dist * 2.0) * 0.25;
-              float alpha = (core + glow) * vBrightness;
+              float alpha = (core * 2.2 + glow * 1.5) * (vBrightness + 0.4);
               gl_FragColor = vec4(vColor, clamp(alpha, 0.0, 1.0));
             }
           `,
@@ -169,7 +169,7 @@ export class SpaceRenderer {
           sizes[i] = 1.5 + Math.random() * 3.0;
           const distFromCenter = Math.abs(y) / 100;
           // Intensified alpha: 2.5x brighter
-          alphas[i] = (1 - distFromCenter) * (0.035 + Math.random() * 0.045);
+          alphas[i] = (1 - distFromCenter) * (0.28 + Math.random() * 0.35);
         }
 
         const geometry = new THREE.BufferGeometry();
@@ -193,7 +193,7 @@ export class SpaceRenderer {
               pos.x += sin(time * 0.08 + position.z * 0.008) * 1.5;
               pos.y += cos(time * 0.06 + position.x * 0.008) * 0.8;
               vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-              gl_PointSize = size * (350.0 / -mvPosition.z);
+              gl_PointSize = max(1.8, size * (750.0 / -mvPosition.z));
               gl_Position = projectionMatrix * mvPosition;
             }
           `,
@@ -338,7 +338,7 @@ export class SpaceRenderer {
               pos.y += scrollOffset * 0.03;
               pos = mod(pos + 90.0, 180.0) - 90.0;
               vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-              vAlpha = 0.65 * (1.0 - smoothstep(10.0, 90.0, -mvPosition.z));
+              vAlpha = 0.85 * (1.0 - smoothstep(5.0, 120.0, -mvPosition.z));
               gl_PointSize = 1.2 * (40.0 / -mvPosition.z);
               gl_Position = projectionMatrix * mvPosition;
             }
