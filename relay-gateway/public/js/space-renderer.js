@@ -222,10 +222,10 @@ export class SpaceRenderer {
       createNebulae() {
         this.nebulae = [];
         const configs = [
-          { x: -350, y: 180, z: -550, size: 420, color: new THREE.Color(0x3a60a8), opacity: 0.18 },
-          { x: 450, y: -130, z: -650, size: 380, color: new THREE.Color(0x7e3ea8), opacity: 0.16 },
-          { x: -180, y: -280, z: -450, size: 320, color: new THREE.Color(0xba4838), opacity: 0.15 },
-          { x: 280, y: 350, z: -800, size: 460, color: new THREE.Color(0x356898), opacity: 0.14 },
+          { x: -320, y: 160, z: -400, size: 650, color: new THREE.Color(0x4070d0), opacity: 0.55 }, // Electric Blue Nebula (Upper Left)
+          { x: 380, y: -100, z: -480, size: 600, color: new THREE.Color(0x9a44d0), opacity: 0.50 }, // Deep Violet Orchid Nebula (Mid Right)
+          { x: -220, y: -240, z: -380, size: 520, color: new THREE.Color(0xdf5535), opacity: 0.45 }, // Solar Flame Nebula (Lower Left)
+          { x: 260, y: 280, z: -550, size: 700, color: new THREE.Color(0x3085b5), opacity: 0.48 }, // Cyan Lagoon Nebula (Upper Right)
         ];
 
         const geometry = new THREE.PlaneGeometry(1, 1);
@@ -256,7 +256,7 @@ export class SpaceRenderer {
                 float falloff = pow(1.0 - smoothstep(0.0, 0.5, dist), 1.5);
                 float structure = fbm(uv * 3.0 + time * 0.015) * 0.5 + fbm(uv * 6.0 - time * 0.01) * 0.3 + fbm(uv * 9.0 + time * 0.008) * 0.2;
                 vec3 color = baseColor + vec3(structure * 0.15);
-                gl_FragColor = vec4(color, falloff * structure * opacity);
+                gl_FragColor = vec4(color, clamp(falloff * (structure + 0.25) * opacity * 1.8, 0.0, 0.95));
               }
             `,
             transparent: true,
