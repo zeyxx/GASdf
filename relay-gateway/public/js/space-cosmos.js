@@ -84,9 +84,9 @@ export class SpaceCosmos {
           vColor = color;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
           float pulse = 0.85 + 0.25 * sin(time * 2.0 + position.x * 0.05);
-          gl_PointSize = size * pulse * (400.0 / -mvPosition.z);
+          gl_PointSize = size * pulse * (600.0 / -mvPosition.z);
           gl_Position = projectionMatrix * mvPosition;
-          vGlow = clamp(400.0 / -mvPosition.z, 0.4, 1.5);
+          vGlow = clamp(600.0 / -mvPosition.z, 0.5, 2.0);
         }
       `,
       fragmentShader: `
@@ -96,11 +96,12 @@ export class SpaceCosmos {
           vec2 coord = gl_PointCoord - vec2(0.5);
           float dist = length(coord);
           if (dist > 0.5) discard;
-          float intensity = pow(1.0 - dist * 2.0, 1.8);
+          float intensity = pow(1.0 - dist * 2.0, 1.5);
           gl_FragColor = vec4(vColor, intensity * vGlow);
         }
       `,
       transparent: true,
+      vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
