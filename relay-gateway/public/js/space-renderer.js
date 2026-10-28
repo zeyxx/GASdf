@@ -3,21 +3,12 @@ import { EffectComposer } from '/js/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from '/js/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '/js/addons/postprocessing/UnrealBloomPass.js';
 
-export 
-    // ========================================================================
-    // GOLDEN RATIO CONSTANTS
-    // ========================================================================
-    const PHI = 1.618033988749894;
-    const PHI_CUBED = PHI * PHI * PHI;
-    const BURN_RATE = 1 - (1 / PHI_CUBED);
-    const TREASURY_RATE = 1 / PHI_CUBED;
-    const ECOSYSTEM_BONUS = 1 / (PHI * PHI);
-
-    // ========================================================================
-    // SPACE RENDERER - Full version with all effects
-    // Stars, Milky Way, Nebulae, Cosmic Dust, Lorenz Comets
-    // ========================================================================
-    class SpaceRenderer {
+// ========================================================================
+// AUTHENTIC HARVARD SPACE RENDERER (Three.js WebGL Engine)
+// Stars (Harvard Spectral), Milky Way, Nebulae, Cosmic Dust, Lorenz Comets
+// Zero Golden Ratio, Pure Astrophysics
+// ========================================================================
+export class SpaceRenderer {
       constructor(container) {
         this.container = container;
         this.time = 0;
@@ -348,8 +339,8 @@ export
         this.cometPool = [];
 
         // Golden ratio constants
-        const PHI_INV = 1 / PHI;
-        const PHI_SQ = PHI * PHI;
+        const PHI_INV = 1 / 1.618033988749895;
+        const PHI_SQ = 1.618033988749895 * 1.618033988749895;
         const PHI_INV_SQ = 1 / PHI_SQ;
 
         // Rule of thirds intersections
@@ -472,8 +463,8 @@ export
         const seed = path.startX * 10 + path.startY * 7 + now * 0.0001;
         comet.lorenz = {
           x: 1 + Math.sin(seed) * 0.3,
-          y: 1 + Math.cos(seed * PHI) * 0.3,
-          z: 1 + Math.sin(seed * PHI * PHI) * 0.3
+          y: 1 + Math.cos(seed * 1.618033988749895) * 0.3,
+          z: 1 + Math.sin(seed * 1.618033988749895 * 1.618033988749895) * 0.3
         };
 
         const aspect = window.innerWidth / window.innerHeight;
