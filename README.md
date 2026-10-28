@@ -1,465 +1,122 @@
-# GASdf
+# GASdf (Gasless $ASDF Relay)
 
-**Gasless transactions for Solana.** Pay network fees with any token instead of SOL.
+> **Zero-friction subscription payments for Solana dApps.**  
+> Users pay in **USDC, USDT, or SOL** without manual swaps. The relay sponsors network fees (zero SOL required) and atomically converts & burns the fee in **$ASDF** (`9zB5wECiLiFvBc1EGpDXFaRzThvNdThFQvd3APp6pump`).
 
-All fees become **$asdfasdfa** and burn forever. Pure golden ratio economics (φ).
+[![Public Relay](https://img.shields.io/badge/relay-relay.talaria.build-success)](https://relay.talaria.build/health)
+[![SDK Tests](https://img.shields.io/badge/sdk%20tests-70%2F70%20passing-brightgreen)](packages/sdk)
+[![Relay Tests](https://img.shields.io/badge/relay%20tests-38%2F38%20passing-brightgreen)](relay-gateway)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](https://github.com/zeyxx/GASdf/releases)
-[![Live](https://img.shields.io/badge/status-live-brightgreen)](https://gasdf-43r8.onrender.com)
-[![Tests](https://img.shields.io/badge/tests-741%20passing-brightgreen.svg)](#testing)
-[![Security](https://img.shields.io/badge/security-12%2F12%20layers-brightgreen.svg)](#security)
+---
 
-## Architecture Overview
+## The Problem
 
-```
-                              ┌─────────────────────────────────────────┐
-                              │              CLIENT                      │
-                              │         (User Wallet/dApp)               │
-                              └────────────────┬────────────────────────┘
-                                               │
-                    ┌──────────────────────────┼──────────────────────────┐
-                    │                          │                          │
-                    ▼                          ▼                          ▼
-             ┌───────────┐              ┌───────────┐              ┌───────────┐
-             │  /quote   │              │  /submit  │              │  /health  │
-             └─────┬─────┘              └─────┬─────┘              └───────────┘
-                   │                          │
-                   └──────────────┬───────────┘
-                                  │
-┌─────────────────────────────────┼─────────────────────────────────────────────┐
-│                        EXPRESS.JS SERVER (Port 3000)                          │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │                     12-LAYER SECURITY MIDDLEWARE                        │  │
-│  │  Helmet │ Rate Limit │ Validation │ Anti-Replay │ Drain Protection     │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
-│                                  │                                            │
-│  ┌───────────────────────────────┼───────────────────────────────────────┐   │
-│  │                           SERVICES                                     │   │
-│  │                                                                        │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
-│  │  │   signer    │  │  validator  │  │   jupiter   │  │    burn     │  │   │
-│  │  │  (fee pay)  │  │ (tx checks) │  │   (swaps)   │  │  (worker)   │  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
-│  │                                                                        │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
-│  │  │   oracle    │  │   holdex    │  │   anomaly   │  │   audit     │  │   │
-│  │  │  (K-score)  │  │ (token gate)│  │ (detection) │  │  (logging)  │  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │   │
-│  └────────────────────────────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────────────────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        │                         │                         │
-        ▼                         ▼                         ▼
-┌───────────────┐         ┌───────────────┐         ┌───────────────┐
-│  Solana RPC   │         │    Redis      │         │   External    │
-│  (Helius +    │         │  (State +     │         │    APIs       │
-│   fallbacks)  │         │   Locking)    │         │               │
-│               │         │               │         │ • Jupiter     │
-│ • getBalance  │         │ • Quotes      │         │ • HolDex      │
-│ • sendTx      │         │ • Locks       │         │ • Pyth        │
-│ • simulate    │         │ • Burns       │         │               │
-└───────────────┘         └───────────────┘         └───────────────┘
-        │                         │                         │
-        └─────────────────────────┼─────────────────────────┘
-                                  │
-                                  ▼
-                    ┌─────────────────────────┐
-                    │    SOLANA BLOCKCHAIN    │
-                    │      (mainnet)          │
-                    └─────────────────────────┘
-```
+On Solana, recurring subscriptions face two major checkout drop-offs:
+1. **Manual Swaps:** Users are forced to find a DEX and manually swap their funds into the protocol token ($ASDF) before subscribing.
+2. **Missing Gas:** Wallets holding sufficient tokens (USDC/USDT) often lack the fractional SOL needed to pay transaction fees.
 
-## Transaction Flow
+## The Solution
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         QUOTE → SUBMIT → BURN FLOW                          │
-└─────────────────────────────────────────────────────────────────────────────┘
+GASdf is an autonomous, sovereign relay gateway:
+- **Zero SOL required:** The relay acts as the fee-payer (via hardened Kora signer) so users can transact with an empty SOL balance.
+- **Atomic Swap & Burn:** Converts input tokens (USDC, USDT, SOL) into $ASDF via Jupiter and burns the exact fee in the **same atomic transaction**.
+- **Drop-in Frontend Integration:** Consumer backends remain untouched. The client SDK handles quoting, transaction building, and sponsored relay submission.
 
-PHASE 1: QUOTE (60s TTL)
-═══════════════════════════════════════════════════════════════════════════════
-User                              GASdf                              External
-  │                                 │                                    │
-  ├─── POST /quote ────────────────►│                                    │
-  │    {paymentToken, userPubkey}   │                                    │
-  │                                 ├─── Token gate check ──────────────►│ HolDex
-  │                                 │    (K-score >= 50?)                 │
-  │                                 │◄── {kScore: 85, tier: "Platinum"} ─┤
-  │                                 │                                    │
-  │                                 ├─── Get swap rate ─────────────────►│ Jupiter
-  │                                 │    (token → SOL)                    │
-  │                                 │◄── {rate, slippage} ───────────────┤
-  │                                 │                                    │
-  │                                 ├─── Reserve fee payer (mutex)       │
-  │                                 │    └─ Check balance                │
-  │                                 │    └─ Round-robin select           │
-  │                                 │    └─ Store reservation            │
-  │                                 │                                    │
-  │◄── Quote Response ──────────────┤                                    │
-  │    {quoteId, feePayer,          │                                    │
-  │     feeAmount, expiresAt}       │                                    │
+---
 
+## Production Endpoints
 
-PHASE 2: SUBMIT (Validation + Execution)
-═══════════════════════════════════════════════════════════════════════════════
-User                              GASdf                              Solana
-  │                                 │                                    │
-  ├─── POST /submit ───────────────►│                                    │
-  │    {quoteId, signedTx}          │                                    │
-  │                                 │                                    │
-  │                                 ├─── Load quote from Redis           │
-  │                                 │    └─ Check not expired            │
-  │                                 │                                    │
-  │                                 ├─── Anti-replay (atomic SETNX)      │
-  │                                 │    └─ Hash tx, 90s TTL             │
-  │                                 │                                    │
-  │                                 ├─── Validate transaction:           │
-  │                                 │    ├─ Blockhash fresh? ───────────►│
-  │                                 │    ├─ Fee payer matches?           │
-  │                                 │    ├─ User signature valid? (Ed25519)
-  │                                 │    ├─ Drain protection (17 blocked)│
-  │                                 │    └─ Fee payment instruction OK?  │
-  │                                 │                                    │
-  │                                 ├─── Simulate transaction ──────────►│
-  │                                 │    └─ Check for CPI attacks        │
-  │                                 │◄── Simulation result ──────────────┤
-  │                                 │                                    │
-  │                                 ├─── Sign with fee payer key         │
-  │                                 │                                    │
-  │                                 ├─── Send transaction ──────────────►│
-  │                                 │    └─ Retry 3x with backoff        │
-  │                                 │◄── Signature ──────────────────────┤
-  │                                 │                                    │
-  │◄── Submit Response ─────────────┤                                    │
-  │    {signature, explorerUrl}     │                                    │
+- **Public Endpoint:** `https://relay.talaria.build`
+- **Health Check:** `https://relay.talaria.build/health`
+- **Live Quote API:** `GET /subscription/quote/live?token=USDC&targetAsdf=30000`
 
+---
 
-PHASE 3: BURN (Background Worker, every 60s)
-═══════════════════════════════════════════════════════════════════════════════
-                                  GASdf                              Solana
-                                    │                                    │
-                                    ├─── Acquire distributed lock        │
-                                    │    (prevent concurrent burns)      │
-                                    │                                    │
-                                    ├─── Sum pending fees                │
-                                    │    └─ Skip if < 0.1 SOL            │
-                                    │                                    │
-                                    ├─── Calculate split (φ-based):      │
-                                    │    ├─ 76.4% → Burn (1 - 1/φ³)      │
-                                    │    └─ 23.6% → Treasury (1/φ³)      │
-                                    │                                    │
-                                    ├─── Swap to $ASDF (Jupiter) ───────►│
-                                    │                                    │
-                                    ├─── Burn $ASDF ────────────────────►│
-                                    │                                    │
-                                    ├─── Store burn proof                │
-                                    │    {signature, amount, timestamp}  │
-                                    │                                    │
-                                    └─── Release lock                    │
-```
+## Client Integration
 
-## Quick Start
+### 1. Install SDK
 
 ```bash
-# Install dependencies
-npm install
-
-# Development (uses devnet)
-npm run dev
-
-# Production
-npm start
+npm install github:zeyxx/GASdf#sdk
 ```
 
-## Dashboard & Analytics
+*(Or point directly to `packages/sdk` in a monorepo setup).*
 
-- **Landing Page**: https://asdfasdfa.tech/
-- **Analytics Dashboard**: https://asdfasdfa.tech/analytics.html
+### 2. Request a Live Quote & Subscribe
 
-## SDK
+```typescript
+import { createGasdfClient } from '@gasdf/sdk';
 
-Install the SDK for easy integration:
-
-```bash
-npm install gasdf-sdk
-```
-
-```javascript
-import { GASdf } from 'gasdf-sdk';
-
-const gasdf = new GASdf({ baseUrl: 'https://asdfasdfa.tech' });
-
-// Get a quote
-const quote = await gasdf.quote({
-  paymentToken: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-  userPubkey: wallet.publicKey.toBase58()
+const client = createGasdfClient({
+  baseUrl: 'https://relay.talaria.build',
 });
 
-// Build your transaction with quote.feePayer as fee payer
-// Sign it and submit
-const result = await gasdf.submit(quote.quoteId, signedTxBase64);
-console.log(`Transaction: ${result.explorerUrl}`);
+// 1. Fetch live quote
+const quote = await client.getLiveQuote({
+  token: 'USDC',
+  targetAsdf: 30_000,
+  appId: 'trenchscanner',
+});
+
+console.log(`Input amount: ${quote.inputAmountFormatted} USDC`);
+console.log(`Valid for: ${quote.ttlSeconds}s`);
+
+// 2. Prepare transaction & submit via sponsored relay
+const session = await client.createSession({
+  appId: 'trenchscanner',
+  planId: 'pro-monthly',
+  buyerPubkey: userWallet.publicKey.toBase58(),
+  paymentToken: 'USDC',
+});
+
+const prepared = await client.prepareSessionTransaction(session.sessionId);
+
+// Sign with user wallet (authority over input token)
+const signedTx = await userWallet.signTransaction(prepared.transaction);
+
+// Relay co-signs fee payer and broadcasts
+const result = await client.submitSessionTransaction(session.sessionId, signedTx);
+console.log(`Transaction confirmed: https://solscan.io/tx/${result.txSignature}`);
 ```
 
-## API Endpoints (v1)
+For full integration details and examples, see [`docs/CONSUMER_INTEGRATION.md`](docs/CONSUMER_INTEGRATION.md).
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/v1/quote` | Get a fee quote (60s TTL) |
-| POST | `/v1/submit` | Submit signed transaction |
-| GET | `/v1/tokens` | List accepted payment tokens |
-| GET | `/v1/stats` | Burn statistics & treasury |
-| GET | `/v1/stats/burns` | Verifiable burn proofs |
-| GET | `/v1/health` | Service health + RPC status |
-| GET | `/metrics` | Prometheus metrics |
+---
 
-### POST /v1/quote
+## Repository Structure
+
+```
+├── packages/
+│   └── sdk/             # Canonical TypeScript SDK (@gasdf/sdk)
+├── relay-gateway/       # Production Relay Gateway (Express + Kora client + Jupiter router)
+├── examples/            # Consumer test flows (e.g. consumer-trenchscanner.mjs)
+├── contracts/           # Token & program specifications
+├── docs/                # Architecture, security audits & integration guides
+└── scripts/             # Local LiteSVM (Surfpool) & deployment tools
+```
+
+---
+
+## Security & Verification
+
+- **Adversarial Integrity Validation:** Every submitted wire transaction is decompiled and checked prior to relay co-signing. Tampered fee-payers, omitted burns, or modified amounts are rejected immediately.
+- **Isolated Signer:** Fee-payer private keys run inside an isolated LXC instance (`cynic-kora`), behind strict program and transfer whitelists.
+- **In-Memory Rate Limiting:** Quote routes are protected against API exhaustion (60 req/min/IP).
+- **LiteSVM Simulation:** Fully tested locally against Solana mainnet state via [Surfpool](https://github.com/solana-foundation/surfpool).
+
+Run tests locally:
 
 ```bash
-curl -X POST https://asdfasdfa.tech/v1/quote \
-  -H "Content-Type: application/json" \
-  -d '{
-    "paymentToken": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    "userPubkey": "YourWalletAddress"
-  }'
+# Test relay gateway
+cd relay-gateway && npm test
+
+# Test SDK
+cd packages/sdk && npm test
 ```
 
-### POST /v1/submit
-
-```bash
-curl -X POST https://asdfasdfa.tech/v1/submit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "quoteId": "550e8400-e29b-41d4-a716-446655440000",
-    "transaction": "base64-encoded-signed-transaction",
-    "userPubkey": "YourWalletAddress"
-  }'
-```
-
-## External Dependencies
-
-| Service | Purpose | Criticality | Fallback |
-|---------|---------|-------------|----------|
-| **Helius RPC** | Primary Solana RPC | Critical | Triton, Public RPC |
-| **Jupiter API** | Token swaps for burns | Critical | None (burns fail) |
-| **HolDex** | Token K-score oracle | High | Diamond tokens only |
-| **Redis** | State, locking, cache | High | In-memory (dev only) |
-| **Pyth** | SOL price feed | Medium | Coingecko, Jupiter |
-
-## Golden Ratio Economics (φ)
-
-All ratios derive from φ = 1.618033988749...
-
-```
-Treasury ratio:  1/φ³  = 23.6%
-Burn ratio:      1 - 1/φ³ = 76.4%
-Max eco bonus:   1/φ²  = 38.2%
-
-Fee Calculation (First Principles):
-├─ Network fee: 5,000 lamports (Solana base)
-├─ Break-even:  5,000 ÷ 0.236 = 21,186 lamports
-├─ Base fee:    50,000 lamports (2.36x margin)
-└─ No magic numbers - everything derived from φ
-```
-
-### Dual Burn Channel
-
-```
-Payment Token
-     │
-     ├── If $asdfasdfa ──▶ 100% BURN (zero treasury cut)
-     │
-     └── If other token ──▶ Jupiter Swap to $asdfasdfa
-                                    │
-                                    ├── 76.4% ──▶ BURN (1 - 1/φ³)
-                                    └── 23.6% ──▶ Treasury (1/φ³)
-```
-
-### $asdfasdfa Holder Discounts
-
-Formula: `discount = min(95%, (log₁₀(share) + 5) / 3)`
-*Source: `src/services/holder-tiers.js:146-153`*
-
-| Tier | Share of Supply | Discount |
-|------|-----------------|----------|
-| DIAMOND | ≥ 1% | 95% (cap) |
-| PLATINUM | ≥ 0.1% | 67% |
-| GOLD | ≥ 0.01% | 33% |
-| SILVER | ≥ 0.001% | 0% |
-| BRONZE | < 0.001% | 0% |
-
-### E-Score (HolDex Harmony)
-
-Engagement-based discount using 7 φ-weighted dimensions:
-
-| Dimension | Weight | Description |
-|-----------|--------|-------------|
-| Hold | φ⁶ | Duration of holding |
-| Burn | φ⁵ | Amount burned |
-| Use | φ⁴ | dApp interactions |
-| Build | φ³ | Developer activity |
-| Node | φ² | Validator/RPC ops |
-| Refer | φ¹ | Referral activity |
-| Duration | φ⁰ | Account age |
-
-Formula: `discount = min(95%, 1 - φ^(-E/25))`
-*Source: `src/services/harmony.js:66, 126-131`*
-
-**Combined discount**: `max(holderDiscount, eScoreDiscount)` — capped at **95%**
-
-## K-Score Token Gating
-
-Tokens are scored by [HolDex](https://holdex-api.onrender.com/api) for trustworthiness.
-*Source: `src/services/holdex.js:104-113`*
-
-| Tier | K-Score | Fee Multiplier | Status |
-|------|---------|----------------|--------|
-| 💎 Diamond | 90-100 | 1.0x | Hardcoded (SOL, USDC, USDT, $asdfasdfa) |
-| 💠 Platinum | 80-89 | 1.0x | Accepted |
-| 🥇 Gold | 70-79 | 1.0x | Accepted |
-| 🥈 Silver | 60-69 | 1.1x | Accepted |
-| 🥉 Bronze | 50-59 | 1.2x | Accepted (minimum for gas) |
-| 🟤 Copper | 40-49 | — | **Rejected** |
-| ⚫ Iron | 20-39 | — | **Rejected** |
-| 🔩 Rust | 0-19 | — | **Rejected** |
-
-**Minimum K-Score for gas payment: 50 (Bronze)**
-
-## Security (12 Layers)
-
-| # | Layer | Implementation |
-|---|-------|----------------|
-| 1 | Headers | Helmet (CSP, X-Frame, HSTS) |
-| 2 | IP Rate Limit | 100 req/min (express-rate-limit) |
-| 3 | Wallet Rate Limit | 50 quotes/min per wallet |
-| 4 | Input Validation | Joi schemas (base58, UUID) |
-| 5 | Anti-Replay | Atomic SETNX (tx hash, 90s TTL) |
-| 6 | Fee Payer Health | Balance checks, unhealthy marking |
-| 7 | SOL Drain Prevention | 6 System Program instructions blocked |
-| 8 | Token Drain Prevention | 11 Token Program instructions blocked |
-| 9 | Circuit Breakers | Per-RPC endpoint + fee payer capacity |
-| 10 | Audit Logging | PII hashed (HMAC-SHA256) |
-| 11 | Anomaly Detection | Baseline learning (30min) + 3σ thresholds |
-| 12 | Key Rotation | Graceful retirement + emergency modes |
-
-## File Structure
-
-```
-src/
-├── index.js                 # Express server entry point
-├── routes/
-│   ├── quote.js             # POST /v1/quote
-│   ├── submit.js            # POST /v1/submit
-│   ├── tokens.js            # GET /v1/tokens
-│   ├── stats.js             # GET /v1/stats, burns, leaderboard
-│   └── health.js            # GET /v1/health, /health/ready
-├── services/
-│   ├── signer.js            # Fee payer wallet management
-│   ├── fee-payer-pool.js    # Multi-wallet pool + key rotation
-│   ├── validator.js         # Transaction validation (Ed25519)
-│   ├── jupiter.js           # Jupiter swap integration
-│   ├── burn.js              # $ASDF burn worker (60s interval)
-│   ├── oracle.js            # K-score pricing
-│   ├── holdex.js            # HolDex API integration
-│   ├── holder-tiers.js      # $ASDF holder discount system
-│   ├── audit.js             # Audit logging (PII anonymized)
-│   ├── alerting.js          # Webhook alerts (Slack/Discord)
-│   └── anomaly-detector.js  # Baseline learning + detection
-├── middleware/
-│   ├── security.js          # Helmet, rate limiting, CSP
-│   └── validation.js        # Input validation schemas
-└── utils/
-    ├── config.js            # Environment configuration
-    ├── redis.js             # Redis client + memory fallback
-    ├── rpc.js               # Multi-RPC failover pool
-    ├── circuit-breaker.js   # Circuit breaker pattern
-    └── safe-math.js         # Overflow-safe calculations
-
-public/
-├── index.html               # Landing page dashboard
-├── analytics.html           # Analytics dashboard (φ-based design)
-└── og-image.svg             # Social sharing image
-
-packages/
-└── sdk/                     # gasdf-sdk npm package
-```
-
-## Environment Variables
-
-```env
-# Required
-HELIUS_API_KEY=your_helius_key
-FEE_PAYER_PRIVATE_KEY=base58_encoded_key
-REDIS_URL=redis://localhost:6379
-
-# Token
-ASDF_MINT=9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump
-
-# Optional
-NODE_ENV=production
-PORT=3000
-PROMETHEUS_ENABLED=true
-ALERTING_WEBHOOK=https://hooks.slack.com/...
-```
-
-## Testing
-
-```bash
-npm test                    # Run all tests
-npm run test:coverage       # With coverage report
-```
-
-741 tests covering security, validation, pricing, and integration.
-
-## Deployment
-
-### Render (Recommended)
-
-Uses `render.yaml` for automatic deployment:
-1. Connect GitHub repo
-2. Set environment variables
-3. Deploy
-
-### Docker
-
-```bash
-docker build -t gasdf .
-docker run -p 3000:3000 --env-file .env gasdf
-```
-
-## Monitoring
-
-- **Prometheus**: `GET /metrics` (set `PROMETHEUS_ENABLED=true`)
-- **Health checks**: `GET /health`, `/health/ready`, `/health/live`
-- **Alerts**: Configure `ALERTING_WEBHOOK` for critical events
-
-## Links
-
-- **Live API**: https://asdfasdfa.tech
-- **Analytics**: https://asdfasdfa.tech/analytics.html
-- **Burns**: https://alonisthe.dev/burns
-- **HolDex**: https://holdex-api.onrender.com/api
-- **$ASDF Ecosystem**: https://alonisthe.dev
-
-## Known Issues
-
-### npm audit: bigint-buffer vulnerability (CVE-2025-3194) - FIXED ✅
-
-The `bigint-buffer` vulnerability has been **patched** using npm overrides.
-
-**Solution**: We override `bigint-buffer` with `@gsknnft/bigint-buffer@1.4.7`, a secure, actively maintained fork that is fuzz-tested and API-compatible.
-
-```json
-"overrides": {
-  "bigint-buffer": "npm:@gsknnft/bigint-buffer@^1.4.7"
-}
-```
-
-**Result**: `npm audit` now reports **0 vulnerabilities**.
-
-Reference: [GHSA-3gc7-fjrx-p6mg](https://github.com/advisories/GHSA-3gc7-fjrx-p6mg)
+---
 
 ## License
 
-MIT
+MIT © 2026 Titouan Corneloup (zeyxx).
