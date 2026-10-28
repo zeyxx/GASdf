@@ -122,62 +122,14 @@
     </footer>
   </div>
 
-    <!-- MODULAR BULLETPROOF COSMOS ENGINE -->
+      <!-- AUTHENTIC SPATIAL ENGINE (HARVARD SPECTRAL + MILKY WAY + NEBULAE + DUST) -->
   <script type="module">
+    import { SpaceRenderer } from '/js/space-renderer.js?v=1793213200';
+
     const container = document.getElementById('space-container');
+    new SpaceRenderer(container);
 
-    // 1. Try Primary High-Definition Three.js Cosmos
-    let initialized = false;
-    try {
-      const mod = await import('/js/space-cosmos.js?v=1793212997');
-      new mod.SpaceCosmos(container);
-      initialized = true;
-    } catch (err) {
-      console.warn('Three.js WebGL initialization bypassed, engaging hardware-accelerated 2D Starfield fallback:', err);
-    }
-
-    // 2. Guaranteed Canvas 2D Fallback if WebGL / GPU acceleration is disabled on client
-    if (!initialized || !container.querySelector('canvas')) {
-      const canvas = document.createElement('canvas');
-      canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;';
-      container.appendChild(canvas);
-      const ctx = canvas.getContext('2d');
-      let w = canvas.width = window.innerWidth;
-      let h = canvas.height = window.innerHeight;
-
-      window.addEventListener('resize', () => {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-      });
-
-      const stars = Array.from({ length: 400 }, () => ({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: Math.random() * 2 + 0.8,
-        color: ['#ffffff', '#9bb0ff', '#ffd2a1', '#ff8a47'][Math.floor(Math.random() * 4)],
-        alpha: Math.random() * 0.7 + 0.3,
-        speed: Math.random() * 0.4 + 0.1
-      }));
-
-      function loop() {
-        ctx.clearRect(0, 0, w, h);
-        for (const s of stars) {
-          s.y -= s.speed;
-          if (s.y < 0) s.y = h;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fillStyle = s.color;
-          ctx.globalAlpha = s.alpha;
-          ctx.shadowBlur = s.r * 3;
-          ctx.shadowColor = s.color;
-          ctx.fill();
-        }
-        requestAnimationFrame(loop);
-      }
-      loop();
-    }
-
-    // Dynamic black hole movement with scroll
+    // Singularity scroll reaction
     const blackHole = document.getElementById('blackHole');
     window.addEventListener('scroll', () => {
       const scrollY = window.scrollY;
