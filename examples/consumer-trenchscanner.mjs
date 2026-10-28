@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Integration consumer test modeling the @gcrtrd (TrenchScanner) consumer.
 
-import { GasdfClient } from '../sdk/dist/client.js';
+import { GasdfClient } from '../packages/sdk/dist/index.js';
 
 const GATEWAY = 'https://relay.talaria.build';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';

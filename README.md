@@ -46,9 +46,9 @@ npm install github:zeyxx/GASdf#sdk
 ### 2. Request a Live Quote & Subscribe
 
 ```typescript
-import { createGasdfClient } from '@gasdf/sdk';
+import { GasdfClient } from '@gasdf/sdk';
 
-const client = createGasdfClient({
+const client = GasdfClient({
   baseUrl: 'https://relay.talaria.build',
 });
 

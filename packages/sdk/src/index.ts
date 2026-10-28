@@ -58,3 +58,16 @@ export {
 
 // Utilities for advanced usage
 export { generateCorrelationId } from './fetch';
+
+
+// Subscription & Atomic Gasless Client (TrenchScanner / CultScreener)
+export { GasdfClient } from './subscription/client';
+export type {
+  GasdfClientOptions,
+  LiveQuote,
+  SubscriptionSession,
+  PreparedAtomicTx,
+  SettlementReceipt,
+  SupportedTokenSymbol,
+  WalletStandardSigner,
+} from './subscription/types';
