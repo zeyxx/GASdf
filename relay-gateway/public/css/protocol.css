@@ -1,0 +1,313 @@
+/* ==========================================================================
+   GASdf Sovereign Protocol Theme
+   Modular, Fast, Zero Monolith
+   ========================================================================== */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #050508;
+  --text-main: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.65);
+  --accent-gold: #f5a623;
+  --accent-flame: #ff6b35;
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --card-bg: rgba(14, 14, 20, 0.65);
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--bg);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text-main);
+  background: transparent;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Three.js Space Canvas Container */
+#space-container {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Singularity Black Hole Effect */
+.singularity {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.black-hole {
+  position: absolute;
+  bottom: -20vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  height: 380px;
+  transition: transform 0.1s ease-out;
+}
+
+.event-horizon {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, #000 60%, transparent 100%);
+  box-shadow: 0 0 100px 30px #000;
+}
+
+.photon-ring {
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  box-shadow: 0 0 60px 15px rgba(245, 166, 35, 0.4),
+              0 0 120px 40px rgba(255, 107, 53, 0.2),
+              inset 0 0 40px 10px rgba(245, 166, 35, 0.3);
+  animation: photon-pulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes photon-pulse {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  100% { transform: scale(1.02); opacity: 1; }
+}
+
+/* Foreground Content */
+.content-layer {
+  position: relative;
+  z-index: 10;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo span {
+  color: var(--accent-gold);
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover {
+  color: #fff;
+}
+
+.btn-nav {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-glass);
+  padding: 8px 16px;
+  border-radius: 999px;
+  color: #fff !important;
+  font-weight: 500;
+}
+
+/* Hero Section */
+.hero {
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 0;
+}
+
+.tagline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--accent-gold);
+  margin-bottom: 24px;
+}
+
+.tagline-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+h1.hero-title {
+  font-size: clamp(38px, 6vw, 68px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 20px;
+}
+
+h1.hero-title span {
+  background: linear-gradient(135deg, #fff 40%, var(--accent-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+p.hero-desc {
+  font-size: clamp(16px, 2vw, 19px);
+  color: var(--text-muted);
+  max-width: 620px;
+  margin-bottom: 40px;
+}
+
+/* Metrics Row */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 680px;
+  width: 100%;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(16px);
+}
+
+.stat-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-mono);
+}
+
+.stat-val.flame {
+  color: var(--accent-flame);
+}
+
+.stat-lbl {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+/* Value Section */
+.section {
+  padding: 80px 0;
+}
+
+.section-head {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.section-head h2 {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.card-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  padding: 28px;
+  backdrop-filter: blur(16px);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.card-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(245, 166, 35, 0.3);
+}
+
+.card-icon {
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+
+.card-item h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.card-item p {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* CTA */
+.cta-box {
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.1) 0%, rgba(255, 107, 53, 0.05) 100%);
+  border: 1px solid rgba(245, 166, 35, 0.25);
+  border-radius: 24px;
+  padding: 48px 32px;
+  text-align: center;
+  margin: 60px 0 100px;
+}
+
+.cta-code {
+  display: inline-block;
+  background: #000;
+  border: 1px solid var(--border-glass);
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent-gold);
+  margin-top: 20px;
+}
+
+footer {
+  padding: 32px 0 60px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-glass);
+}
