@@ -21,7 +21,7 @@
     "fee-abstraction",
     "golden-ratio"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },
@@ -52,5 +52,6 @@
     "pg": "^8.23.1",
     "prettier": "^3.7.4",
     "supertest": "^6.3.3"
-  }
+  },
+  "author": "zeyxx"
 }
