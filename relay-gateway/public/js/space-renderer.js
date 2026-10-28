@@ -66,16 +66,24 @@ export class SpaceRenderer {
 
         for (let i = 0; i < starCount; i++) {
           const i3 = i * 3;
-          const theta = Math.random() * Math.PI * 2;
+          const theta = Math.random() * Math.PI * 2 + this.seedRotationY;
           const phi = Math.acos(2 * Math.random() - 1);
           const radius = 400 + Math.random() * 1200;
 
-          const galacticConcentration = Math.exp(-Math.abs(phi - Math.PI/2) * 2);
+          const galacticConcentration = Math.exp(-Math.abs(phi - (Math.PI/2 + this.galaxyTilt)) * 2);
           const r = radius * (0.5 + 0.5 * galacticConcentration);
 
-          positions[i3] = r * Math.sin(phi) * Math.cos(theta);
-          positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-          positions[i3 + 2] = r * Math.cos(phi);
+          // Apply 3D coordinate rotation based on organic session seed
+          let px = r * Math.sin(phi) * Math.cos(theta);
+          let py = r * Math.sin(phi) * Math.sin(theta);
+          let pz = r * Math.cos(phi);
+
+          // Rotate by galaxyAngle around Z axis
+          const cosA = Math.cos(this.galaxyAngle);
+          const sinA = Math.sin(this.galaxyAngle);
+          positions[i3] = px * cosA - py * sinA;
+          positions[i3 + 1] = px * sinA + py * cosA;
+          positions[i3 + 2] = pz;
 
           let rand = Math.random(), cumulative = 0, spectralIndex = 6;
           for (let j = 0; j < spectralProbs.length; j++) {
@@ -214,19 +222,36 @@ export class SpaceRenderer {
         });
 
         this.milkyWay = new THREE.Points(geometry, material);
-        this.milkyWay.rotation.z = -12 * Math.PI / 180;
+        this.milkyWay.rotation.z = this.galaxyAngle;
+        this.milkyWay.rotation.y = this.seedRotationY * 0.3;
         this.scene.add(this.milkyWay);
       }
 
       // Nebulae with FBM noise
       createNebulae() {
         this.nebulae = [];
-        const configs = [
-          { x: -350, y: 180, z: -550, size: 280, color: new THREE.Color(0x4466aa), opacity: 0.035 },
-          { x: 450, y: -130, z: -650, size: 230, color: new THREE.Color(0x884488), opacity: 0.03 },
-          { x: -180, y: -280, z: -450, size: 180, color: new THREE.Color(0xaa4455), opacity: 0.025 },
-          { x: 280, y: 350, z: -800, size: 320, color: new THREE.Color(0x446688), opacity: 0.02 },
+        // Procedurally randomized nebulae clouds per session
+        const palette = [
+          new THREE.Color(0x3a5ba0), // Deep Stellar Blue
+          new THREE.Color(0x7c3aed), // Violet Nebula
+          new THREE.Color(0xc2410c), // Cosmic Amber Flame
+          new THREE.Color(0x2563eb), // Electric Cobalt
+          new THREE.Color(0x9333ea), // Deep Orchid
         ];
+        const configs = [];
+        const count = 4 + Math.floor(Math.random() * 3);
+        for (let k = 0; k < count; k++) {
+          const angle = (k / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+          const dist = 300 + Math.random() * 450;
+          configs.push({
+            x: Math.cos(angle) * dist,
+            y: Math.sin(angle) * dist * 0.6 + (Math.random() - 0.5) * 100,
+            z: -450 - Math.random() * 400,
+            size: 220 + Math.random() * 160,
+            color: palette[Math.floor(Math.random() * palette.length)],
+            opacity: 0.025 + Math.random() * 0.02
+          });
+        }
 
         const geometry = new THREE.PlaneGeometry(1, 1);
 
