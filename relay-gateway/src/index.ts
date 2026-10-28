@@ -78,6 +78,13 @@ export async function startServer(): Promise<void> {
   const app = express();
   app.use(express.json());
 
+  // Serve static UI from public/
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const publicDir = join(__dirname, '../public');
+  app.use(express.static(publicDir));
+
   // Accounting ledger
   const { LedgerService } = await import('./ledger/ledger.js');
   const ledgerPath = process.env['LEDGER_PATH'] ?? 'data/ledger.jsonl';

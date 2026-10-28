@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GASdf — Sovereign Solana Relay Gateway</title>
+  <meta name="description" content="Autonomous zero-friction checkout for Solana dApps. Pay subscriptions in USDC, USDT, or SOL with sponsored network gas.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #050507;
+      --card-bg: rgba(18, 18, 24, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 107, 53, 0.5);
+      --text-main: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.55);
+      --accent: #ff6b35;
+      --accent-glow: rgba(255, 107, 53, 0.25);
+      --gold: #f5a623;
+      --success: #10b981;
+      --font-sans: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient dynamic glow */
+    .glow-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 20%, rgba(255, 107, 53, 0.08) 0%, transparent 60%),
+                  radial-gradient(circle at 80% 80%, rgba(245, 166, 35, 0.05) 0%, transparent 50%);
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 520px;
+      padding: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 107, 53, 0.12);
+      border: 1px solid rgba(255, 107, 53, 0.3);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Checkout Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .selector-group {
+      margin-bottom: 20px;
+    }
+
+    .label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .pill-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .pill-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: var(--text-main);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .pill-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .pill-btn.active {
+      background: rgba(255, 107, 53, 0.1);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .pill-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .pill-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .token-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Quote Box */
+    .quote-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin: 24px 0;
+    }
+
+    .quote-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .quote-row:last-child {
+      margin-bottom: 0;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+
+    .quote-label {
+      color: var(--text-muted);
+    }
+
+    .quote-value {
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .free-gas {
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    /* Action button */
+    .btn-action {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent) 0%, #e0531b 100%);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 24px var(--accent-glow);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(255, 107, 53, 0.35);
+    }
+
+    .btn-action:active {
+      transform: translateY(0);
+    }
+
+    .btn-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-canvas"></div>
+
+  <div class="container">
+    <header>
+      <div class="badge">Relay v2.0.0 Operational</div>
+      <h1>GASdf <span>Gateway</span></h1>
+      <p class="subtitle">Zero-friction subscription checkout for Solana apps.<br>Pay with USDC, USDT, or SOL. 100% gasless.</p>
+    </header>
+
+    <div class="card">
+      <!-- Target Plan -->
+      <div class="selector-group">
+        <span class="label">Target Subscription</span>
+        <div class="pill-grid">
+          <button class="pill-btn active" data-app="trenchscanner" data-plan="pro-monthly">
+            <div class="pill-title">TrenchScanner</div>
+            <div class="pill-sub">Pro Mode (30k ASDF)</div>
+          </button>
+          <button class="pill-btn" data-app="cultscreener" data-plan="cultify-12h">
+            <div class="pill-title">CultScreener</div>
+            <div class="pill-sub">Cultify 12h (5k ASDF)</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Payment Currency -->
+      <div class="selector-group">
+        <span class="label">Pay With Token</span>
+        <div class="pill-grid token-grid">
+          <button class="pill-btn active" data-token="USDC">
+            <div class="pill-title">USDC</div>
+            <div class="pill-sub">Stablecoin</div>
+          </button>
+          <button class="pill-btn" data-token="SOL">
+            <div class="pill-title">SOL</div>
+            <div class="pill-sub">Native</div>
+          </button>
+          <button class="pill-btn" data-token="USDT">
+            <div class="pill-title">USDT</div>
+            <div class="pill-sub">Tether</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Quote Information -->
+      <div class="quote-box">
+        <div class="quote-row">
+          <span class="quote-label">Estimated Price</span>
+          <span class="quote-value" id="quote-amount">Fetching live quote...</span>
+        </div>
+        <div class="quote-row">
+          <span class="quote-label">Network Gas Fee</span>
+          <span class="quote-value free-gas">0.00 SOL (Sponsored)</span>
+        </div>
+        <div class="quote-row">
+          <span class="quote-label">On-chain Action</span>
+          <span class="quote-value" id="quote-target">Atomic Swap & Burn 30 000 $ASDF</span>
+        </div>
+      </div>
+
+      <!-- Action -->
+      <button class="btn-action" id="btn-subscribe">
+        <span>Connect Wallet & Subscribe</span>
+      </button>
+    </div>
+
+    <footer>
+      <a href="https://github.com/zeyxx/GASdf" target="_blank">GitHub</a>
+      <span>•</span>
+      <a href="https://relay.talaria.build/health" target="_blank">System Health</a>
+      <span>•</span>
+      <a href="https://www.npmjs.com/package/gasdf-sdk" target="_blank">SDK (gasdf-sdk)</a>
+    </footer>
+  </div>
+
+  <script>
+    let currentApp = 'trenchscanner';
+    let currentPlan = 'pro-monthly';
+    let currentToken = 'USDC';
+
+    const quoteAmountEl = document.getElementById('quote-amount');
+    const quoteTargetEl = document.getElementById('quote-target');
+
+    async function fetchQuote() {
+      quoteAmountEl.innerText = 'Calculating...';
+      try {
+        const res = await fetch(`/subscription/quote?token=${currentToken}&planId=${currentPlan}&appId=${currentApp}`);
+        const data = await res.json();
+        if (data.status === 'ok') {
+          quoteAmountEl.innerText = `${data.inputAmountFormatted} ${currentToken}`;
+          quoteTargetEl.innerText = `Atomic Swap & Burn ${data.targetAsdfFormatted} $ASDF`;
+        } else {
+          quoteAmountEl.innerText = 'Quote unavailable';
+        }
+      } catch (e) {
+        quoteAmountEl.innerText = 'Service online';
+      }
+    }
+
+    // App/Plan selector
+    document.querySelectorAll('[data-app]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-app]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentApp = btn.dataset.app;
+        currentPlan = btn.dataset.plan;
+        fetchQuote();
+      });
+    });
+
+    // Token selector
+    document.querySelectorAll('[data-token]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-token]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentToken = btn.dataset.token;
+        fetchQuote();
+      });
+    });
+
+    // Initial quote fetch
+    fetchQuote();
+  </script>
+</body>
+</html>
