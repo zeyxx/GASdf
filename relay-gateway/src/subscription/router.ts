@@ -20,7 +20,7 @@ import {
   decideSettlement,
 } from '../domain/subscription/decision.js';
 import { JupiterQuoteAdapter } from '../adapters/jupiter/quote-client.js';
-import { AtomicSubscriptionTxBuilder } from '../adapters/builder/atomic-tx-builder.js';
+import { AtomicSubscriptionTxBuilder, verifyAtomicSubscriptionTxIntegrity } from '../adapters/builder/atomic-tx-builder.js';
 import { signAndSend, type KoraConfig } from '../kora/client.js';
 
 export function createSubscriptionRouter(
@@ -418,6 +418,27 @@ export function createSubscriptionRouter(
 
       if (!koraConfig) {
         res.status(500).json({ error: 'Kora relay not configured on gateway' });
+        return;
+      }
+
+      // Fetch plan for session to get expected burn amount
+      const plan = planRegistry.plans.find(
+        (p: SubscriptionPlan) => p.appId === session.appId && p.planId === session.planId,
+      );
+      if (!plan) {
+        res.status(500).json({ error: 'Plan associated with session no longer exists' });
+        return;
+      }
+
+      // Verify atomic transaction integrity before co-signing/broadcasting
+      const integrity = verifyAtomicSubscriptionTxIntegrity({
+        base64WireTx: base64SignedTx,
+        expectedBuyerPubkey: session.buyerPubkey,
+        expectedFeePayer: koraSignerAddress ?? '',
+        expectedBurnAmountBaseUnits: BigInt(plan.priceAsdfBaseUnits),
+      });
+      if (!integrity.valid) {
+        res.status(400).json({ error: `Adversarial transaction rejected: ${integrity.reason}` });
         return;
       }
 
