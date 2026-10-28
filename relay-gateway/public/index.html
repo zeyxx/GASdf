@@ -122,68 +122,12 @@
     </footer>
   </div>
 
-            <!-- RESILIENT BULLETPROOF SPATIAL ENGINE (Three.js WebGL + Canvas 2D Fallback) -->
+                  <!-- AUTHENTIC IMMERSIVE THREE.JS ENGINE (FULL 3D HARDWARE-ACCELERATED COSMOS) -->
   <script type="module">
+    import { SpaceRenderer } from '/js/space-renderer.js?v=1793215381';
+
     const container = document.getElementById('space-container');
-    let threeSuccess = false;
-
-    try {
-      const { SpaceRenderer } = await import('/js/space-renderer.js?v=1793215285');
-      new SpaceRenderer(container);
-      threeSuccess = true;
-    } catch (err) {
-      console.warn('[GASdf] WebGL SpaceRenderer failed, activating Canvas2D fallback:', err);
-    }
-
-    // Bulletproof 2D Fallback: Runs if WebGL throws or fails to render
-    if (!threeSuccess) {
-      const cvs = document.createElement('canvas');
-      cvs.style.position = 'fixed';
-      cvs.style.inset = '0';
-      cvs.style.width = '100vw';
-      cvs.style.height = '100vh';
-      cvs.style.zIndex = '1';
-      cvs.style.pointerEvents = 'none';
-      container.appendChild(cvs);
-
-      const ctx = cvs.getContext('2d');
-      let w = cvs.width = window.innerWidth;
-      let h = cvs.height = window.innerHeight;
-
-      const palette = ['#9bb0ff', '#aabfff', '#f8f7ff', '#fff4e8', '#ffd2a1', '#ffbb7b', '#ffaa44'];
-      const stars = Array.from({ length: 800 }, () => ({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: Math.random() * 2.2 + 0.6,
-        color: palette[Math.floor(Math.random() * palette.length)],
-        baseAlpha: Math.random() * 0.7 + 0.3,
-        speed: Math.random() * 0.05 + 0.02,
-        phase: Math.random() * Math.PI * 2
-      }));
-
-      let t = 0;
-      function loop() {
-        ctx.fillStyle = '#050508';
-        ctx.fillRect(0, 0, w, h);
-        t += 0.02;
-
-        for (const s of stars) {
-          const a = s.baseAlpha + Math.sin(t * s.speed * 10 + s.phase) * 0.25;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fillStyle = s.color;
-          ctx.globalAlpha = Math.max(0.1, Math.min(1.0, a));
-          ctx.fill();
-        }
-        requestAnimationFrame(loop);
-      }
-      loop();
-
-      window.addEventListener('resize', () => {
-        w = cvs.width = window.innerWidth;
-        h = cvs.height = window.innerHeight;
-      });
-    }
+    new SpaceRenderer(container);
 
     // Singularity scroll reaction
     const blackHole = document.getElementById('blackHole');
