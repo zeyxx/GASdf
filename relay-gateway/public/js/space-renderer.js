@@ -633,7 +633,7 @@ export class SpaceRenderer {
         }
 
         this.updateComets();
-        this.composer.render();
+        this.renderer.render(this.scene, this.camera);
       }
 
       setupEventListeners() {
@@ -663,7 +663,5 @@ export class SpaceRenderer {
           this.renderer.setSize(w, h);
           this.composer.setSize(w, h);
         });
-      }
     }
-
-      }
+  }
