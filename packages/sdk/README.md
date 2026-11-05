@@ -106,7 +106,7 @@ Get list of supported payment tokens.
 
 ```typescript
 const tokens = await gasdf.getTokens();
-// [{ mint, symbol, name, decimals, logoURI, kScore, tier }, ...]
+// [{ mint, symbol, name, decimals, logoURI }, ...]
 ```
 
 ### `gasdf.health()`
@@ -234,7 +234,7 @@ function TokenSelect({ onChange }) {
 
 ## Supported Tokens
 
-All tokens verified by [HolDex](https://holdex-api.onrender.com) with K-score >= 50 (Bronze+) are accepted.
+All tokens in the whitelist are accepted. HolDex-listed tokens can be merged at runtime.
 
 | Tier | K-Score | Fee Multiplier | Status |
 |------|---------|----------------|--------|

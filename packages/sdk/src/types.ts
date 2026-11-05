@@ -38,7 +38,7 @@ export interface PaymentToken {
 }
 
 /**
- * Payment token info with K-score (as returned in quote)
+ * Payment token info (as returned in quote)
  */
 export interface QuotePaymentToken {
   mint: string;

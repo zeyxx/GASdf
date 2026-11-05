@@ -47,28 +47,6 @@ async function main() {
     console.log(`  Found ${tokens.length} tokens: ${tokens.map(t => t.symbol).join(', ')}`);
   });
 
-  // Test 3: Get token score (trusted token)
-  await test('Get token score (USDC - trusted)', async () => {
-    const score = await gasdf.getTokenScore(USDC_MINT);
-    if (score.tier !== 'TRUSTED') throw new Error(`Expected TRUSTED, got ${score.tier}`);
-    if (score.feeMultiplier !== 1.0) throw new Error(`Expected 1.0x, got ${score.feeMultiplier}x`);
-    console.log(`  USDC: ${score.tier} (${score.feeMultiplier}x)`);
-  });
-
-  // Test 4: Get token score ($ASDF - native)
-  await test('Get token score ($ASDF - native)', async () => {
-    const score = await gasdf.getTokenScore(ASDF_MINT);
-    if (score.tier !== 'TRUSTED') throw new Error(`Expected TRUSTED, got ${score.tier}`);
-    console.log(`  $ASDF: ${score.tier} (${score.feeMultiplier}x)`);
-  });
-
-  // Test 5: Get token score (unknown token)
-  await test('Get token score (unknown token)', async () => {
-    const randomMint = Keypair.generate().publicKey.toBase58();
-    const score = await gasdf.getTokenScore(randomMint);
-    if (score.tier !== 'STANDARD') throw new Error(`Expected STANDARD, got ${score.tier}`);
-    console.log(`  Unknown: ${score.tier} (${score.feeMultiplier}x)`);
-  });
 
   // Test 6: Get quote
   const userKeypair = Keypair.generate();
