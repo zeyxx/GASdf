@@ -1,108 +1,72 @@
-> **Status: STALE.** This document describes an economy that was never implemented.
-> The burn worker burns 100% of received ASDF directly. No golden ratio split,
-> no tiers, no yield gate. Retained for reference only.
+# GASdf service tokenomics
 
-# GASdf service tokenomics — v0
+> **Current state.** Flat fee model, no tiers, no rewards, no yield gate.
+> The burn worker burns 100% of received $ASDF directly. No golden ratio split.
+> All amounts append-only in the cost ledger.
 
-> Operator-decided. All amounts append-only in the cost ledger; no
-> printable money, no rewards, no tiers until the yield gate opens
-> (see `archive/MVP_SCOPE.md`).
+## 1. Fee model
 
-> **Burn threshold (current): $5 minimum per batch** (ROADMAP.md).
-> Historical value $0.50 (DESIGN.md, March 2026) is superseded.
+Flat fee per sponsored transaction. No negotiation, no tiers, no scores.
 
-## 1. Primitives
+- `BASE_FEE_LAMPORTS`: 50000 (init)
+- `FEE_MARKUP`: 2.0x
+- `NETWORK_FEE_LAMPORTS`: 5000
+- Priority fee: Helius estimate (fallback 1000 µCU)
 
-| Primitive | Unit | Rule |
-|-----------|------|------|
-| `quote` | token units, TTL 60s | flat price, no negotiation |
-| `payment` | token transfer user → treasury ATA | verified offchain, program later |
-| `cost` | lamports + CU + offchain compute | 1 ledger line per tx |
-| `hot_reserve` | native SOL | execution capacity, refilled first |
-| `cold_reserve` | USDC | treasury safety |
-| `burn_lot` | $ASDFASDFA bought + burned | weekly manual lot with proof |
-
-## 2. Fee formula
-
+Cost per transaction:
 ```
-priority  = helius estimate (fallback 1000 µCU)
-fee_lamports = BASE_FEE_LAMPORTS (50000) + priority_lamports
-cost_tx      = 5000 + priority_lamports (+ rent if new account)
-             + sender_tip (0 on plain RPC path; 5000 min on Helius
-               Sender SWQOS path; 1M lamports on Sender Max)
-margin       = fee_lamports − cost_tx
+cost_tx = 5000 + priority_lamports + sender_tip (if Helius Sender)
+margin  = fee_lamports - cost_tx
 ```
 
-Helius facts (docs 2026-10-16): Free plan = 1M credits, 10 req/s —
-fits current usage; Developer ($49) when needed. Sender consumes no
-credits but demands a SOL tip per tx. Priority Fee API 401 observed
-with current key/SDK — fallback applies; typical Medium ≈ 40k µCU.
+Slippage quote→swap is paid by the user. ATA rents are measured service costs.
 
-Slippage quote→swap is paid by the user; swap ops calibrated live under
-stress-tests and varied market simulations. ATA rents are measured
-service costs (devnet then mainnet calibration, data-centrism).
-Payer rotation + cold standby payer land in Phase 0. Onchain vault
-program ships when the need is proven — the service turns hybrid then.
-Mainnet bootstrap via $ASDFASDFA cult crowdfunding + operator real-world
-revenue in parallel. $ASDFASDFA: pumpfun origin, ~15% already burned via
-creator fees, not mintable.
+## 2. Burn
 
-## 3. Margin waterfall (formulas with tunable params, no hardcoded amounts)
+The burn worker runs every 60s. It:
 
-```
-usage_24h   = trailing sponsored lamports (sliding 24h window)
-HOT_TARGET  = max(HOT_FLOOR, ALPHA × usage_24h)   # recomputed daily
-```
+1. Checks $ASDF balance in treasury ATA. If > 0, burns 100% directly.
+2. Checks stablecoin balances (USDC, USDT, PYUSD). If >= $5.00, swaps to $ASDF via Jupiter, then burns.
+3. Minimum burn threshold: $5.00 (5_000_000 for 6-decimal tokens).
 
-Params (operator-tunable, never code): `HOT_FLOOR` (init 0.5 SOL),
-`ALPHA` (init 3× daily usage). Everything above `HOT_TARGET` flows on:
+No split. No treasury reserve from burns. All received $ASDF is burned.
 
-1. `hot_reserve` refill to `HOT_TARGET` (execution capacity first).
-2. `cold_reserve` USDC (no cap — safety).
-3. surplus split by phase (see §7): reserves first, then burn-share and
-   cashback-share params.
-4. `operator`: only what exceeds 1–3. Last, never first.
+Burn proof recorded per cycle: signature, amount, method, network.
 
-## 4. Token cache rule
+## 3. Accepted tokens
 
-Hold a received token only if `amount > swap_cost + rents + margin_min`.
-Else swap immediately toward hot SOL / cold USDC. Never hold memecoins
-or $ASDFASDFA as inventory — convert on receipt, burn on schedule.
+Whitelist model (Phase 0). Accepted: USDC, USDT, PYUSD, SOL, WSOL, $ASDF.
 
-## 5. Forbidden until yield gate
+HolDex-listed tokens can be merged into the whitelist (1h cache TTL).
 
-Tiers, scores, staking, revenue-sharing, auto-compounding, discounts.
-Every margin before the gate funds reserves and burn, never rewards.
+No K-score, no tiers, no conviction gating. Whitelist only.
 
-## 6. Distribution phases (moat against 24h clones: reserves + retention)
+## 4. Token
 
-- **Phase 0 — sliding SOL**: fill `HOT_TARGET` from margin only. No
-  operator top-up, no cult top-up. Service must carry its own liquidity.
-- **Phase 1 — USDC treasury**: above hot target, fill `COLD_TARGET` =
-  `RUNWAY_MONTHS` × monthly infra (Jupiter API, Helius RPC, +1 fallback
-  provider) + community audit fund for future protocol upgrades.
-  Startup norm is 12–18 months runway; defensible minimum here is 6
-  months infra + bug-bounty headroom, 12 before any redistribution risk.
-  Sweet spot found by measurement, not by vote.
-- **Phase 2 — cashback**: once sliding SOL is stable AND cold covers
-  `RUNWAY_MONTHS` + bounty headroom, each user recovers `CASHBACK_SHARE`
-  of surplus fees, claimable on-site from the economic minimum
-  (`CLAIM_MIN`, lowest viable for the service). Payout in any accepted
-  token. From here: no more direct memecoin selling — arbitrage and
-  mid/long-term holdings instead.
-- **$ASDF tilt**: cashback claimed in $ASDFASDFA earns fee-discount bonus
-  + perks (not yield: discount on future fees, never rewards on holdings).
+- Mint: `9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`
+- Symbol on-chain: `asdfasdfa` (short name: `$ASDF`)
+- Decimals: 6
+- Origin: pump.fun (not mintable)
+- ~15% already burned via creator fees
 
-Params: `RUNWAY_MONTHS` = 6 (sweet spot — Solana pace, not YC pace),
-`CASHBACK_SHARE`, `CLAIM_MIN`, `BURN_SHARE` (remainder to burn).
-All operator-tunable, all ledger-visible.
+## 5. Constants
 
-Conditional raise: only after proven self-sufficiency + formal memecoin
-ecosystem recognition, via backable.biz. Never to cover operating losses.
+| Constant | Value | Source |
+|----------|-------|--------|
+| Quote TTL | 60s | `config.QUOTE_TTL_SECONDS` |
+| Burn threshold | $5.00 | `config.BURN_THRESHOLD_LAMPORTS` (100000000 lamports) |
+| Burn interval | 60s | `burn-worker.js` |
+| Jito tip min | 0.0002 SOL | `JITO_TIP_LAMPORTS` |
+| Max tx size | 1232 bytes | `MAX_TX_SIZE` |
 
-## 7. Stage mapping
+## 6. What is NOT implemented
 
-- `usable` now: relay proven, flat fees, measured costs.
-- `viable`: margin covers infra + refills for 30 consecutive days.
-- `standard`: external users pay without knowing CYNIC exists.
-- `native`: only after yield gate + governance §6b conditions.
+- Golden ratio split (removed from code and on-chain program)
+- Tier system (DIAMOND/PLATINUM/GOLD/etc. — dead code, removed)
+- K-score token gating (removed)
+- Conviction gating (removed from ROADMAP)
+- Yield gate / margin waterfall (never implemented)
+- Cashback / revenue sharing (never implemented)
+- Staking (never implemented)
+
+These may be revisited if the need is proven. The service turns hybrid only when the need is proven.
