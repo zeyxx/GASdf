@@ -93,3 +93,74 @@ This document describes the material, observable production architecture of GASd
   - Token Name (on-chain): `asdfasdf`
   - Mainnet Fee Payer: `Bcuw4Xb9wmjDUpTsADn8ZM9Rigdhehaf5jfbJndH4rcC`.
   - Ingress: `https://gasdf.talaria.build`.
+
+---
+
+## 10. B2B2C Trust Model
+
+GASdf is B2B2C. Integrators (B2B) embed GASdf in their products. End users (B2C) never interact with GASdf directly.
+
+### Trust Layers
+
+| Layer | Who trusts whom | Mechanism |
+|---|---|---|
+| End user → Integrator | User trusts TrenchScanner's UI | SIWS auth, familiar wallet flow |
+| Integrator → GASdf | Integrator trusts GASdf's execution | On-chain verification (SPL burn, Jupiter slippage) |
+| GASdf → Solana | GASdf trusts the chain | Standard Solana programs |
+
+### What Integrators Can Verify On-Chain
+
+- SPL burn instruction (burn actually happened)
+- Jupiter swap slippage (fee within tolerance)
+- Token transfer (correct amount, correct destination)
+- Transaction signature (user signed)
+
+### What Integrators Must Trust Off-Chain
+
+- Tx assembly correctness (server builds the tx)
+- Fee calculation accuracy (server computes the fee)
+- Relayer uptime (Kora signer availability)
+- Ledger accuracy (append-only JSONL)
+
+### V2 Trust Improvements
+
+- Squads multisig for treasury (integrator can verify who controls funds)
+- On-chain fee verification program (integrator can verify fee <= maxFee)
+- Subscription PDA (integrator can verify subscription state on-chain)
+
+## 11. On-Chain vs Off-Chain Decision Matrix
+
+| Function | Layer | SOTA Practice | V2 Program? |
+|---|---|---|---|
+| Tx assembly | Off-chain | Jupiter does the same | No |
+| Gas payment | Off-chain | Kora (Solana Foundation standard) | No |
+| Price oracle | Off-chain | Jupiter API + Pyth | No |
+| Auth | Off-chain | SIWS | No |
+| Token swap | On-chain | Jupiter/Orca program | No (existing) |
+| Token burn | On-chain | SPL burn instruction | No (existing) |
+| Token transfer | On-chain | SPL transfer | No (existing) |
+| Fee calculation | Off-chain (V1) | Slippage on-chain (Jupiter pattern) | Yes (V2) |
+| Treasury management | Off-chain (V1) | Squads multisig | Yes (V2) |
+| Subscription state | Off-chain (V1) | On-chain PDA | Yes (V2) |
+| Subscription renewal | Off-chain (V1) | Keeper/cron on-chain | Yes (V2) |
+
+## 12. Webhook Contract (Proposed)
+
+**Direction**: TrenchScanner → Trading Agent (NOT GASdf)
+
+**Endpoint**: `POST /webhook/alerts`
+**Auth**: HMAC-SHA256 (shared secret in `X-GASdf-Signature` header)
+**Retry**: 3× on non-2xx with exponential backoff
+
+**Payload**:
+```json
+{
+  "token": "mint_address",
+  "alertSnapshot": { "mcap": 0, "timestamp": 0, "score": 0 },
+  "latest": { "mcap": 0, "timestamp": 0 },
+  "peak": { "mcap": 0, "timestamp": 0 },
+  "curated": { "model": "string", "verdicts": [], "confidence": 0 }
+}
+```
+
+**Response**: 2xx on success, 4xx on invalid payload, 5xx triggers retry.

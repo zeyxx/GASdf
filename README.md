@@ -1,7 +1,8 @@
 # GASdf (Gasless $ASDF Relay)
 
-> **Zero-friction subscription payments for Solana dApps.**  
-> Users pay in **USDC, USDT, or SOL** without manual swaps. The relay sponsors network fees (zero SOL required) and atomically converts & burns the fee in **$ASDF** (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`).
+> **Gasless transaction execution layer for Solana.**  
+> Users pay fees in **USDC, USDT, or SOL** with zero SOL required. The relay sponsors network fees and atomically converts & burns the fee in **$ASDF** (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`).
+> B2B2C: integrators embed GASdf, end users never connect directly.
 
 [![Public Relay](https://img.shields.io/badge/relay-gasdf.talaria.build-success)](https://gasdf.talaria.build/health)
 [![SDK Tests](https://img.shields.io/badge/sdk%20tests-70%2F70%20passing-brightgreen)](packages/sdk)
@@ -22,6 +23,16 @@ GASdf is an autonomous, sovereign relay gateway:
 - **Zero SOL required:** The relay acts as the fee-payer (via hardened Kora signer) so users can transact with an empty SOL balance.
 - **Atomic Swap & Burn:** Converts input tokens (USDC, USDT, SOL) into $ASDF via Jupiter and burns the exact fee in the **same atomic transaction**.
 - **Drop-in Frontend Integration:** Consumer backends remain untouched. The client SDK handles quoting, transaction building, and sponsored relay submission.
+
+---
+
+## What GASdf IS (and ISN'T)
+
+**IS**: Gasless transaction execution layer. B2B2C (integrators embed, end users never connect directly).
+**IS NOT**: Trading agent, token scanner, oracle, wallet, or subscription billing engine.
+
+GASdf provides execution. Trading decisions, token discovery, and scoring are separate concerns
+handled by integrators (e.g., TrenchScanner for intelligence, a trading agent for decisions).
 
 ---
 
