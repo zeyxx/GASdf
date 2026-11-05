@@ -30,6 +30,5 @@ Target: Absolute stability, zero-leak economic safety, proven profitability.
 Target: Open payment support to the wider Solana memecoin ecosystem once Phase 1 is proven viable.
 
 - [ ] **CultScreener Adapter**: Periodic ingestion of verified tokens via `https://github.com/sollama58/CultScreener` (`GET /api/tokens`).
-- [ ] **Conviction Gating**: Auto-accept tokens meeting conviction threshold and liquidity minimums.
 - [ ] **Dynamic Slippage Guard**: Real-time Jupiter route evaluation per token.
 - [ ] **Onchain Program Gate (Pinocchio)**: Move payment validation onchain when treasury revenues justify audit cost.
