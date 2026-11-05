@@ -3,7 +3,7 @@
 use pinocchio::{
     account_info::AccountInfo, entrypoint, program_error::ProgramError, pubkey::Pubkey,
 };
-use pinocchio_token::instructions::{Burn, Transfer};
+use pinocchio_token::instructions::Transfer;
 
 // Entrypoint required for Solana programs
 entrypoint!(process_instruction);
@@ -47,7 +47,7 @@ fn process_pay_fee(accounts: &[AccountInfo], data: &[u8]) -> Result<(), ProgramE
     let user_token_account = &accounts[0];
     let user_authority = &accounts[1];
     let treasury_token_account = &accounts[2];
-    let mint_account = &accounts[3];
+    let _mint_account = &accounts[3];
     let _token_program = &accounts[4];
 
     if !user_authority.is_signer() {
@@ -59,46 +59,18 @@ fn process_pay_fee(accounts: &[AccountInfo], data: &[u8]) -> Result<(), ProgramE
     let total_amount = u64::from_le_bytes(amount_bytes);
 
     // Parse token type (1 byte: 1 = ASDF, 0 = Other)
-    let is_asdf = data[8] == 1;
+    let _is_asdf = data[8] == 1;
 
-    if is_asdf {
-        // ASDF logic: split based on Golden Ratio phi (1/phi^3 = ~23.6%)
-        // 236068 / 1000000 = 23.6068%
-        let treasury_amount = (total_amount as u128 * 236068 / 1000000) as u64;
-        let burn_amount = total_amount.saturating_sub(treasury_amount);
-
-        // 1. Transfer to treasury
-        if treasury_amount > 0 {
-            Transfer {
-                from: user_token_account,
-                to: treasury_token_account,
-                authority: user_authority,
-                amount: treasury_amount,
-            }
-            .invoke()?;
-        }
-
-        // 2. Burn the rest
-        if burn_amount > 0 {
-            Burn {
-                account: user_token_account,
-                mint: mint_account,
-                authority: user_authority,
-                amount: burn_amount,
-            }
-            .invoke()?;
-        }
-    } else {
-        // Other tokens (USDC, USDT, etc.): Transfer 100% to treasury
-        // The off-chain worker will later swap and burn
-        Transfer {
-            from: user_token_account,
-            to: treasury_token_account,
-            authority: user_authority,
-            amount: total_amount,
-        }
-        .invoke()?;
+    // All tokens: transfer 100% to treasury.
+    // The off-chain burn worker handles swap + burn on schedule.
+    // No on-chain split (golden ratio removed — was never applied off-chain).
+    Transfer {
+        from: user_token_account,
+        to: treasury_token_account,
+        authority: user_authority,
+        amount: total_amount,
     }
+    .invoke()?;
 
     Ok(())
 }

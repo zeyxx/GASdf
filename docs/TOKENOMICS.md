@@ -1,3 +1,7 @@
+> **Status: STALE.** This document describes an economy that was never implemented.
+> The burn worker burns 100% of received ASDF directly. No golden ratio split,
+> no tiers, no yield gate. Retained for reference only.
+
 # GASdf service tokenomics — v0
 
 > Operator-decided. All amounts append-only in the cost ledger; no
