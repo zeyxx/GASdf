@@ -16,7 +16,7 @@ A burn lot executes:
 2. BurnChecked: destroy $ASDF (cost: CU + rent if new ATA).
 3. Optional rent recovery: close transient ATA, refund rent to fee payer (ADR-002).
 
-If the accumulated USDC is too small, the swap cost consumes the margin and the burn lot is net-negative or zero. The threshold ensures `amount > swap_cost + rents + margin_min` (TOKENOMICS.md §4).
+If the accumulated USDC is too small, the swap cost consumes the margin and the burn lot is net-negative or zero. The threshold ensures `amount > swap_cost + rents + margin_min` (archive/TOKENOMICS.md §4 — stale).
 
 ## 3. Variables that determine the real threshold
 
@@ -54,7 +54,7 @@ Do not pick a single number. Instead:
 
 ## 7. References
 
-- TOKENOMICS.md §2 (fee formula), §3 (waterfall), §4 (token cache rule)
+- archive/TOKENOMICS.md §2/§3/§4 (stale)
 - DESIGN.md §2.3 (Burn Worker, historical $0.50)
 - ROADMAP.md Phase 1 (threshold-aware batch burn, $5)
 - CALIBRATION_MATRIX.md (dimensions, metrics, method)

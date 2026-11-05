@@ -1,6 +1,6 @@
 /**
  * Economic Simulation Engine for GASdf v2.
- * Based on docs/CALIBRATION_MATRIX.md and docs/MVP_SCOPE.md.
+ * Based on docs/CALIBRATION_MATRIX.md and docs/archive/MVP_SCOPE.md.
  *
  * Models revenue vs network cost, priority fees, and buyback/burn waterfall.
  */
@@ -87,7 +87,7 @@ export function runEconomicSimulation(params: SimulationParams): SimulationResul
   const profitMarginPercent = totalRevenueUsd > 0 ? (grossProfitUsd / totalRevenueUsd) * 100 : 0;
   const isNetPositive = grossProfitUsd > 0;
 
-  // 4. Waterfall distribution (as per MVP_SCOPE.md)
+  // 4. Waterfall distribution (as per archive/MVP_SCOPE.md)
   // Step 1: Network refill (totalNetworkCostUsd) is already deducted
   // Step 2: Cold treasury reserve = 20% of net margin
   // Step 3: ASDF Buyback & Burn = 60% of net margin

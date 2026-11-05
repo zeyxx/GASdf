@@ -1,7 +1,7 @@
 /**
  * Autonomous SOL Refill Worker.
  *
- * Implements the core survival invariant from docs/TOKENOMICS.md & docs/MVP_SCOPE.md:
+ * Implements the core survival invariant from docs/archive/TOKENOMICS.md (stale) & docs/archive/MVP_SCOPE.md:
  * - Reads Kora signer SOL balance.
  * - If balance < HOT_FLOOR (0.5 SOL), service is under SAFU threshold.
  * - Evaluates treasury reserves (USDC/USDT).
