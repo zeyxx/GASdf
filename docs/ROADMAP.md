@@ -15,12 +15,12 @@ Target: Absolute stability, zero-leak economic safety, proven profitability.
 - [x] **Subscription API**: Endpoints `/subscription/plans`, `/tokens`, `/sessions`, `/quote`, `/settle`.
 - [x] **Append-Only Ledger**: Full accounting of every micro-fee and subscription settlement in `data/ledger.jsonl`.
 - [x] **Threshold-Aware Batch Burn**: Burn evaluator preventing fee dissipation (minimum $5 threshold).
-- [x] **Automated Test Suite**: 19/19 native tests passing (gasless, subscriptions, calibration).
+- [x] **Automated Test Suite**: 19/19 native tests passing (gasless, subscriptions, calibration). SDK: 70/70. Relay-gateway: 38/38. Three suites, three scopes.
 - [x] **Strict Token Basket**: Restricted strictly to high-liquidity assets:
   - SOL (native)
   - USDC (`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`)
   - USDT (`Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB`)
-  - $ASDFASDFA (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`)
+  - $ASDFASDFA (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`, symbol on-chain: `asdfasdfa`, short name: `$ASDF`)
 - [ ] **Automated SOL Refill Loop**: Auto-replenish Kora signer when balance drops below 0.5 SOL SAFU threshold.
 - [ ] **External Integration Spec for @gcrtrd**: Concrete client SDK / snippet for TrenchScanner Pay-per-scan.
 

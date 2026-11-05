@@ -4,6 +4,9 @@
 > printable money, no rewards, no tiers until the yield gate opens
 > (see `MVP_SCOPE.md`).
 
+> **Burn threshold (current): $5 minimum per batch** (ROADMAP.md).
+> Historical value $0.50 (DESIGN.md, March 2026) is superseded.
+
 ## 1. Primitives
 
 | Primitive | Unit | Rule |

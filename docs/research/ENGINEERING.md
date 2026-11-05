@@ -1,6 +1,7 @@
 # GASdf — Engineering Stack
 **v1.0 — 12/03/2026 | Comment on build**
 **Référence design : DESIGN.md**
+> **Status: HISTORICAL (March 2026).** Do not read as current state. Current truth: ARCHITECTURE.md + ROADMAP.md. Stack and pattern decisions here are superseded by ADR-001.
 
 ---
 
@@ -22,7 +23,7 @@ Ce principe génère tous les autres choix ci-dessous.
 ```
 Runtime    : Node.js 20+ LTS
 Framework  : Express.js (minimal, pas de magic)
-Solana     : @solana/web3.js v1.x (legacy — VersionedTransaction pour ALTs Phase 2)
+Solana     : @solana/kit + @solana/web3.js v2 (current — see ARCHITECTURE.md). Legacy v1.x retired.
 Tokens     : @solana/spl-token
 RPC        : helius-sdk (wrapper Helius, pas raw @solana/web3.js Connection)
 Swaps      : Jupiter v6 API (JUPITER_API_KEY requis)
@@ -256,7 +257,9 @@ Comment  : tous les checks AVANT co-signature
 
 ```
 Hexagonal / Ports & Adapters
-  → Overkill pour Phase 0. Un seul adaptateur RPC (Helius), un seul store (Redis).
+  → Rejected in March 2026 as overkill for Phase 0 (single RPC adapter, single store).
+  → Superseded by ADR-001 (2026-10-18): now accepted and implemented in relay-gateway.
+  → See ARCHITECTURE.md §2.B and ADR-001.
   → Revisiter si Phase 2 ajoute multi-RPC ou multi-store.
 
 CQRS / Event Sourcing

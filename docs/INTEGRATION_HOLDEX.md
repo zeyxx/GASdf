@@ -1,3 +1,7 @@
+> **SUPERSEDED**: This document has been merged into `docs/INTEGRATION_GUIDE.md`,
+> which is now the canonical integration reference. Retained for historical
+> context only. Do not use as the source of truth.
+
 # Guide d'Intégration GASdf pour Holdex / CultScreener
 
 Ce document décrit comment éliminer le drop-off des utilisateurs sur les fonctionnalités payantes **Cultify** (5 000 $ASDF) et **Holder Behavior** (10 000 $ASDF) grâce au SDK `@gasdf/sdk`.
@@ -41,7 +45,7 @@ Dans le modal du Burn Gate de Holdex :
 import { GasdfClient } from '@gasdf/sdk';
 
 const gasdf = new GasdfClient({
-  gatewayUrl: 'https://relay.gasdf.org', // ou IP de staging
+  gatewayUrl: 'https://gasdf.talaria.build', // ou IP de staging
 });
 
 async function unlockWithGasdf(mintAddress, selectedToken = 'USDC') {

@@ -1,6 +1,7 @@
 # GASdf — Design Document
 **v1.0 — 12/03/2026 | Spec fonctionnelle du rebuild**
 **Référence primaire : FOUNDATION.md**
+> **Status: HISTORICAL (March 2026).** Do not read as current state. Current truth: ARCHITECTURE.md + ROADMAP.md + ADR-002/003. Values marked (historical) are superseded.
 
 ---
 
@@ -119,6 +120,7 @@ TOUJOURS priority fee via ComputeBudgetProgram
 ### 2.3 Burn Worker
 
 **Ce que c'est :** Processus asynchrone qui convertit les fees collectées en $ASDF brûlés.
+> **Burn threshold (current): $5 minimum per batch** (ROADMAP.md). Historical $0.50 (below) is superseded.
 
 **Quand il tourne :** Cron toutes les 60s. Distributed lock (Redis) pour éviter les races.
 

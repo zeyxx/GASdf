@@ -18,7 +18,7 @@ This document describes the material, observable production architecture of GASd
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │          INGRESS BASTION (LXC 109 - 10.10.10.128)      │
-│   Public Domain: relay.talaria.build                   │
+│   Public Domain: gasdf.talaria.build                   │
 │   - Caddy (Reverse Proxy + TLS Termination)            │
 │   - nftables (Kernel SYN-Flood & Rate Limiting)        │
 └───────────────────────────┬────────────────────────────┘
@@ -89,6 +89,7 @@ This document describes the material, observable production architecture of GASd
 
 - **Database:** SQLite running locally on LXC 107 (`/var/lib/cynic/projects/kora/relay-gateway/data/sessions.db`).
 - **Authority SSOT:**
-  - Token Mint: `9zB5wECiLiFvBc1EGpDXFaRzThvNdThFQvd3APp6pump` ($ASDF).
+  - Token Mint: `9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump` (symbol on-chain: `asdfasdfa`, short name: `$ASDF`).
+  - Token Name (on-chain): `asdfasdf`
   - Mainnet Fee Payer: `Bcuw4Xb9wmjDUpTsADn8ZM9Rigdhehaf5jfbJndH4rcC`.
-  - Ingress: `https://relay.talaria.build`.
+  - Ingress: `https://gasdf.talaria.build`.

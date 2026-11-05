@@ -1,3 +1,7 @@
+> **SUPERSEDED**: This document has been merged into `docs/INTEGRATION_GUIDE.md`,
+> which is now the canonical integration reference. Retained for historical
+> context only. Do not use as the source of truth.
+
 # Guide d'Intégration GASdf pour TrenchScanner (1-Click Pro Subscription)
 
 Ce document décrit comment remplacer le flow complexe actuel (achat manuel d'$ASDF + confirmation séparée de burn) par le bouton **1-Click Subscription** alimenté par GASdf.
@@ -37,7 +41,7 @@ import React, { useState, useEffect } from 'react';
 import { GasdfClient, type LiveQuote, type SupportedTokenSymbol } from '@gasdf/sdk';
 
 const gasdf = new GasdfClient({
-  gatewayUrl: 'https://relay.gasdf.org', // ou IP LXC 107 en staging
+  gatewayUrl: 'https://gasdf.talaria.build', // ou IP LXC 107 en staging
 });
 
 export function GasdfSubscriptionButton({

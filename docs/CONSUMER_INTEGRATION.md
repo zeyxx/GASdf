@@ -1,8 +1,12 @@
+> **SUPERSEDED**: This document has been merged into `docs/INTEGRATION_GUIDE.md`,
+> which is now the canonical integration reference. Retained for historical
+> context only. Do not use as the source of truth.
+
 # Consumer Integration Guide — GASdf
 
 > Audience: external consumers integrating GASdf into their product.
 > Target consumers: `@gcrtrd` (TrenchScanner & CultScreener).
-> Production ingress: `https://relay.talaria.build`
+> Production ingress: `https://gasdf.talaria.build`
 
 ---
 
@@ -22,7 +26,7 @@ paying in a token they already hold (USDC, SOL, USDT, …) while GASdf:
 ```
 Consumer (TrenchScanner / CultScreener)
         │
-        │  HTTPS  (https://relay.talaria.build)
+        │  HTTPS  (https://gasdf.talaria.build)
         ▼
    GASdf relay-gateway
         │  quote (Jupiter) + session + atomic tx build
@@ -71,7 +75,7 @@ npm install github:zeyxx/GASdf#sdk
 import { GasdfClient } from 'gasdf-sdk';
 
 const client = new GasdfClient({
-  gatewayUrl: 'https://relay.talaria.build',
+  gatewayUrl: 'https://gasdf.talaria.build',
   timeoutMs: 15000,
 });
 ```
@@ -87,7 +91,7 @@ const client = new GasdfClient({
 ```ts
 import { GasdfClient } from 'gasdf-sdk';
 
-const GATEWAY = 'https://relay.talaria.build';
+const GATEWAY = 'https://gasdf.talaria.build';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 async function subscribe(walletAddress: string, signer: { signTransaction: (tx: any) => Promise<any> }) {
@@ -157,7 +161,7 @@ const receipt = await client.submitAtomicSubscription(session.sessionId, signed)
 - `planId`: `'pro-monthly'` (30 000 $ASDF) or `'cultify-12h'` (5 000 $ASDF).
 - `inputToken`: `'USDC' | 'SOL' | 'USDT'`.
 - `buyerPubkey`: the end user's Solana wallet (base58).
-- Quote TTL: 45s. Refresh the quote every ~40s to avoid expiry.
+- Quote TTL: 60s. Refresh the quote every ~50s to avoid expiry.
 - No SOL required from the end user for network fees (relay sponsors them).
 
 ### Security invariants

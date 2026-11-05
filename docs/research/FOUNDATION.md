@@ -1,5 +1,6 @@
 # GASdf — Foundation Document
 **v1.0 — 11/03/2026 | Remplace STRATEGY.md comme référence primaire**
+> **Status: HISTORICAL (March 2026).** Do not read as current state. Current truth: ARCHITECTURE.md + ROADMAP.md + ADR-002/003.
 
 ---
 
