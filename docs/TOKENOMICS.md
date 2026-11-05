@@ -1,33 +1,36 @@
 # GASdf service tokenomics
 
-> **Current state.** Flat fee model, no tiers, no rewards, no yield gate.
-> The burn worker burns 100% of received $ASDF directly. No golden ratio split.
-> All amounts append-only in the cost ledger.
+Flat fee model. No tiers, no rewards, no yield gate, no golden ratio split.
+The burn worker burns 100% of received $ASDF directly. All amounts append-only
+in the cost ledger.
 
 ## 1. Fee model
 
-Flat fee per sponsored transaction. No negotiation, no tiers, no scores.
+Hybrid fee per sponsored transaction: base + compute units + priority fee.
+No negotiation, no tiers, no scores.
 
-- `BASE_FEE_LAMPORTS`: 50000 (init)
-- `FEE_MARKUP`: 2.0x
-- `NETWORK_FEE_LAMPORTS`: 5000
-- Priority fee: Helius estimate (fallback 1000 µCU)
+```
+fee = BASE_FEE_LAMPORTS
+    + CU_PRICE_PER_KCU_LAMPORTS * ceil(min(requestedCU, CU_CAP) / 1000)
+    + priorityFeeLamports
+```
 
-Cost per transaction:
-```
-cost_tx = 5000 + priority_lamports + sender_tip (if Helius Sender)
-margin  = fee_lamports - cost_tx
-```
+- `BASE_FEE_LAMPORTS`: 50000
+- `CU_PRICE_PER_KCU_LAMPORTS`: 100 (per 1000 CU)
+- `CU_CAP`: 1400000 CU (transactions above the cap are refused)
+- Priority fee: Helius estimate (fallback 1000 µCU per CU)
+- Quote TTL: 60s (`QUOTE_TTL_SECONDS`)
 
 Slippage quote→swap is paid by the user. ATA rents are measured service costs.
 
 ## 2. Burn
 
-The burn worker runs every 60s. It:
+The burn worker runs every 60s (distributed lock, 120s TTL). It:
 
-1. Checks $ASDF balance in treasury ATA. If > 0, burns 100% directly.
-2. Checks stablecoin balances (USDC, USDT, PYUSD). If >= $5.00, swaps to $ASDF via Jupiter, then burns.
-3. Minimum burn threshold: $5.00 (5_000_000 for 6-decimal tokens).
+1. Checks $ASDF balance in the treasury ATA. If > 0, burns 100% directly.
+2. Checks stablecoin balances (USDC, USDT, PYUSD). If >= $5.00, swaps to
+   $ASDF via Jupiter, then burns.
+3. Minimum burn threshold: $5.00 (5_000_000 base units for 6-decimal tokens).
 
 No split. No treasury reserve from burns. All received $ASDF is burned.
 
@@ -54,8 +57,11 @@ No K-score, no tiers, no conviction gating. Whitelist only.
 | Constant | Value | Source |
 |----------|-------|--------|
 | Quote TTL | 60s | `config.QUOTE_TTL_SECONDS` |
-| Burn threshold | $5.00 | `config.BURN_THRESHOLD_LAMPORTS` (100000000 lamports) |
+| Burn threshold | $5.00 | `burn-worker.js` (5_000_000 base units) |
 | Burn interval | 60s | `burn-worker.js` |
+| Base fee | 50000 lamports | `config.BASE_FEE_LAMPORTS` |
+| CU price | 100 lamports / 1000 CU | `config.CU_PRICE_PER_KCU_LAMPORTS` |
+| CU cap | 1400000 CU | `config.CU_CAP` |
 | Jito tip min | 0.0002 SOL | `JITO_TIP_LAMPORTS` |
 | Max tx size | 1232 bytes | `MAX_TX_SIZE` |
 
@@ -68,5 +74,7 @@ No K-score, no tiers, no conviction gating. Whitelist only.
 - Yield gate / margin waterfall (never implemented)
 - Cashback / revenue sharing (never implemented)
 - Staking (never implemented)
+- Rewards on holdings (never implemented)
 
-These may be revisited if the need is proven. The service turns hybrid only when the need is proven.
+These may be revisited if the need is proven. The service turns hybrid only
+when the need is proven.
