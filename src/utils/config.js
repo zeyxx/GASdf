@@ -3,8 +3,6 @@ const path = require('path');
 // Load .env from project root
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-const { GOLDEN_BURN_RATIO, GOLDEN_TREASURY_RATIO } = require('../constants');
-
 // Environment Detection
 const ENV = process.env.NODE_ENV || 'development';
 const IS_DEV = ENV === 'development' || ENV === 'test';
@@ -61,10 +59,6 @@ const config = {
 
   // Treasury (defaults to fee payer in Phase 0)
   TREASURY_ADDRESS: process.env.TREASURY_ADDRESS || null,
-
-  // Fee economics (Golden Ratio split)
-  BURN_RATIO: parseFloat(process.env.BURN_RATIO) || GOLDEN_BURN_RATIO,
-  TREASURY_RATIO: parseFloat(process.env.TREASURY_RATIO) || GOLDEN_TREASURY_RATIO,
 
   NETWORK_FEE_LAMPORTS: parseInt(process.env.NETWORK_FEE_LAMPORTS) || 5000,
   FEE_MARKUP: parseFloat(process.env.FEE_MARKUP) || 2.0,

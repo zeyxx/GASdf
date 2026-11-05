@@ -3,7 +3,7 @@ const { createBurnCheckedInstruction, getAssociatedTokenAddress, getAccount } = 
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const redis = require('../utils/redis');
-const { MINTS, GOLDEN_BURN_RATIO, GOLDEN_TREASURY_RATIO } = require('../constants');
+const { MINTS } = require('../constants');
 const helius = require('./helius');
 const feePayer = require('./fee-payer');
 const jupiter = require('./jupiter');
@@ -84,8 +84,8 @@ async function runBurnCycle() {
         const account = await getAccount(connection, ata);
         const balance = Number(account.amount);
 
-        // Minimum $0.50 threshold (500000 for 6-decimal tokens)
-        if (balance < 500_000) continue;
+        // Minimum $5.00 threshold (5000000 for 6-decimal tokens)
+        if (balance < 5_000_000) continue;
 
         // Swap stablecoin -> $ASDF via Jupiter
         const quote = await jupiter.getTokenToAsdfQuote(mint, balance);

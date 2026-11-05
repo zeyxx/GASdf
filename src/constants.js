@@ -3,12 +3,6 @@
  * All magic numbers live here. Never inline.
  */
 
-// Golden Ratio economics
-const PHI = 1.618033988749;
-const PHI_CUBED = PHI * PHI * PHI;
-const GOLDEN_TREASURY_RATIO = 1 / PHI_CUBED; // ~23.6%
-const GOLDEN_BURN_RATIO = 1 - GOLDEN_TREASURY_RATIO; // ~76.4%
-
 // Token mints (mainnet)
 const MINTS = {
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
@@ -27,15 +21,6 @@ const TOKEN_INFO = {
   [MINTS.WSOL]: { symbol: 'SOL', name: 'Wrapped SOL', decimals: 9 },
 };
 
-// Holder discount tiers (ordered highest to lowest)
-const TIERS = [
-  { name: 'DIAMOND', minSharePercent: 1, discountPercent: 95 },
-  { name: 'PLATINUM', minSharePercent: 0.1, discountPercent: 67 },
-  { name: 'GOLD', minSharePercent: 0.01, discountPercent: 33 },
-  { name: 'SILVER', minSharePercent: 0.001, discountPercent: 0 },
-  { name: 'BRONZE', minSharePercent: 0, discountPercent: 0 },
-];
-
 // Jito tip minimum (0.0002 SOL in lamports)
 const JITO_TIP_LAMPORTS = 200_000;
 
@@ -46,13 +31,8 @@ const MAX_TX_SIZE = 1232;
 const EXPLORER_BASE = 'https://orbmarkets.io';
 
 module.exports = {
-  PHI,
-  PHI_CUBED,
-  GOLDEN_TREASURY_RATIO,
-  GOLDEN_BURN_RATIO,
   MINTS,
   TOKEN_INFO,
-  TIERS,
   JITO_TIP_LAMPORTS,
   MAX_TX_SIZE,
   EXPLORER_BASE,
