@@ -108,7 +108,35 @@ Gateway (HTTP entry point)
 - CultScreener adapter (dynamic token basket)
 - Dynamic slippage guard
 
-## 6. Webhook Contract (Proposed)
+## 6. Recurring Subscription (V2 Gamechanger)
+
+### Problem
+V1 subscriptions are session-based: one-time payment per session. Each renewal requires a new user signature. This creates friction for recurring billing.
+
+### Solution: Token Delegation
+User does a 1-time SPL token delegation upfront. Renewals happen automatically via keeper/cron. No monthly pop-ups.
+
+### Mechanism
+1. User approves GASdf to spend up to `maxAmount` of $ASDF per `period` (SPL Approve, revocable anytime)
+2. Subscription PDA stores state on-chain: subscriber, plan, amount, period, nextRenewal, status
+3. Keeper checks active PDAs, triggers renewal if `now >= nextRenewal`
+4. Renewal: transfer $ASDF (delegated) → burn 100% → update PDA
+5. Revocation: user calls SPL Revoke → PDA status → revoked
+
+### V1 vs V2
+
+| Aspect | V1 (Current) | V2 (Recurring) |
+|---|---|---|
+| Payment | One-time per session | Recurring via delegation |
+| User signature | Every renewal | Once (delegation) |
+| State | Off-chain (SQLite) | On-chain (PDA) |
+| Renewal trigger | User-initiated | Keeper/cron |
+| Revocation | N/A | User calls Revoke |
+
+### Related
+- ADR-004: Recurring Subscription via Token Delegation
+
+## 7. Webhook Contract (Proposed)
 
 **Direction**: TrenchScanner → Trading Agent (not GASdf)
 
@@ -128,7 +156,7 @@ Gateway (HTTP entry point)
 **Retry**: 3× on non-2xx
 **Same for**: filter matches (if cheap)
 
-## 7. Token Basket (V1)
+## 8. Token Basket (V1)
 
 Restricted to high-liquidity assets:
 - SOL (native)
@@ -136,7 +164,7 @@ Restricted to high-liquidity assets:
 - USDT (`Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB`)
 - $ASDF (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`)
 
-## 8. Economic Model
+## 9. Economic Model
 
 - Flat fee: 50000 lamports base, 2.0x markup, 5000 lamports network fee
 - 100% direct burn (no treasury split, no golden ratio)
@@ -145,13 +173,14 @@ Restricted to high-liquidity assets:
 - Quote TTL: 60s
 - Ingress: gasdf.talaria.build
 
-## 9. Open Questions
+## 10. Open Questions
 
 1. Does V1 need on-chain program for B2B trust, or is server-assembled sufficient?
 2. What is the exact webhook format? (GCR to validate)
 3. Should the trading agent reuse GCR's heuristics or build its own?
 4. How to formalize the subscription recurring billing (token delegation)?
 5. What is the SLA/uptime requirement for B2B integrators?
+6. How to implement token delegation securely (maxAmount, period, revocation)?
 
 ---
 
