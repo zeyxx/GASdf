@@ -230,15 +230,6 @@ var GASdf = class {
     return response.tokens;
   }
   /**
-   * Get K-score for a token
-   *
-   * @param mint - Token mint address
-   */
-  async getTokenScore(mint) {
-    const mintStr = this.toBase58(mint);
-    return this.fetch(`/tokens/${mintStr}/score`);
-  }
-  /**
    * Get API health status
    */
   async health() {
@@ -444,22 +435,6 @@ function useTokens() {
   }, [refresh]);
   return { tokens, isLoading, error, refresh };
 }
-function useTokenScore(mint) {
-  const { client } = useGASdf();
-  const [score, setScore] = react.useState(null);
-  const [isLoading, setIsLoading] = react.useState(false);
-  const [error, setError] = react.useState(null);
-  react.useEffect(() => {
-    if (!mint) {
-      setScore(null);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    client.getTokenScore(mint).then(setScore).catch((err) => setError(err instanceof Error ? err : new Error(String(err)))).finally(() => setIsLoading(false));
-  }, [client, mint]);
-  return { score, isLoading, error };
-}
 function useQuote(options) {
   const { client } = useGASdf();
   const { publicKey } = walletAdapterReact.useWallet();
@@ -548,5 +523,4 @@ exports.ValidationError = ValidationError;
 exports.useGASdf = useGASdf;
 exports.useGaslessTransaction = useGaslessTransaction;
 exports.useQuote = useQuote;
-exports.useTokenScore = useTokenScore;
 exports.useTokens = useTokens;

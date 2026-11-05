@@ -228,15 +228,6 @@ var GASdf = class {
     return response.tokens;
   }
   /**
-   * Get K-score for a token
-   *
-   * @param mint - Token mint address
-   */
-  async getTokenScore(mint) {
-    const mintStr = this.toBase58(mint);
-    return this.fetch(`/tokens/${mintStr}/score`);
-  }
-  /**
    * Get API health status
    */
   async health() {
@@ -442,22 +433,6 @@ function useTokens() {
   }, [refresh]);
   return { tokens, isLoading, error, refresh };
 }
-function useTokenScore(mint) {
-  const { client } = useGASdf();
-  const [score, setScore] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  useEffect(() => {
-    if (!mint) {
-      setScore(null);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    client.getTokenScore(mint).then(setScore).catch((err) => setError(err instanceof Error ? err : new Error(String(err)))).finally(() => setIsLoading(false));
-  }, [client, mint]);
-  return { score, isLoading, error };
-}
 function useQuote(options) {
   const { client } = useGASdf();
   const { publicKey } = useWallet();
@@ -539,4 +514,4 @@ function useQuote(options) {
   };
 }
 
-export { GASdfError, GASdfProvider, QuoteExpiredError, ValidationError, useGASdf, useGaslessTransaction, useQuote, useTokenScore, useTokens };
+export { GASdfError, GASdfProvider, QuoteExpiredError, ValidationError, useGASdf, useGaslessTransaction, useQuote, useTokens };

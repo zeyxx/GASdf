@@ -48,7 +48,6 @@ describe('useQuote', () => {
       decimals: 6,
       accepted: 'trusted',
       tier: 'TRUSTED',
-      kScore: 100,
     },
     holderTier: {
       tier: 'BRONZE',

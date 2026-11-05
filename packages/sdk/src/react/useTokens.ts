@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useGASdf } from './context';
-import type { PaymentToken, TokenScore } from '../types';
+import type { PaymentToken } from '../types';
 
 export interface UseTokensReturn {
   /** List of supported payment tokens */
@@ -64,55 +64,3 @@ export function useTokens(): UseTokensReturn {
   return { tokens, isLoading, error, refresh };
 }
 
-export interface UseTokenScoreReturn {
-  /** Token score info */
-  score: TokenScore | null;
-  /** Whether score is loading */
-  isLoading: boolean;
-  /** Error if fetch failed */
-  error: Error | null;
-}
-
-/**
- * Hook to get K-score for a specific token
- *
- * @example
- * ```tsx
- * function TokenInfo({ mint }) {
- *   const { score, isLoading } = useTokenScore(mint);
- *
- *   if (isLoading) return <Spinner />;
- *   if (!score) return null;
- *
- *   return (
- *     <div>
- *       Tier: {score.tier} ({score.feeMultiplier}x fee)
- *     </div>
- *   );
- * }
- * ```
- */
-export function useTokenScore(mint: string | null): UseTokenScoreReturn {
-  const { client } = useGASdf();
-  const [score, setScore] = useState<TokenScore | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    if (!mint) {
-      setScore(null);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    client
-      .getTokenScore(mint)
-      .then(setScore)
-      .catch((err) => setError(err instanceof Error ? err : new Error(String(err))))
-      .finally(() => setIsLoading(false));
-  }, [client, mint]);
-
-  return { score, isLoading, error };
-}

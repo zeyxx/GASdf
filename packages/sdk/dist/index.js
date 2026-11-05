@@ -1,6 +1,7 @@
 'use strict';
 
 var web3_js = require('@solana/web3.js');
+var splToken = require('@solana/spl-token');
 
 // src/client.ts
 
@@ -234,15 +235,6 @@ var GASdf = class {
     return response.tokens;
   }
   /**
-   * Get K-score for a token
-   *
-   * @param mint - Token mint address
-   */
-  async getTokenScore(mint) {
-    const mintStr = this.toBase58(mint);
-    return this.fetch(`/tokens/${mintStr}/score`);
-  }
-  /**
    * Get API health status
    */
   async health() {
@@ -332,13 +324,6 @@ var GASdf = class {
     );
   }
 };
-var TOKEN_PROGRAM_ID = new web3_js.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-new web3_js.PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
-new web3_js.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-new web3_js.PublicKey("So11111111111111111111111111111111111111112");
-new web3_js.PublicKey("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP");
-
-// src/instructions.ts
 var GASDF_PROGRAM_ID = new web3_js.PublicKey("GASdf11111111111111111111111111111111111111");
 function createRelayWithVaultInstruction(params, programId = GASDF_PROGRAM_ID) {
   const keys = [
@@ -347,7 +332,7 @@ function createRelayWithVaultInstruction(params, programId = GASDF_PROGRAM_ID) {
     { pubkey: params.vaultTokenAccount, isSigner: false, isWritable: true },
     { pubkey: params.vaultSolAccount, isSigner: false, isWritable: true },
     { pubkey: params.operatorSolAccount, isSigner: true, isWritable: true },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: splToken.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     { pubkey: web3_js.SystemProgram.programId, isSigner: false, isWritable: false }
   ];
   const data = Buffer.alloc(1 + 8 + 8 + 1);
@@ -362,9 +347,128 @@ function createRelayWithVaultInstruction(params, programId = GASDF_PROGRAM_ID) {
   });
 }
 
+// src/subscription/client.ts
+function base64ToUint8Array(base64) {
+  if (typeof Buffer !== "undefined") {
+    return Uint8Array.from(Buffer.from(base64, "base64"));
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+function uint8ArrayToBase64(bytes) {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+var GasdfClient = class {
+  constructor(opts) {
+    this.gatewayUrl = opts.gatewayUrl.replace(/\/+$/, "");
+    this.timeoutMs = opts.timeoutMs ?? 1e4;
+  }
+  async fetchJson(path, options) {
+    const url = `${this.gatewayUrl}${path}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers ?? {}
+        }
+      });
+      if (!res.ok) {
+        let errorMsg = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error) errorMsg = body.error;
+        } catch {
+          errorMsg = await res.text();
+        }
+        throw new Error(`GASdf API error (${res.status}): ${errorMsg}`);
+      }
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  /**
+   * Fetches a live dynamic quote with TTL for a subscription plan.
+   */
+  async getLiveQuote(token = "USDC", planId = "pro-monthly", appId = "trenchscanner") {
+    return this.fetchJson(
+      `/subscription/quote/live?token=${encodeURIComponent(token)}&planId=${encodeURIComponent(planId)}&appId=${encodeURIComponent(appId)}`
+    );
+  }
+  /**
+   * Starts a subscription session.
+   */
+  async createSession(appId, planId, buyerPubkey) {
+    return this.fetchJson("/subscription/sessions", {
+      method: "POST",
+      body: JSON.stringify({ appId, planId, buyerPubkey })
+    });
+  }
+  /**
+   * Prepares the atomic VersionedTransaction (Base64) ready for user signature.
+   */
+  async prepareAtomicSubscription(sessionId, inputToken) {
+    return this.fetchJson(`/subscription/sessions/${encodeURIComponent(sessionId)}/prepare-tx`, {
+      method: "POST",
+      body: JSON.stringify({ inputTokenMint: inputToken })
+    });
+  }
+  /**
+   * Submits the user-signed transaction to GASdf (Kora co-signs and broadcasts).
+   */
+  async submitAtomicSubscription(sessionId, base64SignedTx) {
+    return this.fetchJson(`/subscription/sessions/${encodeURIComponent(sessionId)}/submit-tx`, {
+      method: "POST",
+      body: JSON.stringify({ base64SignedTx })
+    });
+  }
+  /**
+   * Convenience 1-Click Pipeline:
+   * 1. Creates session
+   * 2. Prepares atomic transaction
+   * 3. Prompts user wallet to sign
+   * 4. Relays co-signed transaction to Solana via Kora
+   */
+  async executeOneClickSubscription(params) {
+    params.onStage?.("preparing");
+    const session = await this.createSession(params.appId, params.planId, params.buyerPubkey);
+    const prepared = await this.prepareAtomicSubscription(session.sessionId, params.inputToken);
+    params.onStage?.("signing");
+    const wireBytes = base64ToUint8Array(prepared.base64WireTx);
+    const signResult = await params.signer.signTransaction({
+      account: { address: params.buyerPubkey },
+      transaction: wireBytes,
+      chain: "solana:mainnet"
+    });
+    const signedItem = Array.isArray(signResult) ? signResult[0] : signResult;
+    if (!signedItem?.signedTransaction) {
+      throw new Error("Wallet did not return a signed transaction");
+    }
+    const signedWireBase64 = uint8ArrayToBase64(signedItem.signedTransaction);
+    params.onStage?.("relaying");
+    return this.submitAtomicSubscription(session.sessionId, signedWireBase64);
+  }
+};
+
 exports.GASDF_PROGRAM_ID = GASDF_PROGRAM_ID;
 exports.GASdf = GASdf;
 exports.GASdfError = GASdfError;
+exports.GasdfClient = GasdfClient;
 exports.NetworkError = NetworkError;
 exports.QuoteExpiredError = QuoteExpiredError;
 exports.QuoteNotFoundError = QuoteNotFoundError;

@@ -53,7 +53,6 @@ describe('GASdf Client', () => {
       feeAmount: '1000000',
       feeFormatted: '1.00 USDC',
       paymentToken: { mint: 'USDC', symbol: 'USDC', decimals: 6 },
-      kScore: { score: 100, tier: 'TRUSTED', feeMultiplier: 1.0 },
       expiresAt: Date.now() + 60000,
       ttl: 60,
     };
@@ -291,41 +290,6 @@ describe('GASdf Client', () => {
     });
   });
 
-  describe('getTokenScore', () => {
-    it('should return token score', async () => {
-      const mockScore = {
-        mint: 'USDC',
-        score: 100,
-        tier: 'TRUSTED',
-        feeMultiplier: 1.0,
-      };
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockScore),
-      });
-
-      const score = await client.getTokenScore('USDC');
-
-      expect(score.tier).toBe('TRUSTED');
-      expect(score.feeMultiplier).toBe(1.0);
-    });
-
-    it('should accept PublicKey', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ mint: 'test', score: 50 }),
-      });
-
-      const mint = Keypair.generate().publicKey;
-      await client.getTokenScore(mint);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining(mint.toBase58()),
-        expect.any(Object),
-      );
-    });
-  });
 
   describe('health', () => {
     it('should return health status', async () => {

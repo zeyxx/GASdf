@@ -66,7 +66,7 @@ This document describes the material, observable production architecture of GASd
 
 ### B. Relay Gateway (`relay-gateway/`)
 - Pure hexagonal architecture (`ADR-001`).
-- **Core Domain:** Pure functions without I/O (`src/domain/quote`, `src/domain/subscription`, `src/domain/priority`).
+- **Core Domain:** Pure functions without I/O (`relay-gateway/src/domain/quote`, `relay-gateway/src/domain/subscription`, `relay-gateway/src/domain/priority`).
 - **Adapters:** SQLite for persistence (`sqlite-session-store.ts`), Jupiter client for route quotes (`quote-client.ts`), and Atomic Tx Builder (`atomic-tx-builder.ts`).
 - **Security Gates:**
   - `verifyAtomicSubscriptionTxIntegrity`: Decompiles submitted wire transactions to ensure the Kora fee-payer is retained, the buyer authority matches, and the exact SPL BurnChecked amount for $ASDF is present.

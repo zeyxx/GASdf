@@ -35,47 +35,14 @@ interface PaymentToken {
     logoURI?: string;
 }
 /**
- * K-score tier affecting fee multiplier
- */
-type KScoreTier = 'TRUSTED' | 'STANDARD' | 'RISKY' | 'UNKNOWN';
-/**
- * Token K-score information
- */
-interface TokenScore {
-    mint: string;
-    score: number;
-    tier: KScoreTier;
-    feeMultiplier: number;
-}
-/**
- * Dual-burn flywheel info (for ecosystem tokens)
- */
-interface DualBurnInfo {
-    burnedPercent: number;
-    ecosystemBurnPct: number;
-    asdfBurnPct: number;
-    treasuryPct: number;
-    explanation: string;
-}
-/**
  * Payment token info with K-score (as returned in quote)
  */
 interface QuotePaymentToken {
     mint: string;
     symbol: string;
     decimals: number;
-    /** How token was accepted: 'trusted', 'holdex_verified', etc. */
+    /** How token was accepted: 'whitelisted', 'holdex_verified', etc. */
     accepted: string;
-    /** K-score tier */
-    tier: KScoreTier;
-    /** K-score value */
-    kScore: number;
-    /** K-score rank */
-    kRank?: string;
-    /** Credit rating */
-    creditRating?: string;
-    /** Dual-burn info (if ecosystem token) */
-    dualBurn?: DualBurnInfo;
 }
 /**
  * Treasury info for fee payment
@@ -85,29 +52,6 @@ interface TreasuryInfo {
     address: string;
     /** Token account for non-SOL payments (null for SOL) */
     ata: string | null;
-}
-/**
- * Holder tier discount info
- */
-interface HolderTierInfo {
-    /** Tier name: BRONZE, SILVER, GOLD, DIAMOND */
-    tier: string;
-    /** Tier emoji */
-    emoji: string;
-    /** Applied discount percentage */
-    discountPercent: number;
-    /** Maximum possible discount */
-    maxDiscountPercent: number;
-    /** Actual savings in lamports */
-    savings: number;
-    /** User's $ASDF balance */
-    asdfBalance: number;
-    /** Next tier to unlock (null if max) */
-    nextTier: string | null;
-    /** Break-even fee threshold */
-    breakEvenFee: number;
-    /** Whether fee is at break-even minimum */
-    isAtBreakEven: boolean;
 }
 /**
  * Quote request parameters
@@ -134,10 +78,8 @@ interface Quote {
     feeAmount: string;
     /** Fee amount formatted with decimals (e.g., "0.01 USDC") */
     feeFormatted: string;
-    /** Payment token info with K-score */
+    /** Payment token info */
     paymentToken: QuotePaymentToken;
-    /** Holder tier discount info */
-    holderTier: HolderTierInfo;
     /** Quote expiry timestamp (unix ms) */
     expiresAt: number;
     /** Time-to-live in seconds */
@@ -269,12 +211,6 @@ declare class GASdf {
      */
     getTokens(): Promise<PaymentToken[]>;
     /**
-     * Get K-score for a token
-     *
-     * @param mint - Token mint address
-     */
-    getTokenScore(mint: string | PublicKey): Promise<TokenScore>;
-    /**
      * Get API health status
      */
     health(): Promise<HealthStatus>;
@@ -344,4 +280,4 @@ declare class NetworkError extends GASdfError {
     constructor(message: string);
 }
 
-export { type BurnStats as B, type DualBurnInfo as D, GASdf as G, type HolderTierInfo as H, type KScoreTier as K, NetworkError as N, type PaymentToken as P, type Quote as Q, type RetryConfig as R, type SubmitRequest as S, type TokenScore as T, ValidationError as V, type GASdfConfig as a, type QuoteRequest as b, type SubmitResult as c, type QuotePaymentToken as d, type TreasuryInfo as e, type HealthStatus as f, type SupportedTransaction as g, GASdfError as h, QuoteExpiredError as i, QuoteNotFoundError as j, TransactionError as k, RateLimitError as l };
+export { type BurnStats as B, GASdf as G, type HealthStatus as H, NetworkError as N, type PaymentToken as P, type Quote as Q, type RetryConfig as R, type SubmitRequest as S, type TreasuryInfo as T, ValidationError as V, type GASdfConfig as a, type QuoteRequest as b, type SubmitResult as c, type QuotePaymentToken as d, type SupportedTransaction as e, GASdfError as f, QuoteExpiredError as g, QuoteNotFoundError as h, TransactionError as i, RateLimitError as j };

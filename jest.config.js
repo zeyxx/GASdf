@@ -1,9 +1,9 @@
 module.exports = {
   testEnvironment: 'node',
-  collectCoverageFrom: ['src/**/*.js', 'sdk/**/*.js', '!src/index.js'],
+  collectCoverageFrom: ['relay-gateway/src/**/*.ts'],
   coveragePathIgnorePatterns: ['/node_modules/'],
-  testMatch: ['**/tests/**/*.test.js'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  testMatch: ['relay-gateway/src/**/*.test.ts'],
+  
   testTimeout: 15000,
   verbose: true,
   forceExit: true,

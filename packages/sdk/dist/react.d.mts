@@ -1,7 +1,7 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import { ReactNode } from 'react';
-import { G as GASdf, a as GASdfConfig, c as SubmitResult, Q as Quote, P as PaymentToken, T as TokenScore } from './errors-CEsZX8T7.mjs';
-export { h as GASdfError, i as QuoteExpiredError, V as ValidationError } from './errors-CEsZX8T7.mjs';
+import { G as GASdf, a as GASdfConfig, c as SubmitResult, Q as Quote, P as PaymentToken } from './errors-1Aerj1Bl.mjs';
+export { f as GASdfError, g as QuoteExpiredError, V as ValidationError } from './errors-1Aerj1Bl.mjs';
 import { PublicKey, Transaction } from '@solana/web3.js';
 
 interface GASdfContextValue {
@@ -133,34 +133,6 @@ interface UseTokensReturn {
  * ```
  */
 declare function useTokens(): UseTokensReturn;
-interface UseTokenScoreReturn {
-    /** Token score info */
-    score: TokenScore | null;
-    /** Whether score is loading */
-    isLoading: boolean;
-    /** Error if fetch failed */
-    error: Error | null;
-}
-/**
- * Hook to get K-score for a specific token
- *
- * @example
- * ```tsx
- * function TokenInfo({ mint }) {
- *   const { score, isLoading } = useTokenScore(mint);
- *
- *   if (isLoading) return <Spinner />;
- *   if (!score) return null;
- *
- *   return (
- *     <div>
- *       Tier: {score.tier} ({score.feeMultiplier}x fee)
- *     </div>
- *   );
- * }
- * ```
- */
-declare function useTokenScore(mint: string | null): UseTokenScoreReturn;
 
 interface UseQuoteOptions {
     /** Token mint to pay fees with */
@@ -205,4 +177,4 @@ interface UseQuoteReturn {
  */
 declare function useQuote(options: UseQuoteOptions): UseQuoteReturn;
 
-export { GASdfConfig, GASdfProvider, type GASdfProviderProps, PaymentToken, Quote, SubmitResult, TokenScore, type TransactionStatus, type UseGaslessTransactionOptions, type UseGaslessTransactionReturn, type UseQuoteOptions, type UseQuoteReturn, type UseTokenScoreReturn, type UseTokensReturn, useGASdf, useGaslessTransaction, useQuote, useTokenScore, useTokens };
+export { GASdfConfig, GASdfProvider, type GASdfProviderProps, PaymentToken, Quote, SubmitResult, type TransactionStatus, type UseGaslessTransactionOptions, type UseGaslessTransactionReturn, type UseQuoteOptions, type UseQuoteReturn, type UseTokensReturn, useGASdf, useGaslessTransaction, useQuote, useTokens };

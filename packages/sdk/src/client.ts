@@ -9,7 +9,6 @@ import type {
   QuoteRequest,
   SubmitResult,
   PaymentToken,
-  TokenScore,
   HealthStatus,
   BurnStats,
   SupportedTransaction,
@@ -163,16 +162,6 @@ export class GASdf {
   async getTokens(): Promise<PaymentToken[]> {
     const response = await this.fetch('/tokens');
     return (response as { tokens: PaymentToken[] }).tokens;
-  }
-
-  /**
-   * Get K-score for a token
-   *
-   * @param mint - Token mint address
-   */
-  async getTokenScore(mint: string | PublicKey): Promise<TokenScore> {
-    const mintStr = this.toBase58(mint);
-    return this.fetch(`/tokens/${mintStr}/score`) as Promise<TokenScore>;
   }
 
   /**

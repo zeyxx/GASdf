@@ -38,50 +38,14 @@ export interface PaymentToken {
 }
 
 /**
- * K-score tier affecting fee multiplier
- */
-export type KScoreTier = 'TRUSTED' | 'STANDARD' | 'RISKY' | 'UNKNOWN';
-
-/**
- * Token K-score information
- */
-export interface TokenScore {
-  mint: string;
-  score: number;
-  tier: KScoreTier;
-  feeMultiplier: number;
-}
-
-/**
- * Dual-burn flywheel info (for ecosystem tokens)
- */
-export interface DualBurnInfo {
-  burnedPercent: number;
-  ecosystemBurnPct: number;
-  asdfBurnPct: number;
-  treasuryPct: number;
-  explanation: string;
-}
-
-/**
  * Payment token info with K-score (as returned in quote)
  */
 export interface QuotePaymentToken {
   mint: string;
   symbol: string;
   decimals: number;
-  /** How token was accepted: 'trusted', 'holdex_verified', etc. */
+  /** How token was accepted: 'whitelisted', 'holdex_verified', etc. */
   accepted: string;
-  /** K-score tier */
-  tier: KScoreTier;
-  /** K-score value */
-  kScore: number;
-  /** K-score rank */
-  kRank?: string;
-  /** Credit rating */
-  creditRating?: string;
-  /** Dual-burn info (if ecosystem token) */
-  dualBurn?: DualBurnInfo;
 }
 
 /**
@@ -92,30 +56,6 @@ export interface TreasuryInfo {
   address: string;
   /** Token account for non-SOL payments (null for SOL) */
   ata: string | null;
-}
-
-/**
- * Holder tier discount info
- */
-export interface HolderTierInfo {
-  /** Tier name: BRONZE, SILVER, GOLD, DIAMOND */
-  tier: string;
-  /** Tier emoji */
-  emoji: string;
-  /** Applied discount percentage */
-  discountPercent: number;
-  /** Maximum possible discount */
-  maxDiscountPercent: number;
-  /** Actual savings in lamports */
-  savings: number;
-  /** User's $ASDF balance */
-  asdfBalance: number;
-  /** Next tier to unlock (null if max) */
-  nextTier: string | null;
-  /** Break-even fee threshold */
-  breakEvenFee: number;
-  /** Whether fee is at break-even minimum */
-  isAtBreakEven: boolean;
 }
 
 /**
@@ -144,10 +84,8 @@ export interface Quote {
   feeAmount: string;
   /** Fee amount formatted with decimals (e.g., "0.01 USDC") */
   feeFormatted: string;
-  /** Payment token info with K-score */
+  /** Payment token info */
   paymentToken: QuotePaymentToken;
-  /** Holder tier discount info */
-  holderTier: HolderTierInfo;
   /** Quote expiry timestamp (unix ms) */
   expiresAt: number;
   /** Time-to-live in seconds */

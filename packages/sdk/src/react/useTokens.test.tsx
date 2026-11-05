@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { GASdfProvider } from './context';
-import { useTokens, useTokenScore } from './useTokens';
+import { useTokens } from './useTokens';
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -87,52 +87,3 @@ describe('useTokens', () => {
   });
 });
 
-describe('useTokenScore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should fetch score when mint provided', async () => {
-    const mockScore = {
-      mint: 'USDC',
-      score: 100,
-      tier: 'TRUSTED',
-      feeMultiplier: 1.0,
-    };
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockScore),
-    });
-
-    const { result } = renderHook(() => useTokenScore('USDC'), { wrapper });
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    expect(result.current.score).toEqual(mockScore);
-    expect(result.current.error).toBeNull();
-  });
-
-  it('should not fetch when mint is null', () => {
-    const { result } = renderHook(() => useTokenScore(null), { wrapper });
-
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.score).toBeNull();
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('should handle fetch error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Token not found'));
-
-    const { result } = renderHook(() => useTokenScore('UNKNOWN'), { wrapper });
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    expect(result.current.score).toBeNull();
-    expect(result.current.error?.message).toBe('Token not found');
-  });
-});

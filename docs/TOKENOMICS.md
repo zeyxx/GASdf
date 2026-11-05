@@ -57,8 +57,8 @@ No K-score, no tiers, no conviction gating. Whitelist only.
 | Constant | Value | Source |
 |----------|-------|--------|
 | Quote TTL | 60s | `config.QUOTE_TTL_SECONDS` |
-| Burn threshold | $5.00 | `burn-worker.js` (5_000_000 base units) |
-| Burn interval | 60s | `burn-worker.js` |
+| Burn threshold | $5.00 | `relay-gateway/src/burn/batch-burn.ts` (5_000_000 base units) |
+| Burn interval | 60s | `relay-gateway/src/burn/batch-burn.ts` |
 | Base fee | 50000 lamports | `config.BASE_FEE_LAMPORTS` |
 | CU price | 100 lamports / 1000 CU | `config.CU_PRICE_PER_KCU_LAMPORTS` |
 | CU cap | 1400000 CU | `config.CU_CAP` |

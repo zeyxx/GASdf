@@ -28,9 +28,7 @@ export {
 } from './useGaslessTransaction';
 export {
   useTokens,
-  useTokenScore,
   type UseTokensReturn,
-  type UseTokenScoreReturn,
 } from './useTokens';
 export {
   useQuote,
@@ -42,7 +40,6 @@ export {
 export type {
   Quote,
   PaymentToken,
-  TokenScore,
   SubmitResult,
   GASdfConfig,
 } from '../types';

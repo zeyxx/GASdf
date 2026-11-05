@@ -14,7 +14,7 @@ Les services actuels mélangent logique métier et I/O :
 - `jupiter.js` mélange pricing, swap execution, cache Redis
 - `validator.js` valide des tx mais dépend de `connection`
 - `token-gate.js` est pur (whitelist) mais couplé à `constants.js`
-- `burn-worker.js` mélange accumulation, swap Jupiter, burn on-chain, ledger
+- `relay-gateway/src/burn/batch-burn.ts` mélange accumulation, swap Jupiter, burn on-chain, ledger
 
 Conséquence : impossible de tester la logique métier sans mocker l'infra, impossible d'auditer le domaine isolément, impossible de réutiliser le domaine dans un autre runtime (ex. Kora sidecar en Rust).
 
@@ -62,7 +62,7 @@ src/
 | Fee calculation | `services/fee-schedule.js` | `PriceOracle` (pour conversion SOL→token) | P0 |
 | Token gate | `services/token-gate.js` | aucun (pur) | P0 |
 | Tx validation | `services/validator.js` | `RpcProvider` (pour sim) | P1 |
-| Burn economics | `services/burn-worker.js` (partie calcul) | `PriceOracle`, `Ledger` | P1 |
+| Burn economics | `relay-gateway/src/burn/batch-burn.ts` | `PriceOracle`, `Ledger` | P1 |
 | Quote lifecycle | `routes/quote.js` + `utils/redis.js` | `QuoteStore` | P2 |
 
 ## 5. Migration plan (incrémentale, pas de big-bang)
