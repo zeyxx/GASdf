@@ -2,7 +2,7 @@
 
 **Status:** draft v0.1 — operator-decided, 2026-10-18
 **Scope:** all joint touchpoints between GASdf (gasless relay, operator-owned) and the projects maintained by @gcrtrd (TrenchScanner, XSCanner, TokenSage, CultScreener, and successors).
-**Companion docs:** `gasdf-DECISIONS.md` (decisions log).
+**Companion docs:** `gasdf-DECISIONS.md` (decisions log), `TOKENOMICS.md` (current — flat fee model).
 
 ---
 
