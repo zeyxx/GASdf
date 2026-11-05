@@ -1,4 +1,4 @@
-import * as THREE from '/js/three.module.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { EffectComposer } from '/js/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from '/js/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '/js/addons/postprocessing/UnrealBloomPass.js';
