@@ -2,15 +2,12 @@
   "name": "gasdf",
   "version": "2.0.0",
   "description": "Gasless transactions for Solana. Pay fees with USDC, USDT, PYUSD, or $ASDF. All fees burn $ASDF forever.",
-  "main": "src/index.js",
+  "main": "relay-gateway/dist/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "cross-env NODE_ENV=development node --watch src/index.js",
-    "test": "cross-env NODE_ENV=test jest",
-    "test:watch": "cross-env NODE_ENV=test jest --watch",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/"
+    "build": "cd relay-gateway && npm run build",
+    "start": "cd relay-gateway && npm start",
+    "test": "cd relay-gateway && npm test",
+    "dev": "cd relay-gateway && npm run build && node dist/index.js"
   },
   "keywords": [
     "solana",
