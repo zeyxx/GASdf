@@ -5,7 +5,7 @@
 export type SupportedTokenSymbol = 'USDC' | 'SOL' | 'USDT';
 
 export interface GasdfClientOptions {
-  gatewayUrl: string; // e.g. "https://relay.gasdf.org" or "http://10.10.10.127:3000"
+  gatewayUrl: string; // e.g. "https://gasdf.talaria.build" or "http://10.10.10.127:3000"
   timeoutMs?: number;
 }
 

@@ -58,7 +58,7 @@ export function GasdfSubscriptionButton({
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<'idle' | 'preparing' | 'signing' | 'relaying'>('idle');
 
-  // 1. Rafraîchissement automatique du devis avec respect du TTL (45s)
+  // 1. Rafraîchissement automatique du devis avec respect du TTL (60s)
   useEffect(() => {
     let active = true;
 
@@ -72,7 +72,7 @@ export function GasdfSubscriptionButton({
     }
 
     fetchQuote();
-    const interval = setInterval(fetchQuote, 40_000); // refresh avant expiration 45s
+    const interval = setInterval(fetchQuote, 50_000); // refresh avant expiration 60s
     return () => {
       active = false;
       clearInterval(interval);

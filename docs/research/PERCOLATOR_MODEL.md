@@ -1,3 +1,5 @@
+> **Status: HISTORICAL.** Do not read as current state. Current truth: ARCHITECTURE.md + ROADMAP.md + ADR-002/003.
+
 # GASdf Percolator Model: Decentralized Gas-as-a-Service
 
 **Status:** Draft / Active Development

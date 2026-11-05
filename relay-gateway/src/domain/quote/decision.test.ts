@@ -31,12 +31,12 @@ test('quote domain: accepts valid quote within safe price impact and sets TTL', 
   assert.equal(decision.inputAmountFormatted, 4.54);
   assert.equal(decision.targetAsdfFormatted, 30000);
   assert.equal(decision.priceImpactPct, 0.45);
-  assert.equal(decision.ttlSeconds, 45);
-  assert.equal(decision.validUntil, now + 45000);
+  assert.equal(decision.ttlSeconds, 60);
+  assert.equal(decision.validUntil, now + 60000);
 
   // Expiration checks
   assert.equal(isQuoteExpired(decision, now + 10000), false);
-  assert.equal(isQuoteExpired(decision, now + 45000), true);
+  assert.equal(isQuoteExpired(decision, now + 60000), true);
   assert.equal(isQuoteExpired(decision, now + 50000), true);
 });
 

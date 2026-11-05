@@ -1,9 +1,9 @@
 # GASdf (Gasless $ASDF Relay)
 
 > **Zero-friction subscription payments for Solana dApps.**  
-> Users pay in **USDC, USDT, or SOL** without manual swaps. The relay sponsors network fees (zero SOL required) and atomically converts & burns the fee in **$ASDF** (`9zB5wECiLiFvBc1EGpDXFaRzThvNdThFQvd3APp6pump`).
+> Users pay in **USDC, USDT, or SOL** without manual swaps. The relay sponsors network fees (zero SOL required) and atomically converts & burns the fee in **$ASDF** (`9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump`).
 
-[![Public Relay](https://img.shields.io/badge/relay-relay.talaria.build-success)](https://relay.talaria.build/health)
+[![Public Relay](https://img.shields.io/badge/relay-gasdf.talaria.build-success)](https://gasdf.talaria.build/health)
 [![SDK Tests](https://img.shields.io/badge/sdk%20tests-70%2F70%20passing-brightgreen)](packages/sdk)
 [![Relay Tests](https://img.shields.io/badge/relay%20tests-38%2F38%20passing-brightgreen)](relay-gateway)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -27,8 +27,8 @@ GASdf is an autonomous, sovereign relay gateway:
 
 ## Production Endpoints
 
-- **Public Endpoint:** `https://relay.talaria.build`
-- **Health Check:** `https://relay.talaria.build/health`
+- **Public Endpoint:** `https://gasdf.talaria.build`
+- **Health Check:** `https://gasdf.talaria.build/health`
 - **Live Quote API:** `GET /subscription/quote/live?token=USDC&targetAsdf=30000`
 
 ---
@@ -49,7 +49,7 @@ npm install github:zeyxx/GASdf#sdk
 import { GasdfClient } from '@gasdf/sdk';
 
 const client = GasdfClient({
-  baseUrl: 'https://relay.talaria.build',
+  baseUrl: 'https://gasdf.talaria.build',
 });
 
 // 1. Fetch live quote

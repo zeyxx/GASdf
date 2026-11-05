@@ -20,7 +20,7 @@ Furthermore, true "Web2-style" recurring billing (automatic periodic debits with
 ## 2. Architecture & Delivery Phases
 
 ### Phase 1: 1-Click Atomic Subscription (Delivered & In Production)
-- **Status:** Active in `gasdf-sdk@2.0.1` and `relay-gateway` (`https://relay.talaria.build/`).
+- **Status:** Active in `gasdf-sdk@2.0.1` and `relay-gateway` (`https://gasdf.talaria.build/`).
 - **Signature Model:** 1 single on-chain signature from the user.
 - **Gas Model:** Gas sponsored by Kora Signer (`feePayer`). User pays 0 SOL.
 - **Settlement:** Atomic single-transaction execution bundling Jupiter DEX swap, destination payment/burn, and immediate closure of transient ATAs to reclaim rent in SOL (ADR-002).

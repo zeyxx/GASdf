@@ -4,7 +4,7 @@
  */
 
 export const ASDF_MINT = '9zB5wRarXMj86MymwLumSKA1Dx35zPqqKfcZtK1Spump';
-export const DEFAULT_QUOTE_TTL_SECONDS = 45; // 45s guarantee window
+export const DEFAULT_QUOTE_TTL_SECONDS = 60; // 60s guarantee window
 export const MAX_ALLOWED_PRICE_IMPACT_PCT = 2.5; // Max 2.5% price impact allowed
 
 export interface LiveQuoteRequest {
