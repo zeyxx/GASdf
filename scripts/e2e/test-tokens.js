@@ -6,7 +6,7 @@
  * Run: node scripts/e2e/test-tokens.js
  */
 
-const API_URL = process.env.API_URL || 'https://gasdf-43r8.onrender.com';
+const API_URL = process.env.API_URL || 'https://relay.talaria.build';
 
 const TOKENS = {
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',

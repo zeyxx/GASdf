@@ -6,7 +6,7 @@
  * Run: node scripts/e2e/test-quote-flow.js
  */
 
-const API_URL = process.env.API_URL || 'https://gasdf-43r8.onrender.com';
+const API_URL = process.env.API_URL || 'https://relay.talaria.build';
 
 // Test wallet (has $ASDF for tier testing)
 const TEST_WALLET = '3eW3WbKpWAu6aNAd3boubvfpXLfTbHzYZpVifNgDTRbn';

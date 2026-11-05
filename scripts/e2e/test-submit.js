@@ -8,7 +8,7 @@
  * Run: node scripts/e2e/test-submit.js
  */
 
-const API_URL = process.env.API_URL || 'https://gasdf-43r8.onrender.com';
+const API_URL = process.env.API_URL || 'https://relay.talaria.build';
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {

@@ -15,7 +15,7 @@ const tests = ['test-quote-flow.js', 'test-tokens.js', 'test-submit.js'];
 
 console.log('========================================');
 console.log('GASdf E2E Test Suite');
-console.log(`API: ${process.env.API_URL || 'https://gasdf-43r8.onrender.com'}`);
+console.log(`API: ${process.env.API_URL || 'https://relay.talaria.build'}`);
 console.log('========================================\n');
 
 let passed = 0;
