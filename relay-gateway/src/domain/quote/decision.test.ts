@@ -31,13 +31,23 @@ test('quote domain: accepts valid quote within safe price impact and sets TTL', 
   assert.equal(decision.inputAmountFormatted, 4.54);
   assert.equal(decision.targetAsdfFormatted, 30000);
   assert.equal(decision.priceImpactPct, 0.45);
-  assert.equal(decision.ttlSeconds, 60);
-  assert.equal(decision.validUntil, now + 60000);
+  // Explicit TTL override must take precedence over the 60s default.
+  assert.equal(decision.ttlSeconds, 45);
+  assert.equal(decision.validUntil, now + 45000);
 
-  // Expiration checks
+  // Expiration boundary for the 45s override.
   assert.equal(isQuoteExpired(decision, now + 10000), false);
-  assert.equal(isQuoteExpired(decision, now + 60000), true);
+  assert.equal(isQuoteExpired(decision, now + 44999), false);
+  assert.equal(isQuoteExpired(decision, now + 45000), true);
   assert.equal(isQuoteExpired(decision, now + 50000), true);
+
+  // No override: domain default stays 60s, as specified in the PRD.
+  const defaultDecision = decideLiveQuote(req, jupQuote, now);
+  assert.equal(defaultDecision.ttlSeconds, DEFAULT_QUOTE_TTL_SECONDS);
+  assert.equal(defaultDecision.ttlSeconds, 60);
+  assert.equal(defaultDecision.validUntil, now + 60000);
+  assert.equal(isQuoteExpired(defaultDecision, now + 59999), false);
+  assert.equal(isQuoteExpired(defaultDecision, now + 60000), true);
 });
 
 test('quote domain: rejects when price impact is too high (> 2.5%)', () => {

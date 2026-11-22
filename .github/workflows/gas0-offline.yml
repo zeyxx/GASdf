@@ -1,0 +1,41 @@
+name: GAS0 offline proof
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [relay-gateway, packages/sdk]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.component }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ matrix.component }}
+        run: npm ci
+      - name: Build or typecheck
+        working-directory: ${{ matrix.component }}
+        run: |
+          if [ "${{ matrix.component }}" = "relay-gateway" ]; then
+            npm run build
+          else
+            npm run typecheck
+          fi
+      - name: Unit tests only (no credentials or live endpoints)
+        working-directory: ${{ matrix.component }}
+        run: npm test
